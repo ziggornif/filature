@@ -5,4 +5,4 @@ edition.workspace = true
 
 [dependencies]
 thiserror.workspace = true
-rust_decimal.workspace = true
+rust_decimal = { version = "1", default-features = false, features = ["std"] }

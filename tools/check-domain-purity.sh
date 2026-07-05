@@ -6,11 +6,19 @@ set -euo pipefail
 
 # The ONLY deps crates/domain may have. Keep minimal — extend deliberately.
 #   thiserror     : domain error types
-#   rust_decimal  : money / precise weights without float drift
+#   rust_decimal  : money / precise weights without float drift (default-features
+#                   disabled in crates/domain/Cargo.toml so its `serde` feature,
+#                   and therefore serde itself, never enters the domain tree)
 #   time          : date/time TYPES only (Clock is an SPI; no now() in domain)
-ALLOW="thiserror|rust_decimal|time"
+#   arrayvec, num-traits : transitive, pure-computation deps of rust_decimal itself
+#                   (no framework/IO surface) — not independently added by domain.
+ALLOW="thiserror|rust_decimal|time|arrayvec|num-traits"
 
-BAD=$(cargo tree -p domain --prefix none --no-dedupe 2>/dev/null \
+# -e normal,no-proc-macro: only runtime deps, excluding proc-macro crates (e.g.
+# thiserror-impl and its own proc-macro2/quote/syn/unicode-ident chain) and
+# build-dependencies (e.g. autocfg) — those are compile-time only, not a
+# framework/IO surface the domain links against.
+BAD=$(cargo tree -p domain -e normal,no-proc-macro --prefix none --no-dedupe 2>/dev/null \
       | sed 's/ v[0-9].*//' | sort -u \
       | grep -vE "^(domain|std|core|alloc| *$|${ALLOW})" || true)
 
