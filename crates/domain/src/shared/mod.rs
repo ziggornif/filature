@@ -52,6 +52,9 @@ mod tests {
 
     #[test]
     fn grams_ratio_guards_zero_net() {
-        assert_eq!(Grams::new(5.0).unwrap().ratio_of(Grams::new(0.0).unwrap()), 0.0);
+        assert_eq!(
+            Grams::new(5.0).unwrap().ratio_of(Grams::new(0.0).unwrap()),
+            0.0
+        );
     }
 }

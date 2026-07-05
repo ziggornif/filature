@@ -1,0 +1,154 @@
+/* Design tokens — verbatim from init_assets/design_handoff_filature/README.md
+   §Design Tokens (Couleurs claire/sombre). Foundation wires the tokens + the
+   minimal sidebar/content shell layout; per-screen styling belongs to the
+   slices that own those screens. */
+
+:root {
+  /* Dark values as the OS-default fallback (prefers-color-scheme below
+     narrows this further); html[data-theme] always wins when set. */
+  --bg: #211f1c;
+  --surface: #282521;
+  --raised: #302d28;
+  --border: #39352f;
+  --border-strong: #4a453d;
+  --text: #ece7df;
+  --muted: #a49c8f;
+  --faint: #736c60;
+  --active-bg: #332f29;
+  --hover-bg: #38342d;
+  --accent: #6b7686;
+  --accent-fg: #ffffff;
+  --ok: #5aa86b;
+  --ok-bg: #25352a;
+  --warn: #c9922f;
+  --warn-bg: #38301f;
+  --danger: #d6584a;
+  --danger-bg: #3a2723;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ece8e1;
+    --surface: #f6f3ee;
+    --raised: #fffefb;
+    --border: #e2dcd0;
+    --border-strong: #cec6b7;
+    --text: #282520;
+    --muted: #6d675c;
+    --faint: #9b9284;
+    --active-bg: #e4ded2;
+    --hover-bg: #ebe5da;
+    --accent: #5b5563;
+    --accent-fg: #ffffff;
+    --ok: #3f7d4e;
+    --ok-bg: #e3efe3;
+    --warn: #a06f1c;
+    --warn-bg: #f2e8d6;
+    --danger: #b23a2e;
+    --danger-bg: #f3e0da;
+    --shadow: 0 1px 2px rgba(40, 35, 25, 0.05), 0 1px 1px rgba(40, 35, 25, 0.03);
+  }
+}
+
+html[data-theme="light"] {
+  --bg: #ece8e1;
+  --surface: #f6f3ee;
+  --raised: #fffefb;
+  --border: #e2dcd0;
+  --border-strong: #cec6b7;
+  --text: #282520;
+  --muted: #6d675c;
+  --faint: #9b9284;
+  --active-bg: #e4ded2;
+  --hover-bg: #ebe5da;
+  --accent: #5b5563;
+  --accent-fg: #ffffff;
+  --ok: #3f7d4e;
+  --ok-bg: #e3efe3;
+  --warn: #a06f1c;
+  --warn-bg: #f2e8d6;
+  --danger: #b23a2e;
+  --danger-bg: #f3e0da;
+  --shadow: 0 1px 2px rgba(40, 35, 25, 0.05), 0 1px 1px rgba(40, 35, 25, 0.03);
+}
+
+html[data-theme="dark"] {
+  --bg: #211f1c;
+  --surface: #282521;
+  --raised: #302d28;
+  --border: #39352f;
+  --border-strong: #4a453d;
+  --text: #ece7df;
+  --muted: #a49c8f;
+  --faint: #736c60;
+  --active-bg: #332f29;
+  --hover-bg: #38342d;
+  --accent: #6b7686;
+  --accent-fg: #ffffff;
+  --ok: #5aa86b;
+  --ok-bg: #25352a;
+  --warn: #c9922f;
+  --warn-bg: #38301f;
+  --danger: #d6584a;
+  --danger-bg: #3a2723;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+}
+
+.sidebar {
+  width: 216px;
+  flex: 0 0 216px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+}
+
+.sidebar .wordmark {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 15px;
+  letter-spacing: 0.16em;
+  padding: 0 20px 16px;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar nav a {
+  padding: 10px 20px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.sidebar nav a:hover {
+  background: var(--hover-bg);
+  color: var(--text);
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  padding: 12px 20px 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.content {
+  flex: 1;
+  padding: 28px;
+}

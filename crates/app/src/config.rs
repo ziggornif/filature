@@ -29,6 +29,9 @@ pub struct I18nConfig {
 impl Config {
     /// TOML file (if present) with FILATURE_ env overrides (double underscore = nesting,
     /// e.g. FILATURE_SERVER__BIND=0.0.0.0:9000).
+    // `figment::Error` is inherently large (it carries rich error context); this runs
+    // once at startup, not on a hot path, so boxing it would add ceremony for no gain.
+    #[allow(clippy::result_large_err)]
     pub fn load(toml_path: &str) -> Result<Self, figment::Error> {
         Figment::new()
             .merge(Toml::file(toml_path))
@@ -42,6 +45,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::result_large_err)]
     fn env_overrides_toml() {
         figment::Jail::expect_with(|jail| {
             jail.create_file(
