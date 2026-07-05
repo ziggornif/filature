@@ -55,6 +55,11 @@ Add/Edit form (weigh→tare→net live calc — the key gesture) · Materials ta
 
 ## Deltas from the handoff
 
+- **htmx via CDN (not embedded).** htmx is loaded from jsdelivr with an SRI
+  `integrity` hash + `crossorigin`, rather than vendored into the binary. This is
+  a deliberate runtime network dependency on the frontend (trades offline
+  self-sufficiency for a lighter binary + browser CDN caching). Self-hosted woff2
+  fonts stay embedded; only htmx is CDN-loaded.
 - **i18n (ADR-0001).** The handoff assumed a French UI; the real UI is
   internationalised (en + fr shipped, extensible). No hardcoded strings — every
   user-facing label comes from a per-locale catalog. htmx fragments must render
