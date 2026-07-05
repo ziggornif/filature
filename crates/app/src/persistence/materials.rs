@@ -20,13 +20,13 @@ impl SqlxMaterialRepository {
     }
 }
 
-/// A UNIQUE violation on `materials.name` becomes `Duplicate`; anything else
-/// is an opaque `Backend` error (the domain never sees SQL details).
-fn backend(e: sqlx::Error) -> RepositoryError {
+/// A UNIQUE violation on `materials.name` becomes `Duplicate(name)`; anything
+/// else is an opaque `Backend` error (the domain never sees SQL details).
+fn backend(e: sqlx::Error, name: &str) -> RepositoryError {
     if let sqlx::Error::Database(db) = &e
         && db.is_unique_violation()
     {
-        return RepositoryError::Duplicate(String::new());
+        return RepositoryError::Duplicate(name.to_string());
     }
     RepositoryError::Backend(e.to_string())
 }
@@ -41,7 +41,7 @@ impl MaterialRepository for SqlxMaterialRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(backend)?;
+        .map_err(|e| backend(e, ""))?;
 
         rows.into_iter()
             .map(|r| {
@@ -80,10 +80,7 @@ impl MaterialRepository for SqlxMaterialRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| match backend(e) {
-            RepositoryError::Duplicate(_) => RepositoryError::Duplicate(m.name.clone()),
-            other => other,
-        })?;
+        .map_err(|e| backend(e, &m.name))?;
 
         Ok(Material {
             id: MaterialId::new(id),
@@ -113,7 +110,7 @@ impl MaterialRepository for SqlxMaterialRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(backend)?;
+        .map_err(|e| backend(e, &m.name))?;
         Ok(m)
     }
 
@@ -124,7 +121,7 @@ impl MaterialRepository for SqlxMaterialRepository {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(backend)?;
+        .map_err(|e| backend(e, ""))?;
         Ok(row.exists)
     }
 }
