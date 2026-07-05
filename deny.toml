@@ -1,0 +1,30 @@
+# cargo-deny config — advisory + license + ban policy. Run: cargo deny check
+# Doubles as a security sensor (RustSec advisories). See docs/security/.
+
+[advisories]
+version = 2
+yanked = "deny"
+# ignore = []   # add "RUSTSEC-YYYY-NNNN" with a justification only when accepted in docs/security/accepted-risks.md
+
+[licenses]
+version = 2
+# Permissive licenses acceptable for a self-hosted binary. Extend as real deps land.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Unicode-3.0",
+  "Zlib",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"       # no `version = "*"` deps
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

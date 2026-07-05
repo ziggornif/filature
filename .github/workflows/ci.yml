@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"   # weekly advisory scan against unchanged code
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SQLX_OFFLINE: "true"     # build/clippy use checked-in .sqlx metadata, no live DB
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Domain purity check (hexagonal dependency rule)
+        run: bash tools/check-domain-purity.sh
+      - name: Slice isolation check (no slice imports a sibling slice)
+        run: bash tools/check-slice-isolation.sh
+
+  test-unit:
+    runs-on: ubuntu-latest
+    needs: [format, lint]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # domain unit tests + use-case tests via SPI stubs (stubs behind a feature)
+      - run: cargo test --workspace --lib --all-features
+
+  test-integration:
+    runs-on: ubuntu-latest
+    needs: [format, lint]
+    # No service container: SPI adapter tests run against in-memory SQLite (embedded).
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --test 'it_*'   # integration test files: it_*.rs
+
+  test-e2e:
+    runs-on: ubuntu-latest
+    needs: [test-integration]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --test 'e2e_*'  # e2e test files: e2e_*.rs
+
+  advisory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@cargo-deny
+      - run: cargo deny check
