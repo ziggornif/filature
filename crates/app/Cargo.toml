@@ -15,7 +15,7 @@ tower-http = { version = "0.6", features = ["trace"] }
 tera = "1"
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "macros", "migrate"] }
 rust-embed = "8"
-figment = { version = "0.10", features = ["toml", "env"] }
+figment = { version = "0.10", features = ["toml", "env", "test"] }
 serde.workspace = true
 serde_json.workspace = true
 rust_decimal.workspace = true
