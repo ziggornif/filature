@@ -3,6 +3,10 @@ name = "filature"
 version = "0.1.0"
 edition.workspace = true
 
+[lib]
+name = "filature"
+path = "src/lib.rs"
+
 [[bin]]
 name = "filature"
 path = "src/main.rs"
