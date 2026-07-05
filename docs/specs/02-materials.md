@@ -161,4 +161,4 @@ by name), so it never overwrites an edited material on restart.
 - Architecture: `docs/architecture.md` (slice inventory, key constraints)
 - ADRs: 0001 (EN code / i18n UI), 0002 (crate structure), 0003 (PostgreSQL)
 - Design handoff §6: `init_assets/design_handoff_filature/README.md`
-- Prior slice: `docs/specs/foundation.md`
+- Prior slice: `docs/specs/01-foundation.md`
