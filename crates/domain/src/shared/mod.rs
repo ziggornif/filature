@@ -26,11 +26,7 @@ impl Grams {
     }
     /// Remaining as a fraction of an initial (net) weight, 0.0..=1.0+.
     pub fn ratio_of(self, net: Grams) -> f64 {
-        if net.0 <= 0.0 {
-            0.0
-        } else {
-            self.0 / net.0
-        }
+        if net.0 <= 0.0 { 0.0 } else { self.0 / net.0 }
     }
 }
 

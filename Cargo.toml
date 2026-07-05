@@ -1,9 +1,9 @@
 [workspace]
-resolver = "2"
+resolver = "3"
 members = ["crates/domain", "crates/app"]
 
 [workspace.package]
-edition = "2021"
+edition = "2024"
 license = "MIT"
 
 [workspace.dependencies]
