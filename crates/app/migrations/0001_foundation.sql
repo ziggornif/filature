@@ -1,6 +1,6 @@
--- Foundation migration — empty seam.
+-- Foundation migration — empty seam (PostgreSQL, ADR-0003).
 -- Establishes the migrations baseline (the _sqlx_migrations table + ordering)
 -- so slices can add their own numbered migrations after it. No domain tables
 -- yet: materials, spools and locations arrive with their own slices.
--- (Foreign-key enforcement is per-connection and set in code via
---  SqliteConnectOptions::foreign_keys(true), so no PRAGMA is needed here.)
+-- (Postgres enforces foreign keys by default per table constraint — there is
+--  no per-connection PRAGMA to set, unlike SQLite.)
