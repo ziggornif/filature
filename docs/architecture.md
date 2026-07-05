@@ -3,9 +3,10 @@
 > High-level overview: topology, key structural decisions, context for ADRs.
 > Hard-to-reverse, surprising, trade-off decisions go in `docs/adr/` instead.
 
-Filament stock manager. Single self-hosted binary + SQLite. Hexagonal (ports &
-adapters) with vertical slices. Stack fixed by the source brief: Axum, SQLx
-(SQLite), Tera, htmx, Tokio. Terms are the glossary's canonical English names.
+Filament stock manager. Self-hosted binary backed by PostgreSQL
+([ADR-0003](adr/0003-postgresql-persistence.md); supersedes the brief's SQLite).
+Hexagonal (ports & adapters) with vertical slices. Stack: Axum, SQLx (Postgres),
+Tera, htmx, Tokio. Terms are the glossary's canonical English names.
 
 ## Topology
 
@@ -36,9 +37,12 @@ crates/
         └── assets/            # embedded templates, htmx, CSS, fonts, migrations
 ```
 
-Single binary holds: embedded migrations + static assets (htmx, CSS, self-hosted
-woff2 fonts, templates) + translation catalogs. SQLite in WAL mode. Config = TOML
-file, env overrides. Backup = file copy (litestream later).
+Single binary holds: embedded migrations + static assets (CSS, self-hosted woff2
+fonts, templates) + translation catalogs. **htmx is loaded from a CDN** (jsdelivr,
+with SRI integrity) rather than embedded — the one deliberate runtime network
+dependency on the frontend. Persistence is **PostgreSQL** (external service, the
+only backend dependency; [ADR-0003](adr/0003-postgresql-persistence.md)). Config =
+TOML file, env overrides. Backup = `pg_dump` / managed Postgres.
 
 ## Key constraints
 
@@ -83,7 +87,7 @@ slice→slice `use`.
 
 ## Composition root
 
-`crates/app/src/main.rs`: load config → open SQLite (WAL) → run embedded
+`crates/app/src/main.rs`: load config → connect Postgres pool → run embedded
 migrations → seed materials → build the SQLx repo structs → inject them (as
 `Arc<dyn …Repository>`) plus `Clock`/`IdGenerator` into each slice's use cases →
 build the Axum router (driving adapter) with the Tera engine, i18n middleware,
@@ -104,8 +108,9 @@ Maps to the layers (see the hexagonal skill):
 - **Domain unit tests** — pure, no mocks: length↔weight, ratio, status transitions
   (remaining→0 ⇒ Empty), stock value, low-stock threshold.
 - **Use-case tests** — through SPI stubs in `crates/domain` (`stubs` feature).
-- **Persistence (SPI) integration tests** — against an in-memory SQLite per slice
-  (brief §6; SQLite is embedded, so no Testcontainers needed).
+- **Persistence (SPI) integration tests** — against a real PostgreSQL via
+  **Testcontainers** (Docker), per slice — test the engine you ship
+  ([ADR-0003](adr/0003-postgresql-persistence.md)).
 - **Template render tests** — every Tera page + htmx fragment rendered with a
   representative context, in the default and at least one non-default locale, so
   missing i18n keys and Tera variable typos fail at `cargo test` (brief §6 +

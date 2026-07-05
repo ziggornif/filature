@@ -1,5 +1,11 @@
 # Foundation Implementation Plan
 
+> **Historical artifact.** This plan targeted SQLite; during PR-1 review the DB was
+> switched to **PostgreSQL** ([ADR-0003](../../adr/0003-postgresql-persistence.md))
+> and htmx moved to a CDN. The shipped foundation reflects those decisions — read
+> `docs/specs/foundation.md` + the ADRs for the current contract, not the SQLite
+> details below.
+>
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A running single-binary Filature app that boots (config → SQLite/WAL → migrations), embeds all assets, and serves the app-shell (sidebar layout) in light/dark themes and en/fr locales — the substrate every domain slice plugs into.

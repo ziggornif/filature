@@ -1,16 +1,18 @@
+mod support;
+
 use axum::body::to_bytes;
-use axum::http::{header, Request, StatusCode};
+use axum::http::{Request, StatusCode, header};
 use filature::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
 use filature::{persistence, web};
 use tower::ServiceExt; // oneshot
 
-fn test_config() -> Config {
+fn test_config(database_url: &str) -> Config {
     Config {
         server: ServerConfig {
             bind: "127.0.0.1:0".into(),
         },
         database: DatabaseConfig {
-            url: "sqlite::memory:".into(),
+            url: database_url.into(),
         },
         i18n: I18nConfig {
             default_locale: "en".into(),
@@ -19,10 +21,9 @@ fn test_config() -> Config {
 }
 
 async fn app() -> axum::Router {
-    let db = persistence::connect_and_migrate("sqlite::memory:")
-        .await
-        .unwrap();
-    web::router(web::AppState::new(db, &test_config()))
+    let url = support::postgres_url().await;
+    let db = persistence::connect_and_migrate(&url).await.unwrap();
+    web::router(web::AppState::new(db, &test_config(&url)))
 }
 
 #[tokio::test]

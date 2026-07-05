@@ -69,8 +69,10 @@ first; revisit the humidity differentiator when sensors exist.
    itself against Spoolman on data-entry quality alone.
    **Cheapest test:** the add/edit weigh→tare→net flow and inline weight edit
    must feel like a ~10-second gesture — validate by using it for real spools.
-2. **Single self-hosted operator, single binary + SQLite is enough.** No
-   multi-user, no concurrency beyond one person. Low risk given scope.
+2. **Single self-hosted operator is enough.** No multi-user, no concurrency
+   beyond one person. Low risk given scope. (Persistence is PostgreSQL in the
+   deployed env — [ADR-0003](../adr/0003-postgresql-persistence.md); the binary
+   stays self-sufficient for everything except the database.)
 3. *(deferred)* **The humidity differentiator works end-to-end and is
    actionable** (SHT31 → MQTT → per-material threshold status). Untestable until
    sensors exist. A throwaway spike (`rumqttc` subscribe → status vs threshold)
@@ -95,8 +97,8 @@ slice will read), but nothing consumes it in v1.
 
 **Out (explicit — the rework firewall):** per-job consumption tracking, per-print
 material cost, per-machine history, PDF/CSV export, multi-user/auth, mobile
-native app, litestream/S3 backup (file copy for now), any npm/JS build beyond
-htmx.
+native app, automated backup tooling (rely on Postgres `pg_dump`/managed backups
+for now), any npm/JS build beyond htmx.
 
 ## Proposed features (hypotheses)
 
