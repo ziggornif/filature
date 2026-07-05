@@ -42,7 +42,6 @@ _AI-generated brief. Origin: orchestrator harness, phase 4._
 - Authentication, multi-user, backups.
 
 **References:**
-- Plan: `docs/superpowers/plans/2026-07-05-foundation.md` (detailed TDD steps)
 - Product brief: `docs/product/brief.md`
 - Architecture: `docs/architecture.md` · ADRs: `docs/adr/0001-language-and-i18n.md`, `docs/adr/0002-crate-structure.md`
 - Design (shell/tokens): `docs/design.md` + `init_assets/design_handoff_filature/README.md`
