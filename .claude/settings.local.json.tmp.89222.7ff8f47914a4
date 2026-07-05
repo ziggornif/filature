@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rtk ls *)",
+      "Bash(rtk read *)",
+      "Bash(rtk git *)",
+      "Bash(command -v gh)",
+      "Bash(echo \"gh: $\\(command -v gh || echo none\\)\")",
+      "Bash(command -v glab)",
+      "Bash(echo \"glab: $\\(command -v glab || echo none\\)\")",
+      "Bash(gh auth *)",
+      "Bash(glab auth *)",
+      "Bash(rtk gh *)",
+      "Read(//home/ziggornif/.claude/projects/-home-ziggornif-Workspace-filature/memory/**)",
+      "Bash(chmod +x /home/ziggornif/Workspace/filature/tools/check-domain-purity.sh /home/ziggornif/Workspace/filature/tools/check-slice-isolation.sh)",
+      "Bash(bash /home/ziggornif/Workspace/filature/tools/check-slice-isolation.sh)",
+      "Bash(rtk npx *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}
