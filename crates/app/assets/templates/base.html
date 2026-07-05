@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="{{ locale }}"{% if theme_attr %} data-theme="{{ theme_attr }}"{% endif %}>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ t(key="app.name") }}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="wordmark">{{ t(key="app.name") }}</div>
+    <nav>
+      <a href="/">{{ t(key="nav.dashboard") }}</a>
+      <a href="/spools">{{ t(key="nav.spools") }}</a>
+      <a href="/materials">{{ t(key="nav.materials") }}</a>
+    </nav>
+    <div class="sidebar-foot">{{ t(key="shell.tagline") }}</div>
+  </aside>
+  <main class="content">
+    {% block content %}{% endblock content %}
+  </main>
+</body>
+</html>

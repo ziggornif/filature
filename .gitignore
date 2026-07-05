@@ -19,3 +19,7 @@ Cargo.lock.orig
 *.swp
 .idea/
 .vscode/
+
+# Claude Code local settings + transient temp files
+.claude/settings.local.json
+.claude/*.tmp.*

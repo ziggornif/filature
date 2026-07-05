@@ -1,0 +1,8 @@
+{
+  "app.name": "Filature",
+  "nav.dashboard": "Tableau de bord",
+  "nav.spools": "Bobines",
+  "nav.humidity": "Humidité",
+  "nav.materials": "Matériaux",
+  "shell.tagline": "Zig Factory · auto-hébergé"
+}

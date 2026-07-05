@@ -1,0 +1,8 @@
+{
+  "app.name": "Filature",
+  "nav.dashboard": "Dashboard",
+  "nav.spools": "Spools",
+  "nav.humidity": "Humidity",
+  "nav.materials": "Materials",
+  "shell.tagline": "Zig Factory · self-hosted"
+}
