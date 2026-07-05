@@ -54,7 +54,7 @@ mod tests {
                 [server]
                 bind = "127.0.0.1:8080"
                 [database]
-                url = "sqlite://filature.db"
+                url = "postgres://localhost/filature"
                 [i18n]
                 default_locale = "fr"
                 "#,
