@@ -1,8 +1,7 @@
 use crate::web::i18n::Catalog;
 use rust_embed::RustEmbed;
-use std::collections::HashMap;
 use std::sync::Arc;
-use tera::{Context, Tera, Value};
+use tera::{Context, Kwargs, State, Tera, TeraResult};
 
 #[derive(RustEmbed)]
 #[folder = "assets/templates"]
@@ -17,13 +16,33 @@ pub struct Renderer {
 impl Renderer {
     pub fn new(catalog: Catalog) -> Self {
         let mut tera = Tera::default();
-        let mut raw: Vec<(String, String)> = Vec::new();
-        for name in TemplateAssets::iter() {
-            let bytes = TemplateAssets::get(name.as_ref()).unwrap().data;
-            raw.push((name.to_string(), String::from_utf8(bytes.to_vec()).unwrap()));
-        }
+
+        // Tera 2 validates at add-time that every function a template calls is
+        // already registered, so `t` must be wired up *before* the embedded
+        // templates are loaded (v1 -> v2: registration order is no longer
+        // "whenever", it's "before add_raw_template(s)"). The closure reads the
+        // active locale back out of the per-render `State` (bound via
+        // `ctx.insert("locale", ...)` in `render`), so — unlike the old
+        // per-render `Tera` clone this replaces — the engine is built once.
+        let t_catalog = catalog.clone();
+        tera.register_function(
+            "t",
+            move |kwargs: Kwargs, state: &State| -> TeraResult<String> {
+                let key = kwargs.must_get::<&str>("key")?;
+                let locale = state.get::<String>("locale")?.unwrap_or_default();
+                Ok(t_catalog.t(&locale, key))
+            },
+        );
+
+        let raw: Vec<(String, String)> = TemplateAssets::iter()
+            .map(|name| {
+                let bytes = TemplateAssets::get(name.as_ref()).unwrap().data;
+                (name.to_string(), String::from_utf8(bytes.to_vec()).unwrap())
+            })
+            .collect();
         tera.add_raw_templates(raw.iter().map(|(n, s)| (n.as_str(), s.as_str())))
             .expect("templates compile");
+
         Self {
             tera: Arc::new(tera),
             catalog,
@@ -36,7 +55,9 @@ impl Renderer {
         self.catalog.has_locale(locale)
     }
 
-    /// Render `template` with a per-request locale + theme; registers a locale-bound `t`.
+    /// Render `template` with a per-request locale + theme; `t(key=...)` reads
+    /// the locale back out of this context (function registered once, at
+    /// construction — see `new`).
     pub fn render(
         &self,
         template: &str,
@@ -46,28 +67,7 @@ impl Renderer {
     ) -> Result<String, tera::Error> {
         ctx.insert("locale", locale);
         ctx.insert("theme_attr", theme_attr);
-        // Bind a `t(key=...)` Tera function to this locale.
-        // NOTE: this deep-clones the whole Tera engine per render so the closure
-        // can capture the request locale. The cost is O(all templates registered
-        // in the engine), not local to this render — it grows with the entire
-        // template set, not the one page. Cheap at foundation scale (a couple of
-        // templates). Revisit — pass the locale through the Tera context and read
-        // it in the function instead — when htmx fragments multiply the template
-        // count, not merely if profiling flags it.
-        let catalog = self.catalog.clone();
-        let locale_owned = locale.to_string();
-        let mut tera = (*self.tera).clone();
-        tera.register_function(
-            "t",
-            move |args: &HashMap<String, Value>| -> tera::Result<Value> {
-                let key = args
-                    .get("key")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| tera::Error::msg("t() needs a `key`"))?;
-                Ok(Value::String(catalog.t(&locale_owned, key)))
-            },
-        );
-        tera.render(template, &ctx)
+        self.tera.render(template, &ctx)
     }
 }
 
