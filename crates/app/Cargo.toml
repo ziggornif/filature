@@ -33,6 +33,7 @@ ulid = "1"
 async-trait = "0.1"
 
 [dev-dependencies]
+domain = { path = "../domain", features = ["stubs"] }
 tower = "0.5"
 testcontainers = "0.27"
 testcontainers-modules = { version = "0.15", features = ["postgres"] }
