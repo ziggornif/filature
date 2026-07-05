@@ -35,6 +35,12 @@ jobs:
         run: bash tools/check-domain-purity.sh
       - name: Slice isolation check (no slice imports a sibling slice)
         run: bash tools/check-slice-isolation.sh
+      - name: Harness layout check (no docs/superpowers/ tree)
+        run: |
+          test ! -d docs/superpowers || {
+            echo "::error::docs/superpowers/ is forbidden by the harness convention. Slice docs live in docs/specs/<NN>-<slice>.md (the agent-brief); brainstorming design and writing-plans plans are ephemeral working steps, not persisted files. Delete docs/superpowers/ and fold its content into the slice's agent-brief."
+            exit 1
+          }
 
   test-unit:
     runs-on: ubuntu-latest
