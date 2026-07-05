@@ -732,7 +732,7 @@ mod tests {
     }
 }
 ```
-> NOTE: cloning `Tera` per render to bind a locale-specific `t` is simple and correct for this scale. If profiling ever shows it hot, switch to passing locale through the Tera context and a function that reads it — deferred (YAGNI).
+> NOTE: cloning `Tera` per render to bind a locale-specific `t` is simple and correct for this scale. The clone cost is O(all templates registered in the engine) — it grows with the whole template set, not the single page rendered. Revisit — switch to passing locale through the Tera context and a function that reads it — when htmx fragments multiply the template count, not merely if profiling flags it (deferred, YAGNI).
 
 - [ ] **Step 4: Run the tests**
 

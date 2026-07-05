@@ -60,3 +60,23 @@ async fn index_honours_lang_cookie() {
     let html = String::from_utf8(body.to_vec()).unwrap();
     assert!(html.contains("Tableau de bord")); // fr via cookie
 }
+
+#[tokio::test]
+async fn unknown_lang_cookie_falls_back_to_default() {
+    let res = app()
+        .await
+        .oneshot(
+            Request::builder()
+                .uri("/")
+                .header(header::COOKIE, "lang=zz")
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let body = to_bytes(res.into_body(), 1 << 20).await.unwrap();
+    let html = String::from_utf8(body.to_vec()).unwrap();
+    assert!(html.contains(r#"lang="en""#)); // bogus locale => default en
+    assert!(!html.contains(r#"lang="zz""#));
+    assert!(html.contains("Dashboard"));
+}

@@ -40,8 +40,12 @@ impl AppState {
 }
 
 /// Resolve locale from the `lang` cookie, else the configured default.
-fn resolve_locale(headers: &HeaderMap, default: &str) -> String {
-    read_cookie(headers, "lang").unwrap_or_else(|| default.to_string())
+/// An unknown cookie locale (no catalog for it) falls back to the default, so a
+/// bogus `lang=zz` never reaches the `lang` attribute or the `t` lookups.
+fn resolve_locale(headers: &HeaderMap, st: &AppState) -> String {
+    read_cookie(headers, "lang")
+        .filter(|loc| st.renderer.knows_locale(loc))
+        .unwrap_or_else(|| st.default_locale.clone())
 }
 fn resolve_theme(headers: &HeaderMap) -> Theme {
     Theme::from_cookie(read_cookie(headers, "theme").as_deref())
@@ -55,7 +59,7 @@ fn read_cookie(headers: &HeaderMap, name: &str) -> Option<String> {
 }
 
 async fn index(State(st): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
-    let locale = resolve_locale(&headers, &st.default_locale);
+    let locale = resolve_locale(&headers, &st);
     let theme = resolve_theme(&headers);
     match st
         .renderer

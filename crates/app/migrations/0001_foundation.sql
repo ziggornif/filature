@@ -1,4 +1,6 @@
--- Foundation migration. Domain tables are added by their slices
--- (materials, spools, locations) as later numbered migrations.
--- This file establishes the migrations table + ordering baseline.
-PRAGMA foreign_keys = ON;
+-- Foundation migration — empty seam.
+-- Establishes the migrations baseline (the _sqlx_migrations table + ordering)
+-- so slices can add their own numbered migrations after it. No domain tables
+-- yet: materials, spools and locations arrive with their own slices.
+-- (Foreign-key enforcement is per-connection and set in code via
+--  SqliteConnectOptions::foreign_keys(true), so no PRAGMA is needed here.)

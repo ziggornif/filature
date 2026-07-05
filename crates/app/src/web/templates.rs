@@ -30,6 +30,12 @@ impl Renderer {
         }
     }
 
+    /// Whether the i18n catalog carries this locale (used to validate a requested
+    /// locale before rendering — an unknown one falls back to the default).
+    pub fn knows_locale(&self, locale: &str) -> bool {
+        self.catalog.has_locale(locale)
+    }
+
     /// Render `template` with a per-request locale + theme; registers a locale-bound `t`.
     pub fn render(
         &self,
@@ -41,6 +47,13 @@ impl Renderer {
         ctx.insert("locale", locale);
         ctx.insert("theme_attr", theme_attr);
         // Bind a `t(key=...)` Tera function to this locale.
+        // NOTE: this deep-clones the whole Tera engine per render so the closure
+        // can capture the request locale. The cost is O(all templates registered
+        // in the engine), not local to this render — it grows with the entire
+        // template set, not the one page. Cheap at foundation scale (a couple of
+        // templates). Revisit — pass the locale through the Tera context and read
+        // it in the function instead — when htmx fragments multiply the template
+        // count, not merely if profiling flags it.
         let catalog = self.catalog.clone();
         let locale_owned = locale.to_string();
         let mut tera = (*self.tera).clone();
@@ -86,12 +99,26 @@ mod tests {
     }
 
     #[test]
-    fn missing_i18n_key_would_surface() {
-        // A template referencing an undefined key renders the key verbatim,
-        // so render tests catch typos at `cargo test`, not in prod (brief §6).
+    fn defined_keys_do_not_leak_raw() {
+        // The shell references only defined keys, so no raw key must appear.
         let html = renderer()
             .render("index.html", "en", "", Context::new())
             .unwrap();
         assert!(!html.contains("nav.dashboard")); // the raw key must NOT leak
+    }
+
+    #[test]
+    fn undefined_key_surfaces_verbatim_through_render() {
+        // Exercise the actual `t` fallback path at the render layer: an UNKNOWN
+        // key must render as itself, so template typos fail at `cargo test`,
+        // not in prod (brief §6). This proves the fallback the whole i18n
+        // design rests on, which the shell templates never trigger.
+        let mut r = renderer();
+        Arc::get_mut(&mut r.tera)
+            .unwrap()
+            .add_raw_template("probe.html", r#"{{ t(key="does.not.exist") }}"#)
+            .unwrap();
+        let html = r.render("probe.html", "en", "", Context::new()).unwrap();
+        assert!(html.contains("does.not.exist"));
     }
 }
