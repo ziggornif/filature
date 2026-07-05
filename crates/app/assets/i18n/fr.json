@@ -4,5 +4,19 @@
   "nav.spools": "Bobines",
   "nav.humidity": "Humidité",
   "nav.materials": "Matériaux",
-  "shell.tagline": "Zig Factory · auto-hébergé"
+  "shell.tagline": "Zig Factory · auto-hébergé",
+  "materials.title": "Matériaux",
+  "materials.col.material": "Matériau",
+  "materials.col.density": "Densité (g/cm³)",
+  "materials.col.drying": "Séchage",
+  "materials.col.temp": "Temp (°C)",
+  "materials.col.time": "Temps (h)",
+  "materials.col.sensitivity": "Sensibilité",
+  "materials.col.threshold": "Seuil %HR",
+  "materials.col.nozzle": "Buse (°C)",
+  "materials.col.bed": "Plateau (°C)",
+  "materials.sensitivity.low": "Faible",
+  "materials.sensitivity.medium": "Moyenne",
+  "materials.sensitivity.high": "Élevée",
+  "materials.add": "Ajouter un matériau"
 }

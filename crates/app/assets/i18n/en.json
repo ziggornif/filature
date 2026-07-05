@@ -4,5 +4,19 @@
   "nav.spools": "Spools",
   "nav.humidity": "Humidity",
   "nav.materials": "Materials",
-  "shell.tagline": "Zig Factory · self-hosted"
+  "shell.tagline": "Zig Factory · self-hosted",
+  "materials.title": "Materials",
+  "materials.col.material": "Material",
+  "materials.col.density": "Density (g/cm³)",
+  "materials.col.drying": "Drying",
+  "materials.col.temp": "Temp (°C)",
+  "materials.col.time": "Time (h)",
+  "materials.col.sensitivity": "Sensitivity",
+  "materials.col.threshold": "RH threshold",
+  "materials.col.nozzle": "Nozzle (°C)",
+  "materials.col.bed": "Bed (°C)",
+  "materials.sensitivity.low": "Low",
+  "materials.sensitivity.medium": "Medium",
+  "materials.sensitivity.high": "High",
+  "materials.add": "Add material"
 }
