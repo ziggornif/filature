@@ -23,7 +23,8 @@ confidence-threshold = 0.9
 
 [bans]
 multiple-versions = "warn"
-wildcards = "deny"       # no `version = "*"` deps
+wildcards = "deny"            # no `version = "*"` deps...
+allow-wildcard-paths = true  # ...except intra-workspace path deps (domain), which are legitimately versionless
 
 [sources]
 unknown-registry = "deny"
