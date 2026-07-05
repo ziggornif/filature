@@ -29,6 +29,8 @@ thiserror.workspace = true
 mime_guess = "2"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+ulid = "1"
+async-trait = "0.1"
 
 [dev-dependencies]
 tower = "0.5"

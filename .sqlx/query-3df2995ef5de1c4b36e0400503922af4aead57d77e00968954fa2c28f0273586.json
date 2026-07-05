@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE materials SET\n                 name=$2, density=$3, drying_temp_c=$4, drying_time_h=$5,\n                 sensitivity=$6, nozzle_c=$7, bed_c=$8\n               WHERE id=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Float8",
+        "Int4",
+        "Int4",
+        "Text",
+        "Int4",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3df2995ef5de1c4b36e0400503922af4aead57d77e00968954fa2c28f0273586"
+}

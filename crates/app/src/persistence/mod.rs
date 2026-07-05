@@ -1,6 +1,8 @@
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 
+pub mod materials;
+
 pub type Db = Pool<Postgres>;
 
 /// Open the pool and run embedded migrations.
