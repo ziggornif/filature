@@ -3,28 +3,36 @@ use crate::persistence::Db;
 use crate::web::i18n::Catalog;
 use crate::web::templates::Renderer;
 use domain::materials::MaterialsUseCases;
+use domain::spools::SpoolsUseCases;
 use std::sync::Arc;
 
-/// Wires the DB pool + renderer + default locale + materials use cases into
-/// the driving (Axum) adapter. Cloned per request by Axum's `State`
-/// extractor — cheap: the pool is a handle, the renderer's `Tera` engine is
-/// `Arc`-shared, and `materials` is an `Arc<dyn _>`.
+/// Wires the DB pool + renderer + default locale + materials/spools use
+/// cases into the driving (Axum) adapter. Cloned per request by Axum's
+/// `State` extractor — cheap: the pool is a handle, the renderer's `Tera`
+/// engine is `Arc`-shared, and `materials`/`spools` are `Arc<dyn _>`.
 #[derive(Clone)]
 pub struct AppState {
     pub db: Db,
     pub renderer: Renderer,
     pub default_locale: String,
     pub materials: Arc<dyn MaterialsUseCases>,
+    pub spools: Arc<dyn SpoolsUseCases>,
 }
 
 impl AppState {
-    pub fn new(db: Db, cfg: &Config, materials: Arc<dyn MaterialsUseCases>) -> Self {
+    pub fn new(
+        db: Db,
+        cfg: &Config,
+        materials: Arc<dyn MaterialsUseCases>,
+        spools: Arc<dyn SpoolsUseCases>,
+    ) -> Self {
         let catalog = Catalog::load(&cfg.i18n.default_locale);
         Self {
             db,
             renderer: Renderer::new(catalog),
             default_locale: cfg.i18n.default_locale.clone(),
             materials,
+            spools,
         }
     }
 }
