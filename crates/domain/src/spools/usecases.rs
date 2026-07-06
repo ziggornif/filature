@@ -1,7 +1,7 @@
-use crate::shared::{SpoolDetail, SpoolListItem};
 use crate::spools::model::{NewSpool, Spool, SpoolId};
 use crate::spools::ports::api::SpoolsUseCases;
 use crate::spools::ports::spi::{RepositoryError, SpoolFilter, SpoolRepository, SpoolSort};
+use crate::spools::read_models::{SpoolDetail, SpoolListItem};
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -168,5 +168,22 @@ mod tests {
             .unwrap();
         assert_eq!(desc[0].id, high.id);
         assert_eq!(desc[1].id, low.id);
+    }
+
+    #[tokio::test]
+    async fn list_created_desc_returns_most_recent_first() {
+        let s = svc();
+        let first = s.add(sample_new_spool("material-1")).await.unwrap();
+        let second = s.add(sample_new_spool("material-1")).await.unwrap();
+        let third = s.add(sample_new_spool("material-1")).await.unwrap();
+
+        let items = s
+            .list(SpoolFilter::default(), SpoolSort::CreatedDesc)
+            .await
+            .unwrap();
+
+        assert_eq!(items[0].id, third.id);
+        assert_eq!(items[1].id, second.id);
+        assert_eq!(items[2].id, first.id);
     }
 }

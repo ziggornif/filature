@@ -1,6 +1,6 @@
-use crate::shared::{SpoolDetail, SpoolListItem};
 use crate::spools::model::{NewSpool, Spool, SpoolId, SpoolStatus};
 use crate::spools::ports::spi::{RepositoryError, SpoolFilter, SpoolRepository, SpoolSort};
+use crate::spools::read_models::{SpoolDetail, SpoolListItem};
 use async_trait::async_trait;
 use std::sync::Mutex;
 

@@ -1,5 +1,6 @@
-use crate::shared::{MaterialId, SpoolDetail, SpoolListItem};
+use crate::shared::MaterialId;
 use crate::spools::model::{NewSpool, Spool, SpoolId, SpoolStatus};
+use crate::spools::read_models::{SpoolDetail, SpoolListItem};
 use async_trait::async_trait;
 use thiserror::Error;
 
