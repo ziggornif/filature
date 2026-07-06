@@ -57,5 +57,8 @@
   "spools.new.error.diameter": "Le diamètre doit être 1.75 ou 2.85",
   "spools.new.error.weight": "Le poids net doit être un nombre positif ou nul",
   "spools.new.error.price": "Le prix payé doit être un montant décimal valide",
-  "spools.new.error.material": "Veuillez sélectionner un matériau valide"
+  "spools.new.error.material": "Veuillez sélectionner un matériau valide",
+  "spools.edit.title": "Modifier la bobine",
+  "spools.edit.submit": "Enregistrer les modifications",
+  "spools.edit.not_found": "Bobine introuvable"
 }

@@ -57,5 +57,8 @@
   "spools.new.error.diameter": "Diameter must be 1.75 or 2.85",
   "spools.new.error.weight": "Net weight must be a non-negative number",
   "spools.new.error.price": "Price paid must be a valid decimal amount",
-  "spools.new.error.material": "Please select a valid material"
+  "spools.new.error.material": "Please select a valid material",
+  "spools.edit.title": "Edit spool",
+  "spools.edit.submit": "Save changes",
+  "spools.edit.not_found": "Spool not found"
 }

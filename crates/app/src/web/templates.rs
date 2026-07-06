@@ -55,6 +55,13 @@ impl Renderer {
         self.catalog.has_locale(locale)
     }
 
+    /// Translate a single key for `locale` outside of a full template render
+    /// — used for the plain-text localized 404 body on an unknown spool id,
+    /// where there is no page shell to render into.
+    pub fn t(&self, locale: &str, key: &str) -> String {
+        self.catalog.t(locale, key)
+    }
+
     /// Render `template` with a per-request locale + theme; `t(key=...)` reads
     /// the locale back out of this context (function registered once, at
     /// construction — see `new`).
