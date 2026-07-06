@@ -2,6 +2,7 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 
 pub mod materials;
+pub mod spools;
 
 pub type Db = Pool<Postgres>;
 
