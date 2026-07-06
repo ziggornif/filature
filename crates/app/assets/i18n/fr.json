@@ -43,5 +43,19 @@
   "spools.status.archived": "Archivée",
   "spools.action.view": "Voir",
   "spools.action.edit": "Modifier",
-  "spools.add": "Ajouter une bobine"
+  "spools.add": "Ajouter une bobine",
+  "spools.new.title": "Ajouter une bobine",
+  "spools.new.material": "Matériau",
+  "spools.new.material_placeholder": "Sélectionnez un matériau",
+  "spools.new.colour_hex": "Couleur (hex)",
+  "spools.new.colour_name": "Nom de la couleur",
+  "spools.new.diameter": "Diamètre (mm)",
+  "spools.new.net_weight": "Poids net (g)",
+  "spools.new.price_paid": "Prix payé",
+  "spools.new.submit": "Ajouter la bobine",
+  "spools.new.error.colour": "La couleur doit être un code hexadécimal #RRVVBB valide",
+  "spools.new.error.diameter": "Le diamètre doit être 1.75 ou 2.85",
+  "spools.new.error.weight": "Le poids net doit être un nombre positif ou nul",
+  "spools.new.error.price": "Le prix payé doit être un montant décimal valide",
+  "spools.new.error.material": "Veuillez sélectionner un matériau valide"
 }

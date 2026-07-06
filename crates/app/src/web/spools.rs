@@ -12,13 +12,16 @@ use crate::web::router::{resolve_locale, resolve_theme};
 use crate::web::state::AppState;
 use axum::{
     Router,
-    extract::{Query, State},
+    extract::{Form, Query, State},
     http::{HeaderMap, StatusCode},
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
     routing::get,
 };
-use domain::shared::MaterialId;
-use domain::spools::{SpoolFilter, SpoolListItem, SpoolSort, SpoolStatus};
+use domain::shared::{Grams, MaterialId};
+use domain::spools::{
+    Colour, Diameter, NewSpool, RepositoryError, SpoolFilter, SpoolListItem, SpoolSort, SpoolStatus,
+};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tera::Context;
 
@@ -193,10 +196,155 @@ async fn rows(
     }
 }
 
+/// The `POST /spools` form payload. Every field is a raw string (rather
+/// than a typed `f64`/`Decimal`) so malformed input — a bad hex, a
+/// non-numeric weight, an unparsable price — reaches this handler's own
+/// validation and can be echoed back on the re-rendered form, instead of
+/// being rejected by Axum's `Form` extractor (a plain 400) before the
+/// handler even runs.
+#[derive(Debug, Deserialize, Default, Clone)]
+pub struct SpoolForm {
+    #[serde(default)]
+    pub material_id: String,
+    #[serde(default)]
+    pub colour_hex: String,
+    #[serde(default)]
+    pub colour_name: String,
+    #[serde(default)]
+    pub diameter: String,
+    #[serde(default)]
+    pub net_weight: String,
+    #[serde(default)]
+    pub price_paid: String,
+}
+
+impl SpoolForm {
+    /// Maps the raw form into a domain `NewSpool`, rejecting invalid
+    /// hex/diameter/weight/price/material with an i18n key (the caller
+    /// turns this into a 422 + re-rendered form) rather than panicking or
+    /// 500-ing on user input.
+    fn to_new(&self) -> Result<NewSpool, &'static str> {
+        if self.material_id.trim().is_empty() {
+            return Err("spools.new.error.material");
+        }
+        let name = self.colour_name.trim();
+        let colour_name = if name.is_empty() {
+            None
+        } else {
+            Some(name.to_string())
+        };
+        let colour = Colour::new(self.colour_hex.trim().to_string(), colour_name)
+            .map_err(|_| "spools.new.error.colour")?;
+        let diameter =
+            Diameter::parse(self.diameter.trim()).map_err(|_| "spools.new.error.diameter")?;
+        let net_weight: f64 = self
+            .net_weight
+            .trim()
+            .parse()
+            .map_err(|_| "spools.new.error.weight")?;
+        let net_weight = Grams::new(net_weight).map_err(|_| "spools.new.error.weight")?;
+        let price_paid = Decimal::from_str_exact(self.price_paid.trim())
+            .map_err(|_| "spools.new.error.price")?;
+        Ok(NewSpool {
+            material_id: MaterialId::new(self.material_id.trim().to_string()),
+            colour,
+            diameter,
+            net_weight,
+            price_paid,
+        })
+    }
+}
+
+/// Renders the add-spool form (fresh on `GET /spools/new`, or re-populated
+/// with the submitted values + a localized error on a failed `POST
+/// /spools`). `error_key` is an i18n key looked up by the template's own
+/// `t(key=error_key)` call, not pre-translated here, so locale switching
+/// works the same way it does for every other string on the page.
+async fn render_form(
+    st: &AppState,
+    locale: &str,
+    theme_attr: &str,
+    status: StatusCode,
+    form: &SpoolForm,
+    error_key: Option<&str>,
+) -> Response {
+    let materials = match material_options(st).await {
+        Ok(ms) => ms,
+        Err(resp) => return resp,
+    };
+    let mut ctx = Context::new();
+    ctx.insert("materials", &materials);
+    ctx.insert("material_id", &form.material_id);
+    ctx.insert("colour_hex", &form.colour_hex);
+    ctx.insert("colour_name", &form.colour_name);
+    ctx.insert("diameter", &form.diameter);
+    ctx.insert("net_weight", &form.net_weight);
+    ctx.insert("price_paid", &form.price_paid);
+    ctx.insert("error_key", &error_key);
+    match st
+        .renderer
+        .render("spools_new.html", locale, theme_attr, ctx)
+    {
+        Ok(html) => (status, Html(html)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+async fn new_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let theme = resolve_theme(&headers);
+    let form = SpoolForm {
+        diameter: "1.75".to_string(),
+        ..Default::default()
+    };
+    render_form(&st, &locale, theme.data_attr(), StatusCode::OK, &form, None).await
+}
+
+async fn create(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<SpoolForm>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let theme = resolve_theme(&headers);
+
+    let new = match form.to_new() {
+        Ok(n) => n,
+        Err(key) => {
+            return render_form(
+                &st,
+                &locale,
+                theme.data_attr(),
+                StatusCode::UNPROCESSABLE_ENTITY,
+                &form,
+                Some(key),
+            )
+            .await;
+        }
+    };
+
+    match st.spools.add(new).await {
+        Ok(_) => Redirect::to("/spools").into_response(),
+        Err(RepositoryError::UnknownMaterial(_)) => {
+            render_form(
+                &st,
+                &locale,
+                theme.data_attr(),
+                StatusCode::UNPROCESSABLE_ENTITY,
+                &form,
+                Some("spools.new.error.material"),
+            )
+            .await
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/spools", get(list_page))
+        .route("/spools", get(list_page).post(create))
         .route("/spools/rows", get(rows))
+        .route("/spools/new", get(new_page))
 }
 
 #[cfg(test)]
@@ -288,5 +436,230 @@ mod tests {
         assert_eq!(filter.status, None);
         assert_eq!(q.to_sort(), SpoolSort::CreatedDesc);
         assert_eq!(q.selected_sort(), "created_desc");
+    }
+
+    fn render_new_form(locale: &str) -> String {
+        let r = Renderer::new(Catalog::load("en"));
+        let mut ctx = Context::new();
+        ctx.insert("materials", &vec![material_option()]);
+        ctx.insert("material_id", "");
+        ctx.insert("colour_hex", "");
+        ctx.insert("colour_name", "");
+        ctx.insert("diameter", "1.75");
+        ctx.insert("net_weight", "");
+        ctx.insert("price_paid", "");
+        ctx.insert("error_key", &Option::<&str>::None);
+        r.render("spools_new.html", locale, "", ctx).unwrap()
+    }
+
+    #[test]
+    fn new_form_lists_material_option_no_raw_keys() {
+        let html = render_new_form("en");
+        assert!(html.contains("PLA"));
+        assert!(html.contains(r#"value="01HMAT""#));
+        assert!(!html.contains("spools.new.")); // no raw i18n key leaks
+    }
+
+    #[test]
+    fn new_form_localises_to_french() {
+        let html = render_new_form("fr");
+        assert!(html.contains("Ajouter une bobine") || html.contains("Matériau"));
+        assert!(!html.contains("spools.new."));
+    }
+
+    #[test]
+    fn new_form_shows_localized_error_when_error_key_set() {
+        let r = Renderer::new(Catalog::load("en"));
+        let mut ctx = Context::new();
+        ctx.insert("materials", &vec![material_option()]);
+        ctx.insert("material_id", "");
+        ctx.insert("colour_hex", "not-a-hex");
+        ctx.insert("colour_name", "");
+        ctx.insert("diameter", "1.75");
+        ctx.insert("net_weight", "1000");
+        ctx.insert("price_paid", "24.99");
+        ctx.insert("error_key", &Some("spools.new.error.colour"));
+        let html = r.render("spools_new.html", "en", "", ctx).unwrap();
+        assert!(html.contains("must be a valid #RRGGBB hex code"));
+        assert!(html.contains(r#"value="not-a-hex""#)); // submitted value echoed back
+    }
+
+    fn valid_form(material_id: &str) -> SpoolForm {
+        SpoolForm {
+            material_id: material_id.to_string(),
+            colour_hex: "#1A9E4B".to_string(),
+            colour_name: "vert sapin".to_string(),
+            diameter: "1.75".to_string(),
+            net_weight: "1000".to_string(),
+            price_paid: "24.99".to_string(),
+        }
+    }
+
+    #[test]
+    fn to_new_maps_valid_form_to_domain_values() {
+        let new = valid_form("01HMAT").to_new().unwrap();
+        assert_eq!(new.material_id, MaterialId::new("01HMAT"));
+        assert_eq!(new.colour.hex(), "#1A9E4B");
+        assert_eq!(new.colour.name(), Some("vert sapin"));
+        assert_eq!(new.diameter, Diameter::Mm1_75);
+        assert_eq!(new.net_weight.value(), 1000.0);
+        assert_eq!(new.price_paid, Decimal::from_str_exact("24.99").unwrap());
+    }
+
+    #[test]
+    fn to_new_rejects_bad_hex() {
+        let mut f = valid_form("01HMAT");
+        f.colour_hex = "not-a-hex".to_string();
+        assert_eq!(f.to_new(), Err("spools.new.error.colour"));
+    }
+
+    #[test]
+    fn to_new_rejects_unknown_diameter() {
+        let mut f = valid_form("01HMAT");
+        f.diameter = "3.00".to_string();
+        assert_eq!(f.to_new(), Err("spools.new.error.diameter"));
+    }
+
+    #[test]
+    fn to_new_rejects_non_numeric_weight() {
+        let mut f = valid_form("01HMAT");
+        f.net_weight = "not-a-number".to_string();
+        assert_eq!(f.to_new(), Err("spools.new.error.weight"));
+    }
+
+    #[test]
+    fn to_new_rejects_negative_weight() {
+        let mut f = valid_form("01HMAT");
+        f.net_weight = "-5".to_string();
+        assert_eq!(f.to_new(), Err("spools.new.error.weight"));
+    }
+
+    #[test]
+    fn to_new_rejects_bad_decimal_price() {
+        let mut f = valid_form("01HMAT");
+        f.price_paid = "not-a-price".to_string();
+        assert_eq!(f.to_new(), Err("spools.new.error.price"));
+    }
+
+    #[test]
+    fn to_new_rejects_blank_material() {
+        let f = valid_form("  ");
+        assert_eq!(f.to_new(), Err("spools.new.error.material"));
+    }
+
+    // --- Handler-level tests: exercise `new_page`/`create` directly against
+    // an in-memory `AppState` (stub repositories + a lazily-connected pool
+    // that is never queried by these handlers) — mirrors materials' render
+    // tests but also drives the actual async handlers, per the add-spool
+    // task brief.
+    mod handlers {
+        use super::*;
+        use crate::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
+        use axum::body::to_bytes;
+        use domain::materials::stubs::StubMaterialRepository;
+        use domain::materials::{
+            Density, DryingParams, MaterialName, MaterialRepository, MaterialsService,
+            MaterialsUseCases, NewMaterial, Sensitivity, Temperature,
+        };
+        use domain::spools::stubs::StubSpoolRepository;
+        use domain::spools::{SpoolRepository, SpoolsService, SpoolsUseCases};
+        use sqlx::PgPool;
+        use std::sync::Arc;
+
+        fn sample_new_material() -> NewMaterial {
+            NewMaterial {
+                name: MaterialName::new("PLA").unwrap(),
+                density: Density::new(1.24).unwrap(),
+                drying: DryingParams {
+                    temp: Temperature::new(45),
+                    time_h: 6,
+                },
+                sensitivity: Sensitivity::Low,
+                nozzle: Temperature::new(210),
+                bed: Temperature::new(60),
+            }
+        }
+
+        /// A ready-to-use `AppState` backed by in-memory stub repositories.
+        /// `db` is a lazily-connected pool (never actually dialed — none of
+        /// `new_page`/`create` touch `AppState::db`), so this needs no
+        /// database to run.
+        async fn test_state() -> (AppState, String) {
+            let materials_repo: Arc<dyn MaterialRepository> =
+                Arc::new(StubMaterialRepository::new());
+            let materials: Arc<dyn MaterialsUseCases> =
+                Arc::new(MaterialsService::new(materials_repo));
+            let seeded = materials.add(sample_new_material()).await.unwrap();
+
+            let spools_repo: Arc<dyn SpoolRepository> = Arc::new(StubSpoolRepository::new());
+            let spools: Arc<dyn SpoolsUseCases> = Arc::new(SpoolsService::new(spools_repo));
+
+            let db = PgPool::connect_lazy("postgres://user:pass@localhost/db").unwrap();
+            let cfg = Config {
+                server: ServerConfig {
+                    bind: "127.0.0.1:0".into(),
+                },
+                database: DatabaseConfig {
+                    url: "postgres://user:pass@localhost/db".into(),
+                },
+                i18n: I18nConfig {
+                    default_locale: "en".into(),
+                },
+            };
+            (
+                AppState::new(db, &cfg, materials, spools),
+                seeded.id.as_str().to_string(),
+            )
+        }
+
+        async fn body_of(res: Response) -> String {
+            let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+            String::from_utf8(bytes.to_vec()).unwrap()
+        }
+
+        #[tokio::test]
+        async fn get_new_renders_form_with_material_option() {
+            let (st, material_id) = test_state().await;
+            let res = new_page(State(st), HeaderMap::new()).await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains("PLA"));
+            assert!(html.contains(&format!(r#"value="{material_id}""#)));
+        }
+
+        #[tokio::test]
+        async fn post_valid_form_adds_spool_and_redirects() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let res = create(State(st), HeaderMap::new(), Form(valid_form(&material_id))).await;
+            assert_eq!(res.status(), StatusCode::SEE_OTHER);
+            assert_eq!(
+                res.headers().get("location").unwrap().to_str().unwrap(),
+                "/spools"
+            );
+            let created = spools
+                .list(SpoolFilter::default(), SpoolSort::CreatedDesc)
+                .await
+                .unwrap();
+            assert_eq!(created.len(), 1);
+        }
+
+        #[tokio::test]
+        async fn post_bad_hex_rerenders_form_with_error_and_does_not_create() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let mut form = valid_form(&material_id);
+            form.colour_hex = "not-a-hex".to_string();
+            let res = create(State(st), HeaderMap::new(), Form(form)).await;
+            assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            let html = body_of(res).await;
+            assert!(html.contains("must be a valid #RRGGBB hex code"));
+            assert!(html.contains(r#"value="not-a-hex""#)); // submitted value echoed
+            let after = spools
+                .list(SpoolFilter::default(), SpoolSort::CreatedDesc)
+                .await
+                .unwrap();
+            assert!(after.is_empty());
+        }
     }
 }
