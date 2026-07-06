@@ -8,6 +8,22 @@ pub struct Grams(f64);
 /// Monetary amount (prices). Decimal to avoid float drift.
 pub type Money = Decimal;
 
+/// Opaque identifier for a `Material`. Lives in the shared kernel (rather
+/// than the `materials` slice) because other slices (e.g. `spools`)
+/// reference a material by id — a cross-slice import of a sibling slice's
+/// own module would violate slice isolation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MaterialId(pub String);
+
+impl MaterialId {
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub enum DomainError {
     #[error("weight must be non-negative, got {0}")]

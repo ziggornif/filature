@@ -1,16 +1,8 @@
 use crate::shared::DomainError;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MaterialId(pub String);
-
-impl MaterialId {
-    pub fn new(s: impl Into<String>) -> Self {
-        Self(s.into())
-    }
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
+// `MaterialId` lives in the shared kernel (see crate::shared) because the
+// `spools` slice also needs it, and a direct sibling-slice import would
+// violate slice isolation. Re-exported here for existing call sites.
+pub use crate::shared::MaterialId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Sensitivity {

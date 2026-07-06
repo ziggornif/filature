@@ -1,4 +1,5 @@
-use crate::shared::DomainError;
+use crate::shared::{DomainError, Grams, MaterialId, Money};
+use std::f64::consts::PI;
 
 /// A spool colour: a validated `#RRGGBB` hex string plus an optional
 /// human-friendly name (e.g. "vert sapin").
@@ -93,9 +94,121 @@ impl SpoolStatus {
     }
 }
 
+/// Opaque identifier for a `Spool`, mirroring `MaterialId`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpoolId(pub String);
+
+impl SpoolId {
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Data required to create a new spool. Remaining weight, status and id
+/// are derived downstream (remaining starts equal to net; status defaults
+/// to `Sealed`; id is assigned by the repository).
+#[derive(Debug, Clone, PartialEq)]
+pub struct NewSpool {
+    pub material_id: MaterialId,
+    pub colour: Colour,
+    pub diameter: Diameter,
+    pub net_weight: Grams,
+    pub price_paid: Money,
+}
+
+/// A physical spool of filament: net weight at purchase, current
+/// remaining weight, and lifecycle status.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Spool {
+    pub id: SpoolId,
+    pub material_id: MaterialId,
+    pub colour: Colour,
+    pub diameter: Diameter,
+    pub net_weight: Grams,
+    pub remaining_weight: Grams,
+    pub price_paid: Money,
+    pub status: SpoolStatus,
+}
+
+impl Spool {
+    /// Remaining weight as a fraction of net weight (0.0..=1.0+).
+    pub fn remaining_ratio(&self) -> f64 {
+        self.remaining_weight.ratio_of(self.net_weight)
+    }
+
+    /// Updates the net weight, clamping `remaining_weight` down to the
+    /// new net weight if it currently exceeds it. If the new net weight
+    /// is still >= the current remaining weight, remaining is left
+    /// unchanged (it does not increase).
+    pub fn set_net_clamping(&mut self, new_net: Grams) {
+        if self.remaining_weight.value() > new_net.value() {
+            self.remaining_weight = new_net;
+        }
+        self.net_weight = new_net;
+    }
+}
+
+/// Estimated remaining filament length in metres, derived from the
+/// remaining mass, the material density (g/cm³) and the filament
+/// diameter. Mass (g) / (density (g/cm³) * cross-section area (cm²))
+/// gives length in cm; dividing by 100 converts to metres.
+pub fn remaining_length_m(remaining: Grams, density: f64, diameter: Diameter) -> f64 {
+    let d_cm = diameter.mm() / 10.0;
+    let radius_cm = d_cm / 2.0;
+    remaining.value() / (density * PI * radius_cm.powi(2)) / 100.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sample_spool(net: Grams, remaining: Grams) -> Spool {
+        Spool {
+            id: SpoolId::new("spool-1"),
+            material_id: MaterialId::new("material-1"),
+            colour: Colour::new("#1A9E4B".into(), None).unwrap(),
+            diameter: Diameter::Mm1_75,
+            net_weight: net,
+            remaining_weight: remaining,
+            price_paid: Money::new(2500, 2),
+            status: SpoolStatus::Open,
+        }
+    }
+
+    #[test]
+    fn remaining_ratio_is_remaining_over_net() {
+        let s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(250.0).unwrap());
+        assert!((s.remaining_ratio() - 0.25).abs() < 1e-9);
+    }
+
+    #[test]
+    fn remaining_length_known_value_175() {
+        // PLA density 1.24 g/cm3, diameter 1.75mm, remaining 1000g.
+        // d_cm = 0.175, r_cm = 0.0875, area = pi * r_cm^2 cm^2.
+        // length_cm = 1000 / (1.24 * area); length_m = length_cm / 100.
+        // Hand-computed expected value: 335.2836194167644 m.
+        let m = remaining_length_m(Grams::new(1000.0).unwrap(), 1.24, Diameter::Mm1_75);
+        assert!((m - 335.2836194167644).abs() < 1e-6);
+    }
+
+    #[test]
+    fn edit_clamps_remaining_when_net_lowered() {
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(800.0).unwrap());
+        s.set_net_clamping(Grams::new(500.0).unwrap());
+        assert_eq!(s.remaining_weight.value(), 500.0);
+    }
+
+    #[test]
+    fn edit_does_not_raise_remaining_when_net_increased() {
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(800.0).unwrap());
+        s.set_net_clamping(Grams::new(1500.0).unwrap());
+        assert_eq!(s.remaining_weight.value(), 800.0);
+        assert_eq!(s.net_weight.value(), 1500.0);
+    }
 
     #[test]
     fn colour_accepts_hex_and_optional_name() {
