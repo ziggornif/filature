@@ -1,15 +1,15 @@
 mod support;
 
 use domain::materials::{
-    Density, DryingParams, MaterialRepository, NewMaterial, RepositoryError, Sensitivity,
-    Temperature,
+    Density, DryingParams, MaterialName, MaterialRepository, NewMaterial, RepositoryError,
+    Sensitivity, Temperature,
 };
 use filature::persistence::connect_and_migrate;
 use filature::persistence::materials::SqlxMaterialRepository;
 
 fn sample(name: &str) -> NewMaterial {
     NewMaterial {
-        name: name.to_string(),
+        name: MaterialName::new(name).unwrap(),
         density: Density::new(1.24).unwrap(),
         drying: DryingParams {
             temp: Temperature::new(45),
@@ -34,7 +34,7 @@ struct Expected<'a> {
 }
 
 fn assert_fields(m: &domain::materials::Material, expected: Expected) {
-    assert_eq!(m.name, expected.name, "name mismatch");
+    assert_eq!(m.name.as_str(), expected.name, "name mismatch");
     assert_eq!(m.density.value(), expected.density, "density mismatch");
     assert_eq!(
         m.drying.temp.value(),
@@ -70,7 +70,7 @@ async fn insert_assigns_ulid_and_roundtrips() {
     assert_fields(&created, expected());
 
     let all = repo.list().await.unwrap();
-    let pla = all.iter().find(|m| m.name == "PLA").unwrap();
+    let pla = all.iter().find(|m| m.name.as_str() == "PLA").unwrap();
     assert_fields(pla, expected());
 }
 
@@ -81,7 +81,7 @@ async fn update_persists() {
     let repo = SqlxMaterialRepository::new(pool);
 
     let mut m = repo.insert(sample("PETG")).await.unwrap();
-    m.name = "PETG-CF".to_string();
+    m.name = MaterialName::new("PETG-CF").unwrap();
     m.density = Density::new(1.3).unwrap();
     m.drying = DryingParams {
         temp: Temperature::new(65),
@@ -104,7 +104,10 @@ async fn update_persists() {
     assert_fields(&updated, expected());
 
     let reread = repo.list().await.unwrap();
-    let petg = reread.iter().find(|x| x.name == "PETG-CF").unwrap();
+    let petg = reread
+        .iter()
+        .find(|x| x.name.as_str() == "PETG-CF")
+        .unwrap();
     assert_fields(petg, expected());
 }
 
@@ -132,7 +135,7 @@ async fn update_name_collision_maps_to_duplicate_error_with_name() {
     repo.insert(sample("ABS")).await.unwrap();
     let mut other = repo.insert(sample("TPU")).await.unwrap();
 
-    other.name = "ABS".to_string();
+    other.name = MaterialName::new("ABS").unwrap();
     let err = repo.update(other).await.unwrap_err();
     match err {
         RepositoryError::Duplicate(n) => assert_eq!(n, "ABS"),

@@ -12,8 +12,8 @@ use axum::{
     routing::{get, put},
 };
 use domain::materials::{
-    Density, DryingParams, Material, MaterialId, NewMaterial, RepositoryError, Sensitivity,
-    Temperature,
+    Density, DryingParams, Material, MaterialId, MaterialName, NewMaterial, RepositoryError,
+    Sensitivity, Temperature,
 };
 use serde::{Deserialize, Serialize};
 use tera::Context;
@@ -37,7 +37,7 @@ impl From<Material> for MaterialView {
     fn from(m: Material) -> Self {
         Self {
             id: m.id.as_str().to_string(),
-            name: m.name,
+            name: m.name.as_str().to_string(),
             density: m.density.value(),
             drying_temp_c: m.drying.temp.value(),
             drying_time_h: m.drying.time_h,
@@ -69,7 +69,7 @@ impl MaterialForm {
     /// caller turns this into a 422) rather than panicking or 500-ing.
     fn to_new(&self) -> Result<NewMaterial, String> {
         Ok(NewMaterial {
-            name: self.name.clone(),
+            name: MaterialName::new(self.name.clone()).map_err(|e| e.to_string())?,
             density: Density::new(self.density).map_err(|e| e.to_string())?,
             drying: DryingParams {
                 temp: Temperature::new(self.drying_temp_c),

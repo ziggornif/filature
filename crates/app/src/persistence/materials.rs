@@ -5,8 +5,8 @@
 use crate::persistence::Db;
 use async_trait::async_trait;
 use domain::materials::{
-    Density, DryingParams, Material, MaterialId, MaterialRepository, NewMaterial, RepositoryError,
-    Sensitivity, Temperature,
+    Density, DryingParams, Material, MaterialId, MaterialName, MaterialRepository, NewMaterial,
+    RepositoryError, Sensitivity, Temperature,
 };
 use ulid::Ulid;
 
@@ -47,7 +47,8 @@ impl MaterialRepository for SqlxMaterialRepository {
             .map(|r| {
                 Ok(Material {
                     id: MaterialId::new(r.id),
-                    name: r.name,
+                    name: MaterialName::new(r.name)
+                        .map_err(|e| RepositoryError::Backend(e.to_string()))?,
                     density: Density::new(r.density)
                         .map_err(|e| RepositoryError::Backend(e.to_string()))?,
                     drying: DryingParams {
@@ -70,7 +71,7 @@ impl MaterialRepository for SqlxMaterialRepository {
                (id, name, density, drying_temp_c, drying_time_h, sensitivity, nozzle_c, bed_c)
                VALUES ($1,$2,$3,$4,$5,$6,$7,$8)"#,
             id,
-            m.name,
+            m.name.as_str(),
             m.density.value(),
             m.drying.temp.value() as i32,
             m.drying.time_h as i32,
@@ -80,7 +81,7 @@ impl MaterialRepository for SqlxMaterialRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| backend(e, &m.name))?;
+        .map_err(|e| backend(e, m.name.as_str()))?;
 
         Ok(Material {
             id: MaterialId::new(id),
@@ -100,7 +101,7 @@ impl MaterialRepository for SqlxMaterialRepository {
                  sensitivity=$6, nozzle_c=$7, bed_c=$8
                WHERE id=$1"#,
             m.id.as_str(),
-            m.name,
+            m.name.as_str(),
             m.density.value(),
             m.drying.temp.value() as i32,
             m.drying.time_h as i32,
@@ -110,7 +111,7 @@ impl MaterialRepository for SqlxMaterialRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| backend(e, &m.name))?;
+        .map_err(|e| backend(e, m.name.as_str()))?;
         Ok(m)
     }
 

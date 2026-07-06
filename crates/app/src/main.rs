@@ -1,5 +1,7 @@
 use domain::materials::{MaterialRepository, MaterialsService, MaterialsUseCases};
+use domain::spools::{SpoolRepository, SpoolsService, SpoolsUseCases};
 use filature::persistence::materials::SqlxMaterialRepository;
+use filature::persistence::spools::SqlxSpoolRepository;
 use filature::{config::Config, persistence, web};
 use std::sync::Arc;
 
@@ -14,7 +16,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let materials: Arc<dyn MaterialsUseCases> = Arc::new(MaterialsService::new(repo));
     materials.seed_defaults().await?;
 
-    let app = web::router(web::AppState::new(db, &cfg, materials));
+    let spool_repo: Arc<dyn SpoolRepository> = Arc::new(SqlxSpoolRepository::new(db.clone()));
+    let spools: Arc<dyn SpoolsUseCases> = Arc::new(SpoolsService::new(spool_repo));
+
+    let app = web::router(web::AppState::new(db, &cfg, materials, spools));
     let listener = tokio::net::TcpListener::bind(&cfg.server.bind).await?;
     tracing::info!(bind = %cfg.server.bind, "filature listening");
     axum::serve(listener, app).await?;

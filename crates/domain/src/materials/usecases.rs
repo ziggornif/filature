@@ -28,7 +28,7 @@ impl MaterialsUseCases for MaterialsService {
     }
     async fn seed_defaults(&self) -> Result<(), RepositoryError> {
         for nm in seed::builtin() {
-            if !self.repo.exists_by_name(&nm.name).await? {
+            if !self.repo.exists_by_name(nm.name.as_str()).await? {
                 match self.repo.insert(nm).await {
                     Ok(_) | Err(RepositoryError::Duplicate(_)) => {} // idempotent under races
                     Err(e) => return Err(e),
@@ -55,8 +55,8 @@ mod tests {
         s.seed_defaults().await.unwrap();
         let all = s.list().await.unwrap();
         assert_eq!(all.len(), crate::materials::seed::builtin().len());
-        assert!(all.iter().any(|m| m.name == "PLA"));
-        assert!(all.iter().any(|m| m.name == "PA-CF"));
+        assert!(all.iter().any(|m| m.name.as_str() == "PLA"));
+        assert!(all.iter().any(|m| m.name.as_str() == "PA-CF"));
     }
 
     #[tokio::test]

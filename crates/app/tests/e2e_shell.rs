@@ -4,6 +4,8 @@ use axum::body::to_bytes;
 use axum::http::{Request, StatusCode, header};
 use domain::materials::stubs::StubMaterialRepository;
 use domain::materials::{MaterialsService, MaterialsUseCases};
+use domain::spools::stubs::StubSpoolRepository;
+use domain::spools::{SpoolsService, SpoolsUseCases};
 use filature::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
 use filature::{persistence, web};
 use std::sync::Arc;
@@ -29,7 +31,14 @@ async fn app() -> axum::Router {
     let materials: Arc<dyn MaterialsUseCases> = Arc::new(MaterialsService::new(Arc::new(
         StubMaterialRepository::new(),
     )));
-    web::router(web::AppState::new(db, &test_config(&url), materials))
+    let spools: Arc<dyn SpoolsUseCases> =
+        Arc::new(SpoolsService::new(Arc::new(StubSpoolRepository::new())));
+    web::router(web::AppState::new(
+        db,
+        &test_config(&url),
+        materials,
+        spools,
+    ))
 }
 
 #[tokio::test]

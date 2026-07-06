@@ -8,8 +8,10 @@ mod support;
 use axum::body::{Body, to_bytes};
 use axum::http::{Request, StatusCode};
 use domain::materials::{MaterialRepository, MaterialsService, MaterialsUseCases};
+use domain::spools::{SpoolRepository, SpoolsService, SpoolsUseCases};
 use filature::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
 use filature::persistence::materials::SqlxMaterialRepository;
+use filature::persistence::spools::SqlxSpoolRepository;
 use filature::{persistence, web};
 use std::sync::Arc;
 use tower::ServiceExt; // oneshot
@@ -38,7 +40,14 @@ async fn seeded_app() -> axum::Router {
     let repo: Arc<dyn MaterialRepository> = Arc::new(SqlxMaterialRepository::new(db.clone()));
     let materials: Arc<dyn MaterialsUseCases> = Arc::new(MaterialsService::new(repo));
     materials.seed_defaults().await.unwrap(); // idempotent — safe under the shared container
-    web::router(web::AppState::new(db, &test_config(&url), materials))
+    let spool_repo: Arc<dyn SpoolRepository> = Arc::new(SqlxSpoolRepository::new(db.clone()));
+    let spools: Arc<dyn SpoolsUseCases> = Arc::new(SpoolsService::new(spool_repo));
+    web::router(web::AppState::new(
+        db,
+        &test_config(&url),
+        materials,
+        spools,
+    ))
 }
 
 #[tokio::test]

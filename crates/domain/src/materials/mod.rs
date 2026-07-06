@@ -7,7 +7,8 @@ pub mod usecases;
 pub mod stubs;
 
 pub use model::{
-    Density, DryingParams, Material, MaterialId, NewMaterial, Sensitivity, Temperature,
+    Density, DryingParams, Material, MaterialId, MaterialName, NewMaterial, Sensitivity,
+    Temperature,
 };
 pub use ports::api::MaterialsUseCases;
 pub use ports::spi::{MaterialRepository, RepositoryError};

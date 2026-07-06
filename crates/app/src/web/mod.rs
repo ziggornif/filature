@@ -6,6 +6,7 @@
 pub mod i18n;
 pub mod materials;
 pub mod router;
+pub mod spools;
 pub mod state;
 pub mod templates;
 pub mod theme;

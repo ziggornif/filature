@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE spools SET\n                 material_id=$2, colour_hex=$3, colour_name=$4, diameter=$5,\n                 net_weight=$6, remaining_weight=$7, price_paid=$8, status=$9\n               WHERE id=$1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Float8",
+        "Float8",
+        "Numeric",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "424933196ffb8f888085bef3c7511c2f09ae33bac426ba26ef9ab18ff7d55ba7"
+}

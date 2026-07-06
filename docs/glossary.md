@@ -21,12 +21,14 @@ not a second canonical name. See [ADR-0001](adr/0001-language-and-i18n.md).
 
 | Term (canonical) | FR label | Definition |
 |---|---|---|
-| **Net Weight** | Poids net | The initial weight of filament alone on a Spool (excludes the empty reel). The baseline the remaining amount is measured against. |
-| **Tare** | Tare | The weight of the empty reel with no filament. Subtracted from a total weighing to derive filament weight: `net = weighed total − tare`. |
-| **Remaining Weight** | Reste | The current filament weight left on a Spool, in grams. Updated by direct weighing or by recording a consumed amount. Zero ⇒ the Spool becomes Empty. |
+| **Net Weight** | Poids net | The filament weight recorded for a Spool, taken from the manufacturer's label (e.g. a "1 kg" spool ⇒ 1000 g). Entered directly, not derived from a weighing. The baseline the remaining amount is measured against. See [ADR-0004](adr/0004-net-weight-no-tare.md). |
+| **Remaining Weight** | Reste | The current filament weight left on a Spool, in grams. Updated by direct entry ("remaining is now X g") or by recording a consumed amount ("used Y g"). Zero ⇒ the Spool becomes Empty. See [ADR-0004](adr/0004-net-weight-no-tare.md). |
 | **Remaining Ratio** | Pourcentage restant | Remaining Weight ÷ Net Weight, as a percentage. Drives low-stock signalling. |
 | **Remaining Length** | Longueur restante | The Remaining Weight expressed as metres of filament, derived from the Material's density and the Spool's diameter. A presentation of the same quantity as Remaining Weight, not a stored value. |
-| **Stock Value** | Valeur du stock | The monetary worth of remaining filament: summed over Spools of `(Remaining Weight ÷ Net Weight) × price paid`. |
+| **Stock Value** | Valeur du stock | The monetary worth of remaining filament: summed over Spools of `(Remaining Weight ÷ Net Weight) × Price Paid`. |
+| **Diameter** | Diamètre | The filament diameter of a Spool. One of the two market standards: **1.75 mm** or **2.85 mm**. Used with Material density to derive Remaining Length. |
+| **Colour** | Couleur | A Spool's real filament colour: a hex value (`#RRGGBB`) with an optional free-text name (e.g. `#1A9E4B` "vert sapin"). |
+| **Price Paid** | Prix payé | The amount paid for a Spool when acquired (full-spool price). Feeds Stock Value. |
 
 ## Enumerations
 
