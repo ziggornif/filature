@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{ t(key="materials.title") }}</h1>
+  <table class="materials-table">
+    <thead>
+      <tr>
+        <th>{{ t(key="materials.col.material") }}</th>
+        <th>{{ t(key="materials.col.density") }}</th>
+        <th>{{ t(key="materials.col.drying") }} — {{ t(key="materials.col.temp") }}</th>
+        <th>{{ t(key="materials.col.drying") }} — {{ t(key="materials.col.time") }}</th>
+        <th>{{ t(key="materials.col.sensitivity") }}</th>
+        <th>{{ t(key="materials.col.threshold") }}</th>
+        <th>{{ t(key="materials.col.nozzle") }}</th>
+        <th>{{ t(key="materials.col.bed") }}</th>
+      </tr>
+    </thead>
+    <tbody id="materials-table-body">
+      {% for m in materials %}
+        {% include "_material_row.html" %}
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <form class="material-add-form"
+        hx-post="/materials"
+        hx-target="#materials-table-body"
+        hx-swap="beforeend">
+    <input type="text" name="name" placeholder="{{ t(key="materials.col.material") }}" required>
+    <input type="number" name="density" step="0.01" placeholder="{{ t(key="materials.col.density") }}" required>
+    <input type="number" name="drying_temp_c" placeholder="{{ t(key="materials.col.temp") }}" required>
+    <input type="number" name="drying_time_h" placeholder="{{ t(key="materials.col.time") }}" required>
+    <select name="sensitivity">
+      <option value="Low">{{ t(key="materials.sensitivity.low") }}</option>
+      <option value="Medium">{{ t(key="materials.sensitivity.medium") }}</option>
+      <option value="High">{{ t(key="materials.sensitivity.high") }}</option>
+    </select>
+    <input type="number" name="nozzle_c" placeholder="{{ t(key="materials.col.nozzle") }}" required>
+    <input type="number" name="bed_c" placeholder="{{ t(key="materials.col.bed") }}" required>
+    <button type="submit">{{ t(key="materials.add") }}</button>
+  </form>
+{% endblock content %}

@@ -16,7 +16,7 @@ FAIL=0
 
 for slice in $SLICES; do
   # any `crate::<otherslice>` reference from inside this slice, excluding self
-  others=$(echo "$SLICES" | grep -vx "$slice" | paste -sd'|' -)
+  others=$( { echo "$SLICES" | grep -vx "$slice" || true; } | paste -sd'|' -)
   [ -n "$others" ] || continue
   hits=$(grep -rnE "crate::(${others})\b" "$SRC/$slice" || true)
   if [ -n "$hits" ]; then

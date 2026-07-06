@@ -17,17 +17,20 @@ struct StaticAssets;
 /// Resolve locale from the `lang` cookie, else the configured default.
 /// An unknown cookie locale (no catalog for it) falls back to the default, so a
 /// bogus `lang=zz` never reaches the `lang` attribute or the `t` lookups.
-fn resolve_locale(headers: &HeaderMap, st: &AppState) -> String {
+///
+/// `pub(crate)`: shared with other driving-adapter handlers (e.g.
+/// `web::materials`) so cookie/locale/theme resolution has one implementation.
+pub(crate) fn resolve_locale(headers: &HeaderMap, st: &AppState) -> String {
     read_cookie(headers, "lang")
         .filter(|loc| st.renderer.knows_locale(loc))
         .unwrap_or_else(|| st.default_locale.clone())
 }
 
-fn resolve_theme(headers: &HeaderMap) -> Theme {
+pub(crate) fn resolve_theme(headers: &HeaderMap) -> Theme {
     Theme::from_cookie(read_cookie(headers, "theme").as_deref())
 }
 
-fn read_cookie(headers: &HeaderMap, name: &str) -> Option<String> {
+pub(crate) fn read_cookie(headers: &HeaderMap, name: &str) -> Option<String> {
     let raw = headers.get(header::COOKIE)?.to_str().ok()?;
     raw.split(';')
         .filter_map(|kv| kv.trim().split_once('='))
@@ -60,6 +63,7 @@ async fn static_handler(Path(path): Path<String>) -> Response {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/", get(index))
+        .merge(crate::web::materials::routes())
         .route("/static/{*path}", get(static_handler))
         .with_state(state)
 }

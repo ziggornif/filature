@@ -12,6 +12,10 @@ pub type Money = Decimal;
 pub enum DomainError {
     #[error("weight must be non-negative, got {0}")]
     NegativeWeight(f64),
+    #[error("density must be > 0 g/cm³, got {0}")]
+    NonPositiveDensity(f64),
+    #[error("unknown sensitivity: {0}")]
+    UnknownSensitivity(String),
 }
 
 impl Grams {

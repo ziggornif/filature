@@ -31,7 +31,7 @@ All skills are in `.claude/skills/`. Claude Code loads them automatically at ses
 ```
 docs/
 ├── product/brief.md          # product brief (product-discovery output)
-├── specs/<slice>.md          # one agent-brief per use-case slice
+├── specs/<NN>-<slice>.md     # one agent-brief per use-case slice, numbered in build order
 ├── adr/                      # Architecture Decision Records
 ├── glossary.md               # ubiquitous language
 ├── architecture.md           # high-level architecture overview
@@ -43,6 +43,14 @@ docs/
 ```
 
 Configuration (tracker, doc paths): `.harness/config.yml`
+
+**One file per slice, no `docs/superpowers/` tree.** The brainstorming *design*
+and the writing-plans *plan* are ephemeral working steps, not persisted files.
+The only committed per-slice artifact is the **agent-brief** at
+`docs/specs/<NN>-<slice>.md` (the design and plan fold into it). The superpowers
+`brainstorming`/`writing-plans` skills default to `docs/superpowers/{specs,plans}/`
+— **this rule overrides those defaults; never create `docs/superpowers/`.** Slices
+are numbered in build order (`01-foundation.md`, `02-materials.md`, …).
 
 ## Project documents
 

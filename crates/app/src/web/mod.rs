@@ -4,6 +4,7 @@
 //! `i18n` (translation catalog), `theme` (light/dark cookie).
 
 pub mod i18n;
+pub mod materials;
 pub mod router;
 pub mod state;
 pub mod templates;

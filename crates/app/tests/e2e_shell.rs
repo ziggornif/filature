@@ -2,8 +2,11 @@ mod support;
 
 use axum::body::to_bytes;
 use axum::http::{Request, StatusCode, header};
+use domain::materials::stubs::StubMaterialRepository;
+use domain::materials::{MaterialsService, MaterialsUseCases};
 use filature::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
 use filature::{persistence, web};
+use std::sync::Arc;
 use tower::ServiceExt; // oneshot
 
 fn test_config(database_url: &str) -> Config {
@@ -23,7 +26,10 @@ fn test_config(database_url: &str) -> Config {
 async fn app() -> axum::Router {
     let url = support::postgres_url().await;
     let db = persistence::connect_and_migrate(&url).await.unwrap();
-    web::router(web::AppState::new(db, &test_config(&url)))
+    let materials: Arc<dyn MaterialsUseCases> = Arc::new(MaterialsService::new(Arc::new(
+        StubMaterialRepository::new(),
+    )));
+    web::router(web::AppState::new(db, &test_config(&url), materials))
 }
 
 #[tokio::test]
