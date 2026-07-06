@@ -307,8 +307,14 @@ impl SpoolForm {
             .parse()
             .map_err(|_| "spools.new.error.weight")?;
         let net_weight = Grams::new(net_weight).map_err(|_| "spools.new.error.weight")?;
+        if net_weight.value() <= 0.0 {
+            return Err("spools.new.error.weight");
+        }
         let price_paid = Decimal::from_str_exact(self.price_paid.trim())
             .map_err(|_| "spools.new.error.price")?;
+        if price_paid < Decimal::ZERO {
+            return Err("spools.new.error.price");
+        }
         Ok(SpoolFormFields {
             material_id: MaterialId::new(self.material_id.trim().to_string()),
             colour,
@@ -885,9 +891,23 @@ mod tests {
     }
 
     #[test]
+    fn to_new_rejects_zero_weight() {
+        let mut f = valid_form("01HMAT");
+        f.net_weight = "0".to_string();
+        assert_eq!(f.to_new(), Err("spools.new.error.weight"));
+    }
+
+    #[test]
     fn to_new_rejects_bad_decimal_price() {
         let mut f = valid_form("01HMAT");
         f.price_paid = "not-a-price".to_string();
+        assert_eq!(f.to_new(), Err("spools.new.error.price"));
+    }
+
+    #[test]
+    fn to_new_rejects_negative_price() {
+        let mut f = valid_form("01HMAT");
+        f.price_paid = "-1.00".to_string();
         assert_eq!(f.to_new(), Err("spools.new.error.price"));
     }
 
@@ -1005,6 +1025,40 @@ mod tests {
             let html = body_of(res).await;
             assert!(html.contains("must be a valid #RRGGBB hex code"));
             assert!(html.contains(r#"value="not-a-hex""#)); // submitted value echoed
+            let after = spools
+                .list(SpoolFilter::default(), SpoolSort::CreatedDesc)
+                .await
+                .unwrap();
+            assert!(after.is_empty());
+        }
+
+        #[tokio::test]
+        async fn post_zero_weight_rerenders_form_with_error_and_does_not_create() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let mut form = valid_form(&material_id);
+            form.net_weight = "0".to_string();
+            let res = create(State(st), HeaderMap::new(), Form(form)).await;
+            assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            let html = body_of(res).await;
+            assert!(html.contains("greater than 0"));
+            let after = spools
+                .list(SpoolFilter::default(), SpoolSort::CreatedDesc)
+                .await
+                .unwrap();
+            assert!(after.is_empty());
+        }
+
+        #[tokio::test]
+        async fn post_negative_price_rerenders_form_with_error_and_does_not_create() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let mut form = valid_form(&material_id);
+            form.price_paid = "-1.00".to_string();
+            let res = create(State(st), HeaderMap::new(), Form(form)).await;
+            assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            let html = body_of(res).await;
+            assert!(html.contains(r#"value="-1.00""#)); // submitted value echoed
             let after = spools
                 .list(SpoolFilter::default(), SpoolSort::CreatedDesc)
                 .await
