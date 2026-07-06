@@ -60,5 +60,7 @@
   "spools.new.error.material": "Veuillez sélectionner un matériau valide",
   "spools.edit.title": "Modifier la bobine",
   "spools.edit.submit": "Enregistrer les modifications",
-  "spools.edit.not_found": "Bobine introuvable"
+  "spools.edit.not_found": "Bobine introuvable",
+  "spools.detail.title": "Détail de la bobine",
+  "spools.detail.back": "Retour aux bobines"
 }

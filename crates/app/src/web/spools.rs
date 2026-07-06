@@ -20,8 +20,8 @@ use axum::{
 };
 use domain::shared::{Grams, MaterialId};
 use domain::spools::{
-    Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolFilter, SpoolId, SpoolListItem,
-    SpoolSort, SpoolStatus,
+    Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolDetail, SpoolFilter, SpoolId,
+    SpoolListItem, SpoolSort, SpoolStatus,
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -71,6 +71,57 @@ impl From<SpoolListItem> for SpoolView {
 
 fn round1(v: f64) -> f64 {
     (v * 10.0).round() / 10.0
+}
+
+/// Template-shaped view of a `SpoolDetail`: every stored field as plain
+/// strings/numbers, plus the same derived percentage/length fields as
+/// `SpoolView` (same rounding/percent conventions — the detail page and the
+/// list must never disagree on what "80%" or "268.2 m" means for the same
+/// spool).
+#[derive(Serialize)]
+pub struct SpoolDetailView {
+    pub id: String,
+    pub material_name: String,
+    pub colour_hex: String,
+    /// The colour's human name if set, else the hex code — always
+    /// something displayable (e.g. as a swatch `title`).
+    pub colour_label: String,
+    /// Whether a colour name was actually set — lets the template show the
+    /// name next to the swatch only when there's a name distinct from the
+    /// hex code.
+    pub has_colour_name: bool,
+    pub diameter: String, // "1.75" | "2.85"
+    pub net_weight: f64,
+    pub remaining_weight: f64,
+    pub remaining_pct: u8,
+    pub remaining_length_m: f64,
+    pub price_paid: String,
+    pub status: String, // "Sealed" | "Open" | "Empty" | "Archived"
+}
+
+impl From<SpoolDetail> for SpoolDetailView {
+    fn from(d: SpoolDetail) -> Self {
+        let remaining_pct = (d.remaining_ratio() * 100.0).round();
+        let remaining_length_m = round1(d.remaining_length_m());
+        Self {
+            id: d.id.as_str().to_string(),
+            material_name: d.material_name.clone(),
+            colour_hex: d.colour.hex().to_string(),
+            colour_label: d
+                .colour
+                .name()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| d.colour.hex().to_string()),
+            has_colour_name: d.colour.name().is_some(),
+            diameter: d.diameter.as_str().to_string(),
+            net_weight: round1(d.net_weight.value()),
+            remaining_weight: round1(d.remaining_weight.value()),
+            remaining_pct: remaining_pct as u8, // saturating cast — no panic on out-of-range ratios
+            remaining_length_m,
+            price_paid: d.price_paid.to_string(),
+            status: d.status.as_str().to_string(),
+        }
+    }
 }
 
 /// A material option for the filter dropdown — the web layer's own
@@ -399,6 +450,36 @@ fn not_found(st: &AppState, locale: &str) -> Response {
         .into_response()
 }
 
+/// `GET /spools/{id}` — the read-only detail page for one spool: every
+/// stored field plus the derived Remaining Ratio/Length, built from
+/// `SpoolsUseCases::view`. 404s (localized) on an unknown id, same pattern
+/// as `edit_page`.
+async fn detail_page(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let theme = resolve_theme(&headers);
+
+    let detail = match st.spools.view(SpoolId::new(id)).await {
+        Ok(d) => d,
+        Err(RepositoryError::NotFound(_)) => return not_found(&st, &locale),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+
+    let view: SpoolDetailView = detail.into();
+    let mut ctx = Context::new();
+    ctx.insert("spool", &view);
+    match st
+        .renderer
+        .render("spools_detail.html", &locale, theme.data_attr(), ctx)
+    {
+        Ok(html) => Html(html).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 /// The parts of `render_edit_form`'s response that vary by call site,
 /// bundled into one struct so the function itself stays under clippy's
 /// too-many-arguments threshold.
@@ -557,7 +638,7 @@ pub fn routes() -> Router<AppState> {
         .route("/spools/rows", get(rows))
         .route("/spools/new", get(new_page))
         .route("/spools/{id}/edit", get(edit_page))
-        .route("/spools/{id}", axum::routing::put(update))
+        .route("/spools/{id}", get(detail_page).put(update))
 }
 
 #[cfg(test)]
@@ -626,6 +707,56 @@ mod tests {
         assert!(html.contains("01HSP"));
         assert!(!html.contains("<html")); // fragment only, no full page shell
         assert!(!html.contains("<table")); // tbody content only, no wrapper
+    }
+
+    fn detail_view(id: &str) -> SpoolDetailView {
+        SpoolDetailView {
+            id: id.into(),
+            material_name: "PLA".into(),
+            colour_hex: "#1A9E4B".into(),
+            colour_label: "vert sapin".into(),
+            has_colour_name: true,
+            diameter: "1.75".into(),
+            net_weight: 1000.0,
+            remaining_weight: 800.0,
+            remaining_pct: 80,
+            remaining_length_m: 268.2,
+            price_paid: "24.99".into(),
+            status: "Open".into(),
+        }
+    }
+
+    fn render_detail(locale: &str) -> String {
+        let r = Renderer::new(Catalog::load("en"));
+        let mut ctx = Context::new();
+        ctx.insert("spool", &detail_view("01HSP"));
+        r.render("spools_detail.html", locale, "", ctx).unwrap()
+    }
+
+    #[test]
+    fn detail_page_shows_all_fields_and_derived_values_no_raw_keys() {
+        let html = render_detail("en");
+        assert!(html.contains("PLA"));
+        assert!(html.contains("#1A9E4B"));
+        assert!(html.contains("vert sapin"));
+        assert!(html.contains("1.75"));
+        assert!(html.contains("1000"));
+        assert!(html.contains("800"));
+        assert!(html.contains("80%"));
+        assert!(html.contains("268.2"));
+        assert!(html.contains("24.99"));
+        assert!(html.contains("/spools/01HSP/edit"));
+        assert!(!html.contains("spools.col."));
+        assert!(!html.contains("spools.detail."));
+        assert!(!html.contains("spools.status."));
+    }
+
+    #[test]
+    fn detail_page_localises_to_french() {
+        let html = render_detail("fr");
+        assert!(html.contains("Détail de la bobine") || html.contains("Matériau"));
+        assert!(!html.contains("spools.col."));
+        assert!(!html.contains("spools.detail."));
     }
 
     #[test]
@@ -994,6 +1125,50 @@ mod tests {
 
             let detail = spools.view(created.id.clone()).await.unwrap();
             assert_eq!(detail.colour.hex(), "#1A9E4B"); // unchanged
+        }
+
+        // --- Task 12: GET /spools/{id} (detail view).
+
+        #[tokio::test]
+        async fn get_detail_renders_spool_fields_and_derived_values() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let mut created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+            // Draw the spool down so remaining ratio/length differ from net.
+            created.remaining_weight = Grams::new(800.0).unwrap();
+            spools.edit(created.clone()).await.unwrap();
+
+            let res = detail_page(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains("stub")); // material name (stub repo's fixed join value)
+            assert!(html.contains("#1A9E4B")); // colour hex
+            assert!(html.contains("vert sapin")); // colour name
+            assert!(html.contains("1.75")); // diameter
+            assert!(html.contains("1000")); // net weight
+            assert!(html.contains("800")); // remaining weight
+            assert!(html.contains("80%")); // remaining ratio (800/1000)
+            assert!(html.contains("24.99")); // price paid
+            assert!(html.contains(&format!("/spools/{}/edit", created.id.as_str()))); // edit link
+            assert!(!html.contains("spools.col.")); // no raw i18n key leaks
+            assert!(!html.contains("spools.detail.")); // no raw i18n key leaks
+        }
+
+        #[tokio::test]
+        async fn get_detail_unknown_id_returns_404() {
+            let (st, _material_id) = test_state().await;
+            let res = detail_page(
+                State(st),
+                HeaderMap::new(),
+                Path("does-not-exist".to_string()),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::NOT_FOUND);
         }
 
         #[tokio::test]

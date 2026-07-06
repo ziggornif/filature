@@ -60,5 +60,7 @@
   "spools.new.error.material": "Please select a valid material",
   "spools.edit.title": "Edit spool",
   "spools.edit.submit": "Save changes",
-  "spools.edit.not_found": "Spool not found"
+  "spools.edit.not_found": "Spool not found",
+  "spools.detail.title": "Spool detail",
+  "spools.detail.back": "Back to spools"
 }
