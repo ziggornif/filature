@@ -18,6 +18,12 @@ pub enum DomainError {
     UnknownSensitivity(String),
     #[error("material name must not be blank")]
     BlankMaterialName,
+    #[error("invalid colour hex: {0}")]
+    InvalidColour(String),
+    #[error("unknown diameter: {0}")]
+    UnknownDiameter(String),
+    #[error("unknown spool status: {0}")]
+    UnknownSpoolStatus(String),
 }
 
 impl Grams {
