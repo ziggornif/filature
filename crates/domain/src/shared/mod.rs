@@ -16,6 +16,8 @@ pub enum DomainError {
     NonPositiveDensity(f64),
     #[error("unknown sensitivity: {0}")]
     UnknownSensitivity(String),
+    #[error("material name must not be blank")]
+    BlankMaterialName,
 }
 
 impl Grams {

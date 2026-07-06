@@ -48,7 +48,7 @@ impl Sensitivity {
 pub struct Density(f64);
 impl Density {
     pub fn new(v: f64) -> Result<Self, DomainError> {
-        if v > 0.0 {
+        if v.is_finite() && v > 0.0 {
             Ok(Self(v))
         } else {
             Err(DomainError::NonPositiveDensity(v))
@@ -56,6 +56,23 @@ impl Density {
     }
     pub fn value(self) -> f64 {
         self.0
+    }
+}
+
+/// A material's display name. Validated so it can never be blank/whitespace
+/// (spools & the referential rely on a meaningful, trimmed name).
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MaterialName(String);
+impl MaterialName {
+    pub fn new(s: impl Into<String>) -> Result<Self, DomainError> {
+        let trimmed = s.into().trim().to_string();
+        if trimmed.is_empty() {
+            return Err(DomainError::BlankMaterialName);
+        }
+        Ok(Self(trimmed))
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -79,7 +96,7 @@ pub struct DryingParams {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
     pub id: MaterialId,
-    pub name: String,
+    pub name: MaterialName,
     pub density: Density,
     pub drying: DryingParams,
     pub sensitivity: Sensitivity,
@@ -89,7 +106,7 @@ pub struct Material {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NewMaterial {
-    pub name: String,
+    pub name: MaterialName,
     pub density: Density,
     pub drying: DryingParams,
     pub sensitivity: Sensitivity,
@@ -134,5 +151,21 @@ mod tests {
             Density::new(-1.0),
             Err(DomainError::NonPositiveDensity(_))
         ));
+    }
+
+    #[test]
+    fn density_rejects_non_finite() {
+        assert!(Density::new(f64::INFINITY).is_err());
+        assert!(Density::new(f64::NAN).is_err());
+    }
+
+    #[test]
+    fn material_name_rejects_blank() {
+        assert!(MaterialName::new("   ".to_string()).is_err());
+        assert!(MaterialName::new("".to_string()).is_err());
+        assert_eq!(
+            MaterialName::new(" PLA ".to_string()).unwrap().as_str(),
+            "PLA"
+        );
     }
 }

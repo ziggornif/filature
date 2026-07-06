@@ -34,7 +34,7 @@ impl MaterialRepository for StubMaterialRepository {
     async fn insert(&self, m: NewMaterial) -> Result<Material, RepositoryError> {
         let mut rows = self.rows.lock().unwrap();
         if rows.iter().any(|r| r.name == m.name) {
-            return Err(RepositoryError::Duplicate(m.name));
+            return Err(RepositoryError::Duplicate(m.name.as_str().to_string()));
         }
         let material = Material {
             id: MaterialId::new(format!("stub-{}", rows.len())),
@@ -59,6 +59,11 @@ impl MaterialRepository for StubMaterialRepository {
         }
     }
     async fn exists_by_name(&self, name: &str) -> Result<bool, RepositoryError> {
-        Ok(self.rows.lock().unwrap().iter().any(|r| r.name == name))
+        Ok(self
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|r| r.name.as_str() == name))
     }
 }

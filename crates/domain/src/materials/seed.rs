@@ -1,4 +1,6 @@
-use crate::materials::model::{Density, DryingParams, NewMaterial, Sensitivity, Temperature};
+use crate::materials::model::{
+    Density, DryingParams, MaterialName, NewMaterial, Sensitivity, Temperature,
+};
 
 fn material(
     name: &str,
@@ -10,7 +12,7 @@ fn material(
     bed: u16,
 ) -> NewMaterial {
     NewMaterial {
-        name: name.to_string(),
+        name: MaterialName::new(name).expect("builtin material name is non-blank"),
         density: Density::new(density).expect("builtin density > 0"),
         drying: DryingParams {
             temp: Temperature::new(dry_t),
