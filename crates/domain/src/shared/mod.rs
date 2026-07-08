@@ -193,12 +193,18 @@ mod tests {
     #[test]
     fn location_in_use_error() {
         let err = DomainError::LocationInUse { count: 5 };
-        assert_eq!(err.to_string(), "location has 5 spools and cannot be deleted");
+        assert_eq!(
+            err.to_string(),
+            "location has 5 spools and cannot be deleted"
+        );
     }
 
     #[test]
     fn location_in_use_error_single_spool() {
         let err = DomainError::LocationInUse { count: 1 };
-        assert_eq!(err.to_string(), "location has 1 spools and cannot be deleted");
+        assert_eq!(
+            err.to_string(),
+            "location has 1 spools and cannot be deleted"
+        );
     }
 }

@@ -107,10 +107,7 @@ mod tests {
 
     #[test]
     fn note_from_preserves_internal_whitespace() {
-        assert_eq!(
-            note_from(" cool  place "),
-            Some("cool  place".to_string())
-        );
+        assert_eq!(note_from(" cool  place "), Some("cool  place".to_string()));
     }
 
     #[test]
