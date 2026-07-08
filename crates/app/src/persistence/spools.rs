@@ -108,7 +108,7 @@ impl SpoolRepository for SqlxSpoolRepository {
     }
 
     async fn update(&self, s: Spool) -> Result<Spool, RepositoryError> {
-        sqlx::query!(
+        let result = sqlx::query!(
             r#"UPDATE spools SET
                  material_id=$2, colour_hex=$3, colour_name=$4, diameter=$5,
                  net_weight=$6, remaining_weight=$7, price_paid=$8, status=$9
@@ -126,6 +126,9 @@ impl SpoolRepository for SqlxSpoolRepository {
         .execute(&self.pool)
         .await
         .map_err(|e| backend(e, s.material_id.as_str()))?;
+        if result.rows_affected() == 0 {
+            return Err(RepositoryError::NotFound(s.id));
+        }
         Ok(s)
     }
 
@@ -146,6 +149,7 @@ impl SpoolRepository for SqlxSpoolRepository {
                        FROM spools s JOIN materials m ON m.id = s.material_id
                        WHERE ($1::text IS NULL OR s.material_id = $1)
                          AND ($2::text IS NULL OR s.status = $2)
+                         AND (s.status <> 'Archived' OR $2 = 'Archived')
                        ORDER BY s.created_at DESC"#,
                     material_id,
                     status
@@ -177,6 +181,7 @@ impl SpoolRepository for SqlxSpoolRepository {
                        FROM spools s JOIN materials m ON m.id = s.material_id
                        WHERE ($1::text IS NULL OR s.material_id = $1)
                          AND ($2::text IS NULL OR s.status = $2)
+                         AND (s.status <> 'Archived' OR $2 = 'Archived')
                        ORDER BY (s.remaining_weight / s.net_weight) ASC"#,
                     material_id,
                     status
@@ -208,6 +213,7 @@ impl SpoolRepository for SqlxSpoolRepository {
                        FROM spools s JOIN materials m ON m.id = s.material_id
                        WHERE ($1::text IS NULL OR s.material_id = $1)
                          AND ($2::text IS NULL OR s.status = $2)
+                         AND (s.status <> 'Archived' OR $2 = 'Archived')
                        ORDER BY (s.remaining_weight / s.net_weight) DESC"#,
                     material_id,
                     status
@@ -268,13 +274,55 @@ impl SpoolRepository for SqlxSpoolRepository {
         }))
     }
 
-    // TODO(task 6): real impl
-    async fn find(&self, _id: &SpoolId) -> Result<Option<Spool>, RepositoryError> {
-        Err(RepositoryError::Backend("not implemented".into()))
+    async fn find(&self, id: &SpoolId) -> Result<Option<Spool>, RepositoryError> {
+        let row = sqlx::query!(
+            r#"SELECT id, material_id, colour_hex, colour_name, diameter,
+                      net_weight, remaining_weight, price_paid, status
+               FROM spools WHERE id = $1"#,
+            id.as_str()
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| backend(e, ""))?;
+
+        let Some(r) = row else {
+            return Ok(None);
+        };
+
+        Ok(Some(Spool {
+            id: SpoolId::new(r.id),
+            material_id: MaterialId::new(r.material_id),
+            colour: build_colour(r.colour_hex, r.colour_name)?,
+            diameter: build_diameter(&r.diameter)?,
+            net_weight: build_grams(r.net_weight)?,
+            remaining_weight: build_grams(r.remaining_weight)?,
+            price_paid: Money::from_decimal(r.price_paid)
+                .map_err(|e| RepositoryError::Backend(e.to_string()))?,
+            status: build_status(&r.status)?,
+        }))
     }
 
-    // TODO(task 6): real impl
-    async fn stock_value(&self, _filter: SpoolFilter) -> Result<Money, RepositoryError> {
-        Err(RepositoryError::Backend("not implemented".into()))
+    async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError> {
+        let material_id = filter.material_id.as_ref().map(|m| m.as_str());
+        let status = filter.status.map(|s| s.as_str());
+
+        let row = sqlx::query!(
+            r#"SELECT COALESCE(SUM((CAST(remaining_weight AS NUMERIC)/CAST(net_weight AS NUMERIC)) * price_paid), 0)::numeric AS value
+               FROM spools
+               WHERE status <> 'Archived'
+                 AND ($1::text IS NULL OR material_id = $1)
+                 AND ($2::text IS NULL OR status = $2)"#,
+            material_id,
+            status
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| backend(e, ""))?;
+
+        let value = row.value.ok_or_else(|| {
+            RepositoryError::Backend("stock_value query returned no value".into())
+        })?;
+
+        Money::from_decimal(value).map_err(|e| RepositoryError::Backend(e.to_string()))
     }
 }

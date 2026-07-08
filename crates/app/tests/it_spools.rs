@@ -245,3 +245,170 @@ async fn list_sorts_by_created_desc_and_remaining_ratio_asc() {
         .collect();
     assert_eq!(ids, vec![first.id.as_str(), second.id.as_str()]);
 }
+
+#[tokio::test]
+async fn find_returns_aggregate_for_known_id_and_none_for_unknown() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+
+    let material = materials.insert(sample_material("PLA-Find")).await.unwrap();
+    let created = spools
+        .insert(sample_spool(material.id.clone(), 1000.0, "15.00"))
+        .await
+        .unwrap();
+
+    let found = spools.find(&created.id).await.unwrap().unwrap();
+    assert_eq!(found, created);
+
+    let missing = domain::spools::SpoolId::new("nope-find");
+    assert!(spools.find(&missing).await.unwrap().is_none());
+}
+
+#[tokio::test]
+async fn update_unknown_id_returns_not_found() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+
+    let material = materials
+        .insert(sample_material("PLA-NotFound"))
+        .await
+        .unwrap();
+
+    let fake = domain::spools::Spool {
+        id: domain::spools::SpoolId::new("01FAKEIDDOESNOTEXISTXXXXXX"),
+        material_id: material.id.clone(),
+        colour: Colour::new("#000000".into(), None).unwrap(),
+        diameter: Diameter::Mm1_75,
+        net_weight: Grams::new(500.0).unwrap(),
+        remaining_weight: Grams::new(500.0).unwrap(),
+        price_paid: Money::from_decimal(Decimal::from_str_exact("5.00").unwrap()).unwrap(),
+        status: SpoolStatus::Sealed,
+    };
+
+    let err = spools.update(fake.clone()).await.unwrap_err();
+    match err {
+        RepositoryError::NotFound(id) => assert_eq!(id, fake.id),
+        other => panic!("expected NotFound, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn update_then_find_reflects_opened_consumed_spool() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+
+    let material = materials
+        .insert(sample_material("PLA-Consume"))
+        .await
+        .unwrap();
+    let mut created = spools
+        .insert(sample_spool(material.id.clone(), 1000.0, "12.00"))
+        .await
+        .unwrap();
+
+    created.status = SpoolStatus::Open;
+    created.remaining_weight = Grams::new(650.0).unwrap();
+    spools.update(created.clone()).await.unwrap();
+
+    let found = spools.find(&created.id).await.unwrap().unwrap();
+    assert_eq!(found.status, SpoolStatus::Open);
+    assert_eq!(found.remaining_weight.value(), 650.0);
+}
+
+#[tokio::test]
+async fn stock_value_sums_non_archived_and_excludes_archived() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+
+    let material = materials
+        .insert(sample_material("PLA-StockValue"))
+        .await
+        .unwrap();
+
+    // 1000g @ 24.99, drawn down to 500g remaining -> half the value.
+    let mut s1 = spools
+        .insert(sample_spool(material.id.clone(), 1000.0, "24.99"))
+        .await
+        .unwrap();
+    s1.status = SpoolStatus::Open;
+    s1.remaining_weight = Grams::new(500.0).unwrap();
+    spools.update(s1.clone()).await.unwrap();
+
+    // 1000g @ 10.00, still full -> full value.
+    let _s2 = spools
+        .insert(sample_spool(material.id.clone(), 1000.0, "10.00"))
+        .await
+        .unwrap();
+
+    // Archived spool must contribute 0 regardless of remaining/net.
+    let mut s3 = spools
+        .insert(sample_spool(material.id.clone(), 1000.0, "999.00"))
+        .await
+        .unwrap();
+    s3.status = SpoolStatus::Archived;
+    spools.update(s3.clone()).await.unwrap();
+
+    let value = spools
+        .stock_value(SpoolFilter {
+            material_id: Some(material.id.clone()),
+            status: None,
+        })
+        .await
+        .unwrap();
+
+    // (500/1000)*24.99 + (1000/1000)*10.00 = 12.495 + 10.00 = 22.495
+    let expected = Money::from_decimal(Decimal::from_str_exact("22.495").unwrap()).unwrap();
+    assert_eq!(value, expected);
+}
+
+#[tokio::test]
+async fn list_default_excludes_archived_and_status_filter_includes_it() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+
+    let material = materials
+        .insert(sample_material("PLA-Archived"))
+        .await
+        .unwrap();
+
+    let mut archived = spools
+        .insert(sample_spool(material.id.clone(), 1000.0, "8.00"))
+        .await
+        .unwrap();
+    archived.status = SpoolStatus::Archived;
+    spools.update(archived.clone()).await.unwrap();
+
+    let default_list = spools
+        .list(
+            SpoolFilter {
+                material_id: Some(material.id.clone()),
+                status: None,
+            },
+            SpoolSort::CreatedDesc,
+        )
+        .await
+        .unwrap();
+    assert!(!default_list.iter().any(|i| i.id == archived.id));
+
+    let archived_list = spools
+        .list(
+            SpoolFilter {
+                material_id: Some(material.id.clone()),
+                status: Some(SpoolStatus::Archived),
+            },
+            SpoolSort::CreatedDesc,
+        )
+        .await
+        .unwrap();
+    assert!(archived_list.iter().any(|i| i.id == archived.id));
+}
