@@ -60,7 +60,7 @@ mod tests {
             colour: Colour::new("#1A9E4B".into(), None).unwrap(),
             diameter: Diameter::Mm1_75,
             net_weight: Grams::new(1000.0).unwrap(),
-            price_paid: Money::new(2500, 2),
+            price_paid: Money::new(2500, 2).unwrap(),
         }
     }
 

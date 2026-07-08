@@ -174,7 +174,7 @@ mod tests {
             diameter: Diameter::Mm1_75,
             net_weight: net,
             remaining_weight: remaining,
-            price_paid: Money::new(2500, 2),
+            price_paid: Money::new(2500, 2).unwrap(),
             status: SpoolStatus::Open,
         }
     }

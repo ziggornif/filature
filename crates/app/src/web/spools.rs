@@ -18,7 +18,7 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
 };
-use domain::shared::{Grams, MaterialId};
+use domain::shared::{Grams, MaterialId, Money};
 use domain::spools::{
     Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolDetail, SpoolFilter, SpoolId,
     SpoolListItem, SpoolSort, SpoolStatus,
@@ -279,7 +279,7 @@ struct SpoolFormFields {
     colour: Colour,
     diameter: Diameter,
     net_weight: Grams,
-    price_paid: Decimal,
+    price_paid: Money,
 }
 
 impl SpoolForm {
@@ -310,11 +310,10 @@ impl SpoolForm {
         if net_weight.value() <= 0.0 {
             return Err("spools.new.error.weight");
         }
-        let price_paid = Decimal::from_str_exact(self.price_paid.trim())
+        let price_paid_dec = Decimal::from_str_exact(self.price_paid.trim())
             .map_err(|_| "spools.new.error.price")?;
-        if price_paid < Decimal::ZERO {
-            return Err("spools.new.error.price");
-        }
+        let price_paid =
+            Money::from_decimal(price_paid_dec).map_err(|_| "spools.new.error.price")?;
         Ok(SpoolFormFields {
             material_id: MaterialId::new(self.material_id.trim().to_string()),
             colour,
@@ -859,7 +858,10 @@ mod tests {
         assert_eq!(new.colour.name(), Some("vert sapin"));
         assert_eq!(new.diameter, Diameter::Mm1_75);
         assert_eq!(new.net_weight.value(), 1000.0);
-        assert_eq!(new.price_paid, Decimal::from_str_exact("24.99").unwrap());
+        assert_eq!(
+            new.price_paid,
+            Money::from_decimal(Decimal::from_str_exact("24.99").unwrap()).unwrap()
+        );
     }
 
     #[test]

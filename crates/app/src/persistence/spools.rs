@@ -6,7 +6,7 @@
 
 use crate::persistence::Db;
 use async_trait::async_trait;
-use domain::shared::{Grams, MaterialId};
+use domain::shared::{Grams, MaterialId, Money};
 use domain::spools::{
     Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolDetail, SpoolFilter, SpoolId,
     SpoolListItem, SpoolRepository, SpoolSort, SpoolStatus,
@@ -89,7 +89,7 @@ impl SpoolRepository for SqlxSpoolRepository {
             s.colour.name(),
             s.diameter.as_str(),
             s.net_weight.value(),
-            s.price_paid,
+            s.price_paid.value(),
         )
         .execute(&self.pool)
         .await
@@ -120,7 +120,7 @@ impl SpoolRepository for SqlxSpoolRepository {
             s.diameter.as_str(),
             s.net_weight.value(),
             s.remaining_weight.value(),
-            s.price_paid,
+            s.price_paid.value(),
             s.status.as_str(),
         )
         .execute(&self.pool)
@@ -261,7 +261,8 @@ impl SpoolRepository for SqlxSpoolRepository {
             diameter: build_diameter(&r.diameter)?,
             net_weight: build_grams(r.net_weight)?,
             remaining_weight: build_grams(r.remaining_weight)?,
-            price_paid: r.price_paid,
+            price_paid: Money::from_decimal(r.price_paid)
+                .map_err(|e| RepositoryError::Backend(e.to_string()))?,
             status: build_status(&r.status)?,
             density: r.density,
         }))

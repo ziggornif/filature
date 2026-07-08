@@ -3,7 +3,7 @@ mod support;
 use domain::materials::{
     Density, DryingParams, MaterialName, MaterialRepository, NewMaterial, Sensitivity, Temperature,
 };
-use domain::shared::{Grams, MaterialId};
+use domain::shared::{Grams, MaterialId, Money};
 use domain::spools::{
     Colour, Diameter, NewSpool, RepositoryError, SpoolFilter, SpoolRepository, SpoolSort,
     SpoolStatus,
@@ -33,7 +33,7 @@ fn sample_spool(material_id: MaterialId, net: f64, price: &str) -> NewSpool {
         colour: Colour::new("#1A9E4B".into(), Some("vert sapin".into())).unwrap(),
         diameter: Diameter::Mm1_75,
         net_weight: Grams::new(net).unwrap(),
-        price_paid: Decimal::from_str_exact(price).unwrap(),
+        price_paid: Money::from_decimal(Decimal::from_str_exact(price).unwrap()).unwrap(),
     }
 }
 
@@ -58,7 +58,7 @@ async fn insert_get_full_roundtrip() {
     assert_eq!(created.status, SpoolStatus::Sealed);
     assert_eq!(
         created.price_paid,
-        Decimal::from_str_exact("24.99").unwrap()
+        Money::from_decimal(Decimal::from_str_exact("24.99").unwrap()).unwrap()
     );
     assert_eq!(created.colour.hex(), "#1A9E4B");
     assert_eq!(created.colour.name(), Some("vert sapin"));
@@ -74,7 +74,10 @@ async fn insert_get_full_roundtrip() {
     assert_eq!(detail.diameter, Diameter::Mm1_75);
     assert_eq!(detail.net_weight.value(), 1000.0);
     assert_eq!(detail.remaining_weight.value(), 1000.0);
-    assert_eq!(detail.price_paid, Decimal::from_str_exact("24.99").unwrap());
+    assert_eq!(
+        detail.price_paid,
+        Money::from_decimal(Decimal::from_str_exact("24.99").unwrap()).unwrap()
+    );
     assert_eq!(detail.status, SpoolStatus::Sealed);
 }
 
@@ -122,7 +125,7 @@ async fn update_persists_changes() {
     created.colour = Colour::new("#FF0000".into(), None).unwrap();
     created.status = SpoolStatus::Open;
     created.remaining_weight = Grams::new(400.0).unwrap();
-    created.price_paid = Decimal::from_str_exact("21.50").unwrap();
+    created.price_paid = Money::from_decimal(Decimal::from_str_exact("21.50").unwrap()).unwrap();
 
     let updated = spools.update(created.clone()).await.unwrap();
     assert_eq!(updated.colour.hex(), "#FF0000");
@@ -131,14 +134,17 @@ async fn update_persists_changes() {
     assert_eq!(updated.remaining_weight.value(), 400.0);
     assert_eq!(
         updated.price_paid,
-        Decimal::from_str_exact("21.50").unwrap()
+        Money::from_decimal(Decimal::from_str_exact("21.50").unwrap()).unwrap()
     );
 
     let detail = spools.get(&created.id).await.unwrap().unwrap();
     assert_eq!(detail.colour.hex(), "#FF0000");
     assert_eq!(detail.status, SpoolStatus::Open);
     assert_eq!(detail.remaining_weight.value(), 400.0);
-    assert_eq!(detail.price_paid, Decimal::from_str_exact("21.50").unwrap());
+    assert_eq!(
+        detail.price_paid,
+        Money::from_decimal(Decimal::from_str_exact("21.50").unwrap()).unwrap()
+    );
 }
 
 #[tokio::test]
