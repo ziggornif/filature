@@ -165,8 +165,14 @@ async fn count_spools_zero_then_n_after_assigning_spools() {
 
     let material = locations_test_material(&materials).await;
 
-    let s1 = spools.insert(sample_spool(material.id.clone())).await.unwrap();
-    let s2 = spools.insert(sample_spool(material.id.clone())).await.unwrap();
+    let s1 = spools
+        .insert(sample_spool(material.id.clone()))
+        .await
+        .unwrap();
+    let s2 = spools
+        .insert(sample_spool(material.id.clone()))
+        .await
+        .unwrap();
 
     // NewSpool has no location_id field yet — assign it directly via SQL,
     // mirroring how the brief allows setting up the FK for this test.
@@ -193,6 +199,11 @@ async fn count_spools_zero_then_n_after_assigning_spools() {
     assert_eq!(locations.count_spools(&location.id).await.unwrap(), 2);
 }
 
-async fn locations_test_material(materials: &SqlxMaterialRepository) -> domain::materials::Material {
-    materials.insert(sample_material("Loc-Test-Mat")).await.unwrap()
+async fn locations_test_material(
+    materials: &SqlxMaterialRepository,
+) -> domain::materials::Material {
+    materials
+        .insert(sample_material("Loc-Test-Mat"))
+        .await
+        .unwrap()
 }
