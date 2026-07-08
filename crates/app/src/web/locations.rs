@@ -69,25 +69,30 @@ fn not_found(st: &AppState, locale: &str) -> Response {
         .into_response()
 }
 
-fn render_row(
-    st: &AppState,
-    locale: &str,
-    status: StatusCode,
-    view: LocationView,
-    blocked_message: Option<String>,
-) -> Response {
+fn render_row(st: &AppState, locale: &str, status: StatusCode, view: LocationView) -> Response {
     let mut ctx = Context::new();
     ctx.insert("l", &view);
-    ctx.insert("blocked_message", &blocked_message);
     match st.renderer.render("_location_row.html", locale, "", ctx) {
         Ok(html) => (status, Html(html)).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
 
+/// Renders the standalone `#locations-msg` slot (`_locations_msg.html`) with
+/// `message` — used for the 409 delete-blocked response, which the htmx
+/// `response-targets` extension routes to that slot via `hx-target-409`
+/// (see `_location_row.html`'s delete button), leaving the table untouched.
+fn render_message(st: &AppState, locale: &str, status: StatusCode, message: String) -> Response {
+    let mut ctx = Context::new();
+    ctx.insert("message", &message);
+    match st.renderer.render("_locations_msg.html", locale, "", ctx) {
+        Ok(html) => (status, Html(html)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
 /// Looks up `id`'s current spool count via `list_with_spool_counts` — used
-/// after a successful edit (whose `Ok(Location)` carries no count) and
-/// after a blocked delete (to re-render the row with its live data). Falls
+/// after a successful edit (whose `Ok(Location)` carries no count). Falls
 /// back to `0` if the location can't be found or the lookup errors, rather
 /// than failing the whole request over a display-only count.
 async fn spool_count_for(st: &AppState, id: &LocationId) -> u64 {
@@ -132,7 +137,7 @@ async fn create(
     match st.locations.add(new).await {
         Ok(l) => {
             let view: LocationView = (l, 0u64).into(); // freshly created: no spools yet
-            render_row(&st, &locale, StatusCode::OK, view, None)
+            render_row(&st, &locale, StatusCode::OK, view)
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -158,7 +163,7 @@ async fn edit(
         Ok(l) => {
             let count = spool_count_for(&st, &l.id).await;
             let view: LocationView = (l, count).into();
-            render_row(&st, &locale, StatusCode::OK, view, None)
+            render_row(&st, &locale, StatusCode::OK, view)
         }
         Err(RepositoryError::NotFound(_)) => not_found(&st, &locale),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -167,10 +172,14 @@ async fn edit(
 
 /// `DELETE /locations/{id}` — removes the location if it has no spools
 /// assigned. 200 with an empty body on success (the htmx row swap removes
-/// the `<tr>`); 409 with the row re-rendered plus an inline, i18n-formatted
-/// "N spools assigned" message when `LocationsUseCases::delete` refuses
-/// (`DomainError::LocationInUse`) — `t()` has no param interpolation, so the
-/// count is substituted into the localized template string here.
+/// the `<tr>`); 409 with an i18n-formatted "N spools assigned" message when
+/// `LocationsUseCases::delete` refuses (`DomainError::LocationInUse`) —
+/// `t()` has no param interpolation, so the count (already carried by the
+/// domain error — no extra lookup needed) is substituted into the localized
+/// template string here. The 409 body is routed to the dedicated
+/// `#locations-msg` slot by the htmx `response-targets` extension
+/// (`hx-target-409` on the delete button in `_location_row.html`), so the
+/// table itself is never touched on this path.
 async fn delete(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -182,20 +191,11 @@ async fn delete(
         Ok(()) => (StatusCode::OK, Html("")).into_response(),
         Err(RepositoryError::NotFound(_)) => not_found(&st, &locale),
         Err(RepositoryError::Domain(DomainError::LocationInUse { count })) => {
-            match st.locations.list_with_spool_counts().await {
-                Ok(all) => match all.into_iter().find(|(l, _)| l.id == location_id) {
-                    Some((loc, cnt)) => {
-                        let view: LocationView = (loc, cnt).into();
-                        let message = st
-                            .renderer
-                            .t(&locale, "locations.delete.blocked")
-                            .replace("{count}", &count.to_string());
-                        render_row(&st, &locale, StatusCode::CONFLICT, view, Some(message))
-                    }
-                    None => not_found(&st, &locale),
-                },
-                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
-            }
+            let message = st
+                .renderer
+                .t(&locale, "locations.delete.blocked")
+                .replace("{count}", &count.to_string());
+            render_message(&st, &locale, StatusCode::CONFLICT, message)
         }
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
@@ -246,16 +246,18 @@ mod tests {
     }
 
     #[test]
-    fn row_with_blocked_message_renders_inline_and_no_raw_keys() {
+    fn locations_msg_renders_the_interpolated_count_no_raw_keys() {
+        // Mirrors what `delete()` renders into `#locations-msg` on a 409 —
+        // the i18n template string with `{count}` substituted before render.
         let r = Renderer::new(Catalog::load("en"));
         let mut ctx = Context::new();
-        ctx.insert("l", &view());
         ctx.insert(
-            "blocked_message",
-            &Some("This location has 3 spools assigned and cannot be deleted.".to_string()),
+            "message",
+            "This location has 3 spool(s) assigned and cannot be deleted.",
         );
-        let html = r.render("_location_row.html", "en", "", ctx).unwrap();
-        assert!(html.contains("3 spools assigned"));
+        let html = r.render("_locations_msg.html", "en", "", ctx).unwrap();
+        assert!(html.contains(r#"id="locations-msg""#));
+        assert!(html.contains("3 spool(s) assigned"));
         assert!(!html.contains("locations."));
     }
 }

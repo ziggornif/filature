@@ -14,11 +14,9 @@
     <button type="button"
             hx-delete="/locations/{{ l.id }}"
             hx-target="closest tr" hx-swap="outerHTML"
+            hx-target-409="#locations-msg"
             hx-confirm="{{ t(key="locations.delete.confirm") }}">
       {{ t(key="locations.delete") }}
     </button>
-    {% if blocked_message is defined and blocked_message %}
-      <span class="form-error">{{ blocked_message }}</span>
-    {% endif %}
   </td>
 </tr>

@@ -3,21 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- htmx's default responseHandling never swaps non-2xx bodies, which
-       would silently drop the localized error fragments this app returns
-       on 4xx (e.g. materials/spools/locations 422 validation errors, the
-       locations 409 delete-blocked row). 5xx stays swap:false (still an
-       unhandled server error), everything else swaps. -->
-  <meta name="htmx-config" content='{"responseHandling":[
-    {"code":"204", "swap": false},
-    {"code":"[23]..", "swap": true},
-    {"code":"[4]..", "swap": true},
-    {"code":"[5]..", "swap": false, "error": true},
-    {"code":"...", "swap": true}
-  ]}'>
   <title>{{ t(key="app.name") }}</title>
   <link rel="stylesheet" href="/static/app.css">
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
+  <!-- response-targets: lets a control route a specific non-2xx status code
+       to a dedicated target element instead of htmx's default (non-2xx
+       bodies are never swapped into the primary hx-target). Loaded here
+       alongside htmx core so it's available everywhere, but it only takes
+       effect where a template opts in via hx-ext="response-targets" (the
+       locations delete control) — inert everywhere else, incl. materials. -->
+  <script src="https://cdn.jsdelivr.net/npm/htmx-ext-response-targets@2.0.4" integrity="sha384-T41oglUPvXLGBVyRdZsVRxNWnOOqCynaPubjUVjxhsjFTKrFJGEMm3/0KGmNQ+Pg" crossorigin="anonymous"></script>
 </head>
 <body>
   <aside class="sidebar">

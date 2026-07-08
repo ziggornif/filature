@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
   <h1>{{ t(key="locations.title") }}</h1>
-  <table class="locations-table">
+  <div id="locations-msg"></div>
+  <table class="locations-table" hx-ext="response-targets">
     <thead>
       <tr>
         <th>{{ t(key="locations.col.name") }}</th>
