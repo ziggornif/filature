@@ -44,6 +44,14 @@ pub enum DomainError {
     UnknownSpoolStatus(String),
     #[error("price must not be negative, got {0}")]
     NegativeMoney(Decimal),
+    #[error("spool is archived and cannot be modified")]
+    SpoolArchived,
+    #[error("remaining weight must not exceed net weight")]
+    RemainingAboveNet,
+    #[error("spool is already archived")]
+    SpoolAlreadyArchived,
+    #[error("spool is not archived")]
+    SpoolNotArchived,
 }
 
 impl Grams {

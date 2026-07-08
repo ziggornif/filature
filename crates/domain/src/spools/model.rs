@@ -150,6 +150,65 @@ impl Spool {
         }
         self.net_weight = new_net;
     }
+
+    /// Sets the remaining weight directly, deriving status from it.
+    /// Rejects archived spools and remaining weights above net weight.
+    pub fn set_remaining(&mut self, new: Grams) -> Result<(), DomainError> {
+        if self.status == SpoolStatus::Archived {
+            return Err(DomainError::SpoolArchived);
+        }
+        if new.value() > self.net_weight.value() {
+            return Err(DomainError::RemainingAboveNet);
+        }
+        self.remaining_weight = new;
+        self.status = status_for(new, self.net_weight);
+        Ok(())
+    }
+
+    /// Consumes `amount` grams from the remaining weight, flooring at
+    /// zero, and derives status from the result. Rejects archived spools.
+    pub fn consume(&mut self, amount: Grams) -> Result<(), DomainError> {
+        if self.status == SpoolStatus::Archived {
+            return Err(DomainError::SpoolArchived);
+        }
+        let new = Grams::new((self.remaining_weight.value() - amount.value()).max(0.0)).unwrap();
+        self.remaining_weight = new;
+        self.status = status_for(new, self.net_weight);
+        Ok(())
+    }
+
+    /// Archives the spool, leaving remaining weight untouched. Rejects
+    /// spools that are already archived.
+    pub fn archive(&mut self) -> Result<(), DomainError> {
+        if self.status == SpoolStatus::Archived {
+            return Err(DomainError::SpoolAlreadyArchived);
+        }
+        self.status = SpoolStatus::Archived;
+        Ok(())
+    }
+
+    /// Restores an archived spool, deriving status from its remaining
+    /// weight. Rejects spools that are not archived.
+    pub fn restore(&mut self) -> Result<(), DomainError> {
+        if self.status != SpoolStatus::Archived {
+            return Err(DomainError::SpoolNotArchived);
+        }
+        self.status = status_for(self.remaining_weight, self.net_weight);
+        Ok(())
+    }
+}
+
+/// Derives lifecycle status from remaining and net weight. `remaining` is
+/// always within `0..=net` by construction. Never produces `Archived` —
+/// that transition is explicit via `Spool::archive`.
+pub fn status_for(remaining: Grams, net: Grams) -> SpoolStatus {
+    if remaining.value() <= 0.0 {
+        SpoolStatus::Empty
+    } else if remaining.value() >= net.value() {
+        SpoolStatus::Sealed
+    } else {
+        SpoolStatus::Open
+    }
 }
 
 /// Estimated remaining filament length in metres, derived from the
@@ -238,5 +297,96 @@ mod tests {
         ] {
             assert_eq!(SpoolStatus::parse(s.as_str()).unwrap(), s);
         }
+    }
+
+    #[test]
+    fn set_remaining_derives_status() {
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(1000.0).unwrap());
+        s.set_remaining(Grams::new(400.0).unwrap()).unwrap();
+        assert_eq!(s.remaining_weight.value(), 400.0);
+        assert_eq!(s.status, SpoolStatus::Open);
+        s.set_remaining(Grams::new(0.0).unwrap()).unwrap();
+        assert_eq!(s.status, SpoolStatus::Empty);
+        s.set_remaining(Grams::new(1000.0).unwrap()).unwrap();
+        assert_eq!(s.status, SpoolStatus::Sealed);
+        assert_eq!(
+            s.set_remaining(Grams::new(1001.0).unwrap()),
+            Err(DomainError::RemainingAboveNet)
+        );
+    }
+
+    #[test]
+    fn consume_partial_stays_open() {
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(1000.0).unwrap());
+        s.consume(Grams::new(300.0).unwrap()).unwrap();
+        assert_eq!(s.remaining_weight.value(), 700.0);
+        assert_eq!(s.status, SpoolStatus::Open);
+    }
+
+    #[test]
+    fn consume_more_than_remaining_floors_at_zero_and_empty() {
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(200.0).unwrap());
+        s.consume(Grams::new(500.0).unwrap()).unwrap();
+        assert_eq!(s.remaining_weight.value(), 0.0);
+        assert_eq!(s.status, SpoolStatus::Empty);
+    }
+
+    #[test]
+    fn set_remaining_and_consume_on_archived_spool_err() {
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(500.0).unwrap());
+        s.status = SpoolStatus::Archived;
+        assert_eq!(
+            s.set_remaining(Grams::new(100.0).unwrap()),
+            Err(DomainError::SpoolArchived)
+        );
+        assert_eq!(
+            s.consume(Grams::new(100.0).unwrap()),
+            Err(DomainError::SpoolArchived)
+        );
+    }
+
+    #[test]
+    fn archive_from_each_non_archived_status_succeeds() {
+        for (net, remaining) in [
+            (1000.0, 1000.0), // Sealed
+            (1000.0, 400.0),  // Open
+            (1000.0, 0.0),    // Empty
+        ] {
+            let mut s = sample_spool(Grams::new(net).unwrap(), Grams::new(remaining).unwrap());
+            s.archive().unwrap();
+            assert_eq!(s.status, SpoolStatus::Archived);
+            assert_eq!(s.remaining_weight.value(), remaining);
+        }
+    }
+
+    #[test]
+    fn archive_when_already_archived_errs() {
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(500.0).unwrap());
+        s.status = SpoolStatus::Archived;
+        assert_eq!(s.archive(), Err(DomainError::SpoolAlreadyArchived));
+    }
+
+    #[test]
+    fn restore_when_archived_derives_status() {
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(0.0).unwrap());
+        s.status = SpoolStatus::Archived;
+        s.restore().unwrap();
+        assert_eq!(s.status, SpoolStatus::Empty);
+
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(1000.0).unwrap());
+        s.status = SpoolStatus::Archived;
+        s.restore().unwrap();
+        assert_eq!(s.status, SpoolStatus::Sealed);
+
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(400.0).unwrap());
+        s.status = SpoolStatus::Archived;
+        s.restore().unwrap();
+        assert_eq!(s.status, SpoolStatus::Open);
+    }
+
+    #[test]
+    fn restore_when_not_archived_errs() {
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(400.0).unwrap());
+        assert_eq!(s.restore(), Err(DomainError::SpoolNotArchived));
     }
 }
