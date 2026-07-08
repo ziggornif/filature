@@ -572,11 +572,16 @@ async fn finish_op(
 /// Parses a raw form weight field (`remaining`/`amount`) into a valid
 /// `Grams`, rejecting non-numeric input the same way `Grams::new` rejects
 /// negative values — both collapse to the caller's generic
-/// `spools.op.error.weight` message.
+/// `spools.op.error.weight` message. Also rejects non-finite floats
+/// (`NaN`/`Infinity`) up front: `Grams::new` only rejects `< 0.0`, so those
+/// would otherwise pass validation and corrupt `remaining_weight` (a NaN
+/// write, or a `consume` that silently floors the spool at zero via `NaN`
+/// comparisons).
 fn parse_grams(raw: &str) -> Option<Grams> {
     raw.trim()
         .parse::<f64>()
         .ok()
+        .filter(|v| v.is_finite())
         .and_then(|v| Grams::new(v).ok())
 }
 
@@ -1522,6 +1527,61 @@ mod tests {
             assert_eq!(res.status(), StatusCode::NOT_FOUND);
         }
 
+        // --- Review fix 1: non-finite weight input (NaN/Inf) must be
+        // rejected the same way a negative or non-numeric weight is —
+        // `Grams::new` only rejects `< 0.0`, so `"nan"`/`"inf"` sailed
+        // through unless `parse_grams` also checks finiteness.
+        #[tokio::test]
+        async fn post_consume_nan_amount_returns_422_and_does_not_change_spool() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+            let before = spools.view(created.id.clone()).await.unwrap();
+
+            let res = consume(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+                Form(ConsumeForm {
+                    amount: "nan".to_string(),
+                }),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            let html = body_of(res).await;
+            assert!(html.contains("Enter a weight of 0 or more."));
+
+            let after = spools.view(created.id.clone()).await.unwrap();
+            assert_eq!(
+                after.remaining_weight.value(),
+                before.remaining_weight.value()
+            );
+        }
+
+        // --- Review fix 3: a weight op on an already-archived spool must
+        // map `RepositoryError::Domain(DomainError::SpoolArchived)` to a 422
+        // with the localized "This spool is archived." text, over HTTP.
+        #[tokio::test]
+        async fn post_consume_on_archived_spool_returns_422_with_archived_error() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+            spools.archive(created.id.clone()).await.unwrap();
+
+            let res = consume(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+                Form(ConsumeForm {
+                    amount: "10".to_string(),
+                }),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            let html = body_of(res).await;
+            assert!(html.contains("This spool is archived."));
+        }
+
         #[test]
         fn card_fragment_localises_to_french_no_raw_keys() {
             let r = Renderer::new(Catalog::load("en"));
@@ -1529,7 +1589,10 @@ mod tests {
             ctx.insert("spool", &detail_view("01HSP"));
             ctx.insert("error_key", &Option::<&str>::None);
             let html = r.render("_spool_detail_card.html", "fr", "", ctx).unwrap();
-            assert!(html.contains("Enregistrer l'utilisation") || html.contains("Archiver"));
+            // Tera HTML-escapes the apostrophe (`&#39;`) — match the actual
+            // rendered entity, not the raw catalog string.
+            assert!(html.contains("Enregistrer l&#39;utilisation"));
+            assert!(html.contains("Archiver"));
             assert!(!html.contains("spools.")); // no raw i18n key leaks
         }
     }
