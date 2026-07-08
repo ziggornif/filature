@@ -193,10 +193,16 @@ async fn material_options(st: &AppState) -> Result<Vec<MaterialOption>, Response
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response())
 }
 
-fn render_rows(st: &AppState, locale: &str, items: Vec<SpoolListItem>) -> Response {
+fn render_rows(
+    st: &AppState,
+    locale: &str,
+    items: Vec<SpoolListItem>,
+    stock_value: &str,
+) -> Response {
     let views: Vec<SpoolView> = items.into_iter().map(Into::into).collect();
     let mut ctx = Context::new();
     ctx.insert("spools", &views);
+    ctx.insert("stock_value", stock_value);
     match st.renderer.render("_spool_rows.html", locale, "", ctx) {
         Ok(html) => Html(html).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -216,7 +222,13 @@ async fn list_page(
         Err(resp) => return resp,
     };
 
-    match st.spools.list(q.to_filter(), q.to_sort()).await {
+    let filter = q.to_filter();
+    let stock_value = match st.spools.stock_value(filter.clone()).await {
+        Ok(v) => v.to_string(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+
+    match st.spools.list(filter, q.to_sort()).await {
         Ok(items) => {
             let views: Vec<SpoolView> = items.into_iter().map(Into::into).collect();
             let mut ctx = Context::new();
@@ -225,6 +237,7 @@ async fn list_page(
             ctx.insert("selected_material", q.material_id.as_deref().unwrap_or(""));
             ctx.insert("selected_status", q.status.as_deref().unwrap_or(""));
             ctx.insert("selected_sort", q.selected_sort());
+            ctx.insert("stock_value", &stock_value);
             match st
                 .renderer
                 .render("spools.html", &locale, theme.data_attr(), ctx)
@@ -243,8 +256,13 @@ async fn rows(
     Query(q): Query<SpoolQuery>,
 ) -> Response {
     let locale = resolve_locale(&headers, &st);
-    match st.spools.list(q.to_filter(), q.to_sort()).await {
-        Ok(items) => render_rows(&st, &locale, items),
+    let filter = q.to_filter();
+    let stock_value = match st.spools.stock_value(filter.clone()).await {
+        Ok(v) => v.to_string(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+    match st.spools.list(filter, q.to_sort()).await {
+        Ok(items) => render_rows(&st, &locale, items, &stock_value),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
@@ -877,6 +895,7 @@ mod tests {
         ctx.insert("selected_material", "");
         ctx.insert("selected_status", "");
         ctx.insert("selected_sort", "created_desc");
+        ctx.insert("stock_value", "37.50");
         r.render("spools.html", locale, "", ctx).unwrap()
     }
 
@@ -899,14 +918,42 @@ mod tests {
     }
 
     #[test]
+    fn list_page_shows_stock_value_stat_no_raw_keys() {
+        let html = render_list("en");
+        assert!(html.contains(r#"id="stock-value""#));
+        assert!(html.contains("Stock value"));
+        assert!(html.contains("37.50"));
+        assert!(!html.contains("spools.stock_value")); // no raw i18n key leaks
+    }
+
+    #[test]
+    fn list_page_stock_value_localises_to_french() {
+        let html = render_list("fr");
+        assert!(html.contains("Valeur du stock"));
+        assert!(!html.contains("spools.stock_value"));
+    }
+
+    #[test]
     fn rows_fragment_renders_only_rows_no_page_shell() {
         let r = Renderer::new(Catalog::load("en"));
         let mut ctx = Context::new();
         ctx.insert("spools", &vec![view("01HSP", "Open")]);
+        ctx.insert("stock_value", "37.50");
         let html = r.render("_spool_rows.html", "en", "", ctx).unwrap();
         assert!(html.contains("01HSP"));
         assert!(!html.contains("<html")); // fragment only, no full page shell
         assert!(!html.contains("<table")); // tbody content only, no wrapper
+    }
+
+    #[test]
+    fn rows_fragment_includes_oob_stock_value_span() {
+        let r = Renderer::new(Catalog::load("en"));
+        let mut ctx = Context::new();
+        ctx.insert("spools", &vec![view("01HSP", "Open")]);
+        ctx.insert("stock_value", "37.50");
+        let html = r.render("_spool_rows.html", "en", "", ctx).unwrap();
+        assert!(html.contains(r#"id="stock-value" hx-swap-oob="true""#));
+        assert!(html.contains("37.50"));
     }
 
     fn detail_view(id: &str) -> SpoolDetailView {
@@ -1264,6 +1311,34 @@ mod tests {
         }
 
         // --- Task 11: GET /spools/{id}/edit and PUT /spools/{id}.
+
+        // --- Task 8: Stock Value stat on the list page.
+
+        #[tokio::test]
+        async fn get_list_shows_stock_value_for_seeded_spool() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            spools.add(valid_new_spool(&material_id)).await.unwrap();
+
+            let res = list_page(State(st), HeaderMap::new(), Query(SpoolQuery::default())).await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains(r#"id="stock-value""#));
+            assert!(html.contains("24.99")); // full sealed spool: remaining == net -> full price
+        }
+
+        #[tokio::test]
+        async fn get_rows_includes_oob_stock_value_for_seeded_spool() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            spools.add(valid_new_spool(&material_id)).await.unwrap();
+
+            let res = rows(State(st), HeaderMap::new(), Query(SpoolQuery::default())).await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains(r#"id="stock-value" hx-swap-oob="true""#));
+            assert!(html.contains("24.99"));
+        }
 
         #[tokio::test]
         async fn get_edit_prefills_form_from_stored_spool() {

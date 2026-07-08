@@ -20,6 +20,7 @@
   "materials.sensitivity.high": "High",
   "materials.add": "Add material",
   "spools.title": "Spools",
+  "spools.stock_value": "Stock value",
   "spools.filter.material": "Material",
   "spools.filter.all_materials": "All materials",
   "spools.filter.status": "Status",

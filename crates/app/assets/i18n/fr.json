@@ -20,6 +20,7 @@
   "materials.sensitivity.high": "Élevée",
   "materials.add": "Ajouter un matériau",
   "spools.title": "Bobines",
+  "spools.stock_value": "Valeur du stock",
   "spools.filter.material": "Matériau",
   "spools.filter.all_materials": "Tous les matériaux",
   "spools.filter.status": "Statut",

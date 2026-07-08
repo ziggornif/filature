@@ -2,6 +2,11 @@
 {% block content %}
   <h1>{{ t(key="spools.title") }}</h1>
 
+  <p class="spools-stock-value">
+    {{ t(key="spools.stock_value") }}
+    <span id="stock-value">{{ stock_value }}</span>
+  </p>
+
   <form class="spools-filter-bar"
         hx-get="/spools/rows"
         hx-target="#spools-table-body"
