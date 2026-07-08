@@ -339,6 +339,12 @@ mod tests {
             s.set_remaining(Grams::new(100.0).unwrap()),
             Err(DomainError::SpoolArchived)
         );
+        // Value exceeds net weight (1000.0): proves the archived check runs
+        // BEFORE the RemainingAboveNet check, not after.
+        assert_eq!(
+            s.set_remaining(Grams::new(1001.0).unwrap()),
+            Err(DomainError::SpoolArchived)
+        );
         assert_eq!(
             s.consume(Grams::new(100.0).unwrap()),
             Err(DomainError::SpoolArchived)
