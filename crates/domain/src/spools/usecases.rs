@@ -1,3 +1,4 @@
+use crate::shared::{Grams, Money};
 use crate::spools::model::{NewSpool, Spool, SpoolId};
 use crate::spools::ports::api::SpoolsUseCases;
 use crate::spools::ports::spi::{RepositoryError, SpoolFilter, SpoolRepository, SpoolSort};
@@ -41,12 +42,56 @@ impl SpoolsUseCases for SpoolsService {
             .await?
             .ok_or(RepositoryError::NotFound(id))
     }
+
+    async fn set_remaining(&self, id: SpoolId, remaining: Grams) -> Result<Spool, RepositoryError> {
+        let mut s = self
+            .repo
+            .find(&id)
+            .await?
+            .ok_or(RepositoryError::NotFound(id))?;
+        s.set_remaining(remaining)?;
+        self.repo.update(s).await
+    }
+
+    async fn consume(&self, id: SpoolId, amount: Grams) -> Result<Spool, RepositoryError> {
+        let mut s = self
+            .repo
+            .find(&id)
+            .await?
+            .ok_or(RepositoryError::NotFound(id))?;
+        s.consume(amount)?;
+        self.repo.update(s).await
+    }
+
+    async fn archive(&self, id: SpoolId) -> Result<Spool, RepositoryError> {
+        let mut s = self
+            .repo
+            .find(&id)
+            .await?
+            .ok_or(RepositoryError::NotFound(id))?;
+        s.archive()?;
+        self.repo.update(s).await
+    }
+
+    async fn restore(&self, id: SpoolId) -> Result<Spool, RepositoryError> {
+        let mut s = self
+            .repo
+            .find(&id)
+            .await?
+            .ok_or(RepositoryError::NotFound(id))?;
+        s.restore()?;
+        self.repo.update(s).await
+    }
+
+    async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError> {
+        self.repo.stock_value(filter).await
+    }
 }
 
 #[cfg(all(test, feature = "stubs"))]
 mod tests {
     use super::*;
-    use crate::shared::{Grams, MaterialId, Money};
+    use crate::shared::{DomainError, Grams, MaterialId, Money};
     use crate::spools::model::{Colour, Diameter, SpoolStatus};
     use crate::spools::stubs::StubSpoolRepository;
 
@@ -60,7 +105,7 @@ mod tests {
             colour: Colour::new("#1A9E4B".into(), None).unwrap(),
             diameter: Diameter::Mm1_75,
             net_weight: Grams::new(1000.0).unwrap(),
-            price_paid: Money::new(2500, 2),
+            price_paid: Money::new(2500, 2).unwrap(),
         }
     }
 
@@ -185,5 +230,107 @@ mod tests {
         assert_eq!(items[0].id, third.id);
         assert_eq!(items[1].id, second.id);
         assert_eq!(items[2].id, first.id);
+    }
+
+    #[tokio::test]
+    async fn consume_drives_sealed_to_open_to_empty() {
+        let s = svc();
+        let created = s.add(sample_new_spool("material-1")).await.unwrap();
+        assert_eq!(created.status, SpoolStatus::Sealed);
+
+        s.consume(created.id.clone(), Grams::new(300.0).unwrap())
+            .await
+            .unwrap();
+        let after_partial = s.view(created.id.clone()).await.unwrap();
+        assert_eq!(after_partial.remaining_weight.value(), 700.0);
+        assert_eq!(after_partial.status, SpoolStatus::Open);
+
+        s.consume(created.id.clone(), Grams::new(700.0).unwrap())
+            .await
+            .unwrap();
+        let after_full = s.view(created.id.clone()).await.unwrap();
+        assert_eq!(after_full.remaining_weight.value(), 0.0);
+        assert_eq!(after_full.status, SpoolStatus::Empty);
+    }
+
+    #[tokio::test]
+    async fn set_remaining_above_net_is_rejected() {
+        let s = svc();
+        let created = s.add(sample_new_spool("material-1")).await.unwrap();
+        let err = s
+            .set_remaining(created.id.clone(), Grams::new(1001.0).unwrap())
+            .await
+            .unwrap_err();
+        assert_eq!(err, RepositoryError::Domain(DomainError::RemainingAboveNet));
+    }
+
+    #[tokio::test]
+    async fn set_remaining_on_unknown_id_is_not_found() {
+        let s = svc();
+        let err = s
+            .set_remaining(SpoolId::new("does-not-exist"), Grams::new(10.0).unwrap())
+            .await
+            .unwrap_err();
+        assert!(matches!(err, RepositoryError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn archive_omits_from_default_list_and_restore_derives_status() {
+        let s = svc();
+        let created = s.add(sample_new_spool("material-1")).await.unwrap();
+        s.set_remaining(created.id.clone(), Grams::new(400.0).unwrap())
+            .await
+            .unwrap();
+        s.add(sample_new_spool("material-1")).await.unwrap(); // stays Sealed
+
+        let archived = s.archive(created.id.clone()).await.unwrap();
+        assert_eq!(archived.status, SpoolStatus::Archived);
+
+        let default_list = s
+            .list(SpoolFilter::default(), SpoolSort::CreatedDesc)
+            .await
+            .unwrap();
+        assert!(default_list.iter().all(|i| i.id != created.id));
+        assert_eq!(default_list.len(), 1);
+
+        let archived_list = s
+            .list(
+                SpoolFilter {
+                    material_id: None,
+                    status: Some(SpoolStatus::Archived),
+                },
+                SpoolSort::CreatedDesc,
+            )
+            .await
+            .unwrap();
+        assert_eq!(archived_list.len(), 1);
+        assert_eq!(archived_list[0].id, created.id);
+
+        let restored = s.restore(created.id.clone()).await.unwrap();
+        assert_eq!(restored.status, SpoolStatus::Open);
+        assert_eq!(restored.remaining_weight.value(), 400.0);
+
+        let default_list_after_restore = s
+            .list(SpoolFilter::default(), SpoolSort::CreatedDesc)
+            .await
+            .unwrap();
+        assert_eq!(default_list_after_restore.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn stock_value_sums_remaining_ratio_times_price() {
+        let s = svc();
+        // Full spool: 1000g net, 2500 (25.00) price, remaining == net -> 25.00.
+        let full = s.add(sample_new_spool("material-1")).await.unwrap();
+        assert_eq!(full.status, SpoolStatus::Sealed);
+
+        // Half-consumed spool: remaining 500/1000 -> 12.50.
+        let half = s.add(sample_new_spool("material-1")).await.unwrap();
+        s.set_remaining(half.id.clone(), Grams::new(500.0).unwrap())
+            .await
+            .unwrap();
+
+        let value = s.stock_value(SpoolFilter::default()).await.unwrap();
+        assert_eq!(value, Money::new(3750, 2).unwrap());
     }
 }

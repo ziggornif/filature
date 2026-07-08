@@ -16,9 +16,9 @@ use axum::{
     extract::{Form, Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
-    routing::get,
+    routing::{get, post},
 };
-use domain::shared::{Grams, MaterialId};
+use domain::shared::{DomainError, Grams, MaterialId, Money};
 use domain::spools::{
     Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolDetail, SpoolFilter, SpoolId,
     SpoolListItem, SpoolSort, SpoolStatus,
@@ -193,10 +193,16 @@ async fn material_options(st: &AppState) -> Result<Vec<MaterialOption>, Response
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response())
 }
 
-fn render_rows(st: &AppState, locale: &str, items: Vec<SpoolListItem>) -> Response {
+fn render_rows(
+    st: &AppState,
+    locale: &str,
+    items: Vec<SpoolListItem>,
+    stock_value: &str,
+) -> Response {
     let views: Vec<SpoolView> = items.into_iter().map(Into::into).collect();
     let mut ctx = Context::new();
     ctx.insert("spools", &views);
+    ctx.insert("stock_value", stock_value);
     match st.renderer.render("_spool_rows.html", locale, "", ctx) {
         Ok(html) => Html(html).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
@@ -216,7 +222,13 @@ async fn list_page(
         Err(resp) => return resp,
     };
 
-    match st.spools.list(q.to_filter(), q.to_sort()).await {
+    let filter = q.to_filter();
+    let stock_value = match st.spools.stock_value(filter.clone()).await {
+        Ok(v) => v.to_string(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+
+    match st.spools.list(filter, q.to_sort()).await {
         Ok(items) => {
             let views: Vec<SpoolView> = items.into_iter().map(Into::into).collect();
             let mut ctx = Context::new();
@@ -225,6 +237,7 @@ async fn list_page(
             ctx.insert("selected_material", q.material_id.as_deref().unwrap_or(""));
             ctx.insert("selected_status", q.status.as_deref().unwrap_or(""));
             ctx.insert("selected_sort", q.selected_sort());
+            ctx.insert("stock_value", &stock_value);
             match st
                 .renderer
                 .render("spools.html", &locale, theme.data_attr(), ctx)
@@ -243,8 +256,13 @@ async fn rows(
     Query(q): Query<SpoolQuery>,
 ) -> Response {
     let locale = resolve_locale(&headers, &st);
-    match st.spools.list(q.to_filter(), q.to_sort()).await {
-        Ok(items) => render_rows(&st, &locale, items),
+    let filter = q.to_filter();
+    let stock_value = match st.spools.stock_value(filter.clone()).await {
+        Ok(v) => v.to_string(),
+        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    };
+    match st.spools.list(filter, q.to_sort()).await {
+        Ok(items) => render_rows(&st, &locale, items, &stock_value),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
@@ -279,7 +297,7 @@ struct SpoolFormFields {
     colour: Colour,
     diameter: Diameter,
     net_weight: Grams,
-    price_paid: Decimal,
+    price_paid: Money,
 }
 
 impl SpoolForm {
@@ -310,11 +328,10 @@ impl SpoolForm {
         if net_weight.value() <= 0.0 {
             return Err("spools.new.error.weight");
         }
-        let price_paid = Decimal::from_str_exact(self.price_paid.trim())
+        let price_paid_dec = Decimal::from_str_exact(self.price_paid.trim())
             .map_err(|_| "spools.new.error.price")?;
-        if price_paid < Decimal::ZERO {
-            return Err("spools.new.error.price");
-        }
+        let price_paid =
+            Money::from_decimal(price_paid_dec).map_err(|_| "spools.new.error.price")?;
         Ok(SpoolFormFields {
             material_id: MaterialId::new(self.material_id.trim().to_string()),
             colour,
@@ -477,6 +494,10 @@ async fn detail_page(
     let view: SpoolDetailView = detail.into();
     let mut ctx = Context::new();
     ctx.insert("spool", &view);
+    // The page includes `_spool_detail_card.html`, which always references
+    // `error_key` (to show/hide its op-error line) — insert `None` here so
+    // that include doesn't hit an undefined variable on a fresh page load.
+    ctx.insert("error_key", &Option::<&str>::None);
     match st
         .renderer
         .render("spools_detail.html", &locale, theme.data_attr(), ctx)
@@ -484,6 +505,189 @@ async fn detail_page(
         Ok(html) => Html(html).into_response(),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
+}
+
+/// Renders the detail-card fragment (`_spool_detail_card.html`) — the
+/// weight/status `<dl>` plus the op forms (set-remaining/consume/archive or
+/// restore) — used both standalone (an op handler's htmx `outerHTML` swap
+/// target) and `{% include %}`d inside the full detail page. `error_key`,
+/// when set, is shown as a localized op-error line inside the card.
+async fn render_card(
+    st: &AppState,
+    locale: &str,
+    status: StatusCode,
+    detail: SpoolDetail,
+    error_key: Option<&str>,
+) -> Response {
+    let view: SpoolDetailView = detail.into();
+    let mut ctx = Context::new();
+    ctx.insert("spool", &view);
+    ctx.insert("error_key", &error_key);
+    match st
+        .renderer
+        .render("_spool_detail_card.html", locale, "", ctx)
+    {
+        Ok(html) => (status, Html(html)).into_response(),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+/// Re-fetches `id`'s detail and renders the card fragment — the shared tail
+/// of every op handler's success and domain-error paths (both need a fresh
+/// `SpoolDetail`, since the mutated `Spool` returned by the use case lacks
+/// the display-only `material_name`/`density` joined by `view`).
+async fn render_card_for(
+    st: &AppState,
+    locale: &str,
+    id: SpoolId,
+    status: StatusCode,
+    error_key: Option<&str>,
+) -> Response {
+    match st.spools.view(id).await {
+        Ok(detail) => render_card(st, locale, status, detail, error_key).await,
+        Err(RepositoryError::NotFound(_)) => not_found(st, locale),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+/// Maps a lifecycle `DomainError` from a weight/archive op to the i18n key
+/// shown in the re-rendered card fragment. The archive-lifecycle variants
+/// (`SpoolArchived` — a weight op on an archived spool, `SpoolAlreadyArchived`,
+/// `SpoolNotArchived`) all share one "this spool is archived" message; any
+/// other `DomainError` (defensive catch-all — the four ops here only ever
+/// produce the variants above) falls back to the generic weight error.
+fn op_error_key(e: &DomainError) -> &'static str {
+    match e {
+        DomainError::RemainingAboveNet => "spools.op.error.remaining_above_net",
+        DomainError::SpoolArchived
+        | DomainError::SpoolAlreadyArchived
+        | DomainError::SpoolNotArchived => "spools.op.error.archived",
+        _ => "spools.op.error.weight",
+    }
+}
+
+/// Maps an op's `Result<Spool, RepositoryError>` to a response: success and
+/// domain-error both re-render the card fragment (200 / 422 respectively),
+/// `NotFound` 404s, anything else 500s (TD-005's existing `e.to_string()`
+/// pattern, unchanged).
+async fn finish_op(
+    st: &AppState,
+    locale: &str,
+    id: SpoolId,
+    result: Result<Spool, RepositoryError>,
+) -> Response {
+    match result {
+        Ok(_) => render_card_for(st, locale, id, StatusCode::OK, None).await,
+        Err(RepositoryError::NotFound(_)) => not_found(st, locale),
+        Err(RepositoryError::Domain(e)) => {
+            let key = op_error_key(&e);
+            render_card_for(st, locale, id, StatusCode::UNPROCESSABLE_ENTITY, Some(key)).await
+        }
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+/// Parses a raw form weight field (`remaining`/`amount`) into a valid
+/// `Grams`, rejecting non-numeric input the same way `Grams::new` rejects
+/// negative values — both collapse to the caller's generic
+/// `spools.op.error.weight` message. Non-finite floats (`NaN`/`Infinity`)
+/// are rejected by `Grams::new` itself, at the domain root.
+fn parse_grams(raw: &str) -> Option<Grams> {
+    raw.trim()
+        .parse::<f64>()
+        .ok()
+        .and_then(|v| Grams::new(v).ok())
+}
+
+/// The shared "couldn't even parse the weight field" response for
+/// `set_remaining`/`consume` — re-renders the card fragment (422) with the
+/// generic weight-error key, same shape as a domain-rejected weight.
+async fn invalid_weight(st: &AppState, locale: &str, id: SpoolId) -> Response {
+    render_card_for(
+        st,
+        locale,
+        id,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        Some("spools.op.error.weight"),
+    )
+    .await
+}
+
+/// The `POST /spools/{id}/remaining` form payload — a raw string (see
+/// `SpoolForm`'s doc comment for why: malformed input reaches this
+/// handler's own validation rather than a plain 400 from `Form`).
+#[derive(Debug, Deserialize, Default)]
+pub struct RemainingForm {
+    #[serde(default)]
+    pub remaining: String,
+}
+
+/// The `POST /spools/{id}/consume` form payload.
+#[derive(Debug, Deserialize, Default)]
+pub struct ConsumeForm {
+    #[serde(default)]
+    pub amount: String,
+}
+
+/// `POST /spools/{id}/remaining` — sets the spool's remaining weight
+/// directly (e.g. after a physical re-weigh). Rejects a remaining weight
+/// above net weight and archived spools (both via `Spool::set_remaining`).
+async fn set_remaining(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Form(form): Form<RemainingForm>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let spool_id = SpoolId::new(id);
+    let Some(grams) = parse_grams(&form.remaining) else {
+        return invalid_weight(&st, &locale, spool_id).await;
+    };
+    let result = st.spools.set_remaining(spool_id.clone(), grams).await;
+    finish_op(&st, &locale, spool_id, result).await
+}
+
+/// `POST /spools/{id}/consume` — draws down the spool's remaining weight by
+/// `amount` grams, flooring at zero (via `Spool::consume`).
+async fn consume(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Form(form): Form<ConsumeForm>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let spool_id = SpoolId::new(id);
+    let Some(grams) = parse_grams(&form.amount) else {
+        return invalid_weight(&st, &locale, spool_id).await;
+    };
+    let result = st.spools.consume(spool_id.clone(), grams).await;
+    finish_op(&st, &locale, spool_id, result).await
+}
+
+/// `POST /spools/{id}/archive` — no body. Rejects an already-archived
+/// spool.
+async fn archive(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let spool_id = SpoolId::new(id);
+    let result = st.spools.archive(spool_id.clone()).await;
+    finish_op(&st, &locale, spool_id, result).await
+}
+
+/// `POST /spools/{id}/restore` — no body. Rejects a spool that isn't
+/// archived.
+async fn restore(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let spool_id = SpoolId::new(id);
+    let result = st.spools.restore(spool_id.clone()).await;
+    finish_op(&st, &locale, spool_id, result).await
 }
 
 /// The parts of `render_edit_form`'s response that vary by call site,
@@ -645,6 +849,10 @@ pub fn routes() -> Router<AppState> {
         .route("/spools/new", get(new_page))
         .route("/spools/{id}/edit", get(edit_page))
         .route("/spools/{id}", get(detail_page).put(update))
+        .route("/spools/{id}/remaining", post(set_remaining))
+        .route("/spools/{id}/consume", post(consume))
+        .route("/spools/{id}/archive", post(archive))
+        .route("/spools/{id}/restore", post(restore))
 }
 
 #[cfg(test)]
@@ -683,6 +891,7 @@ mod tests {
         ctx.insert("selected_material", "");
         ctx.insert("selected_status", "");
         ctx.insert("selected_sort", "created_desc");
+        ctx.insert("stock_value", "37.50");
         r.render("spools.html", locale, "", ctx).unwrap()
     }
 
@@ -705,14 +914,42 @@ mod tests {
     }
 
     #[test]
+    fn list_page_shows_stock_value_stat_no_raw_keys() {
+        let html = render_list("en");
+        assert!(html.contains(r#"id="stock-value""#));
+        assert!(html.contains("Stock value"));
+        assert!(html.contains("37.50"));
+        assert!(!html.contains("spools.stock_value")); // no raw i18n key leaks
+    }
+
+    #[test]
+    fn list_page_stock_value_localises_to_french() {
+        let html = render_list("fr");
+        assert!(html.contains("Valeur du stock"));
+        assert!(!html.contains("spools.stock_value"));
+    }
+
+    #[test]
     fn rows_fragment_renders_only_rows_no_page_shell() {
         let r = Renderer::new(Catalog::load("en"));
         let mut ctx = Context::new();
         ctx.insert("spools", &vec![view("01HSP", "Open")]);
+        ctx.insert("stock_value", "37.50");
         let html = r.render("_spool_rows.html", "en", "", ctx).unwrap();
         assert!(html.contains("01HSP"));
         assert!(!html.contains("<html")); // fragment only, no full page shell
         assert!(!html.contains("<table")); // tbody content only, no wrapper
+    }
+
+    #[test]
+    fn rows_fragment_includes_oob_stock_value_span() {
+        let r = Renderer::new(Catalog::load("en"));
+        let mut ctx = Context::new();
+        ctx.insert("spools", &vec![view("01HSP", "Open")]);
+        ctx.insert("stock_value", "37.50");
+        let html = r.render("_spool_rows.html", "en", "", ctx).unwrap();
+        assert!(html.contains(r#"id="stock-value" hx-swap-oob="true""#));
+        assert!(html.contains("37.50"));
     }
 
     fn detail_view(id: &str) -> SpoolDetailView {
@@ -859,7 +1096,10 @@ mod tests {
         assert_eq!(new.colour.name(), Some("vert sapin"));
         assert_eq!(new.diameter, Diameter::Mm1_75);
         assert_eq!(new.net_weight.value(), 1000.0);
-        assert_eq!(new.price_paid, Decimal::from_str_exact("24.99").unwrap());
+        assert_eq!(
+            new.price_paid,
+            Money::from_decimal(Decimal::from_str_exact("24.99").unwrap()).unwrap()
+        );
     }
 
     #[test]
@@ -1068,6 +1308,34 @@ mod tests {
 
         // --- Task 11: GET /spools/{id}/edit and PUT /spools/{id}.
 
+        // --- Task 8: Stock Value stat on the list page.
+
+        #[tokio::test]
+        async fn get_list_shows_stock_value_for_seeded_spool() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            spools.add(valid_new_spool(&material_id)).await.unwrap();
+
+            let res = list_page(State(st), HeaderMap::new(), Query(SpoolQuery::default())).await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains(r#"id="stock-value""#));
+            assert!(html.contains("24.99")); // full sealed spool: remaining == net -> full price
+        }
+
+        #[tokio::test]
+        async fn get_rows_includes_oob_stock_value_for_seeded_spool() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            spools.add(valid_new_spool(&material_id)).await.unwrap();
+
+            let res = rows(State(st), HeaderMap::new(), Query(SpoolQuery::default())).await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains(r#"id="stock-value" hx-swap-oob="true""#));
+            assert!(html.contains("24.99"));
+        }
+
         #[tokio::test]
         async fn get_edit_prefills_form_from_stored_spool() {
             let (st, material_id) = test_state().await;
@@ -1236,6 +1504,167 @@ mod tests {
             )
             .await;
             assert_eq!(res.status(), StatusCode::NOT_FOUND);
+        }
+
+        // --- Task 7: detail-page weight ops + archive/restore (htmx).
+
+        #[tokio::test]
+        async fn post_consume_drives_status_open_and_returns_fragment() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+
+            let res = consume(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+                Form(ConsumeForm {
+                    amount: "300".to_string(),
+                }),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(!html.contains("<html")); // fragment only, no page shell
+            assert!(!html.contains("<table"));
+            assert!(html.contains("700")); // 1000 - 300 remaining
+            assert!(html.contains("Open")); // spools.status.open label (en)
+
+            let detail = spools.view(created.id.clone()).await.unwrap();
+            assert_eq!(detail.remaining_weight.value(), 700.0);
+            assert_eq!(detail.status, SpoolStatus::Open);
+        }
+
+        #[tokio::test]
+        async fn post_set_remaining_above_net_returns_422_with_error() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+
+            let res = set_remaining(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+                Form(RemainingForm {
+                    remaining: "1500".to_string(),
+                }),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            let html = body_of(res).await;
+            assert!(html.contains("Remaining cannot exceed net weight."));
+
+            let detail = spools.view(created.id.clone()).await.unwrap();
+            assert_eq!(detail.remaining_weight.value(), 1000.0); // unchanged
+        }
+
+        #[tokio::test]
+        async fn post_archive_then_restore_toggles_card_controls() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+            let id = created.id.as_str().to_string();
+            let restore_post = format!(r#"hx-post="/spools/{id}/restore""#);
+            let remaining_post = format!(r#"hx-post="/spools/{id}/remaining""#);
+            let consume_post = format!(r#"hx-post="/spools/{id}/consume""#);
+
+            let archived = archive(State(st.clone()), HeaderMap::new(), Path(id.clone())).await;
+            assert_eq!(archived.status(), StatusCode::OK);
+            let html = body_of(archived).await;
+            assert!(html.contains(&restore_post)); // Restore control shown
+            assert!(!html.contains(&remaining_post)); // weight forms hidden
+            assert!(!html.contains(&consume_post));
+
+            let restored = restore(State(st), HeaderMap::new(), Path(id)).await;
+            assert_eq!(restored.status(), StatusCode::OK);
+            let html = body_of(restored).await;
+            assert!(html.contains(&remaining_post)); // ops forms shown again
+            assert!(html.contains(&consume_post));
+            assert!(!html.contains(&restore_post));
+        }
+
+        #[tokio::test]
+        async fn post_consume_unknown_id_returns_404() {
+            let (st, _material_id) = test_state().await;
+            let res = consume(
+                State(st),
+                HeaderMap::new(),
+                Path("does-not-exist".to_string()),
+                Form(ConsumeForm {
+                    amount: "10".to_string(),
+                }),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::NOT_FOUND);
+        }
+
+        // --- Review fix 1: non-finite weight input (NaN/Inf) must be
+        // rejected the same way a negative or non-numeric weight is —
+        // `Grams::new` rejects non-finite values at the domain root, so
+        // `"nan"`/`"inf"` are caught by `parse_grams`'s `Grams::new` call.
+        #[tokio::test]
+        async fn post_consume_nan_amount_returns_422_and_does_not_change_spool() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+            let before = spools.view(created.id.clone()).await.unwrap();
+
+            let res = consume(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+                Form(ConsumeForm {
+                    amount: "nan".to_string(),
+                }),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            let html = body_of(res).await;
+            assert!(html.contains("Enter a weight of 0 or more."));
+
+            let after = spools.view(created.id.clone()).await.unwrap();
+            assert_eq!(
+                after.remaining_weight.value(),
+                before.remaining_weight.value()
+            );
+        }
+
+        // --- Review fix 3: a weight op on an already-archived spool must
+        // map `RepositoryError::Domain(DomainError::SpoolArchived)` to a 422
+        // with the localized "This spool is archived." text, over HTTP.
+        #[tokio::test]
+        async fn post_consume_on_archived_spool_returns_422_with_archived_error() {
+            let (st, material_id) = test_state().await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+            spools.archive(created.id.clone()).await.unwrap();
+
+            let res = consume(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+                Form(ConsumeForm {
+                    amount: "10".to_string(),
+                }),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+            let html = body_of(res).await;
+            assert!(html.contains("This spool is archived."));
+        }
+
+        #[test]
+        fn card_fragment_localises_to_french_no_raw_keys() {
+            let r = Renderer::new(Catalog::load("en"));
+            let mut ctx = Context::new();
+            ctx.insert("spool", &detail_view("01HSP"));
+            ctx.insert("error_key", &Option::<&str>::None);
+            let html = r.render("_spool_detail_card.html", "fr", "", ctx).unwrap();
+            // Tera HTML-escapes the apostrophe (`&#39;`) — match the actual
+            // rendered entity, not the raw catalog string.
+            assert!(html.contains("Enregistrer l&#39;utilisation"));
+            assert!(html.contains("Archiver"));
+            assert!(!html.contains("spools.")); // no raw i18n key leaks
         }
     }
 }

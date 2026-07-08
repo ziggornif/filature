@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id, s.colour_hex, s.colour_name, s.diameter,\n                              s.net_weight, s.remaining_weight, s.status,\n                              m.name AS material_name, m.density\n                       FROM spools s JOIN materials m ON m.id = s.material_id\n                       WHERE ($1::text IS NULL OR s.material_id = $1)\n                         AND ($2::text IS NULL OR s.status = $2)\n                       ORDER BY (s.remaining_weight / s.net_weight) DESC",
+  "query": "SELECT id, material_id, colour_hex, colour_name, diameter,\n                      net_weight, remaining_weight, price_paid, status\n               FROM spools WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -16,6 +16,17 @@
       },
       {
         "ordinal": 1,
+        "name": "material_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spools",
+            "name": "material_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
         "name": "colour_hex",
         "type_info": "Text",
         "origin": {
@@ -26,7 +37,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "colour_name",
         "type_info": "Text",
         "origin": {
@@ -37,7 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "diameter",
         "type_info": "Text",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "net_weight",
         "type_info": "Float8",
         "origin": {
@@ -59,7 +70,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "remaining_weight",
         "type_info": "Float8",
         "origin": {
@@ -70,7 +81,18 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
+        "name": "price_paid",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "spools",
+            "name": "price_paid"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "status",
         "type_info": "Text",
         "origin": {
@@ -79,37 +101,15 @@
             "name": "status"
           }
         }
-      },
-      {
-        "ordinal": 7,
-        "name": "material_name",
-        "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "materials",
-            "name": "name"
-          }
-        }
-      },
-      {
-        "ordinal": 8,
-        "name": "density",
-        "type_info": "Float8",
-        "origin": {
-          "Table": {
-            "table": "materials",
-            "name": "density"
-          }
-        }
       }
     ],
     "parameters": {
       "Left": [
-        "Text",
         "Text"
       ]
     },
     "nullable": [
+      false,
       false,
       false,
       true,
@@ -117,9 +117,8 @@
       false,
       false,
       false,
-      false,
       false
     ]
   },
-  "hash": "ea9b2cf2ae448f8b7f98bd2637169981c5a601e5d21a0a154214da8130e865d2"
+  "hash": "3fa5b5ef0e36614ef5c74c3b76760bff887b092ffde93bb26bb89ed927c18919"
 }

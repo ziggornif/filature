@@ -1,3 +1,4 @@
+use crate::shared::{Grams, Money};
 use crate::spools::model::{NewSpool, Spool, SpoolId};
 use crate::spools::ports::spi::{RepositoryError, SpoolFilter, SpoolSort};
 use crate::spools::read_models::{SpoolDetail, SpoolListItem};
@@ -13,4 +14,9 @@ pub trait SpoolsUseCases: Send + Sync {
         sort: SpoolSort,
     ) -> Result<Vec<SpoolListItem>, RepositoryError>;
     async fn view(&self, id: SpoolId) -> Result<SpoolDetail, RepositoryError>;
+    async fn set_remaining(&self, id: SpoolId, remaining: Grams) -> Result<Spool, RepositoryError>;
+    async fn consume(&self, id: SpoolId, amount: Grams) -> Result<Spool, RepositoryError>;
+    async fn archive(&self, id: SpoolId) -> Result<Spool, RepositoryError>;
+    async fn restore(&self, id: SpoolId) -> Result<Spool, RepositoryError>;
+    async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError>;
 }

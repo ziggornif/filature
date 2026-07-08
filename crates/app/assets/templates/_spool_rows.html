@@ -1,3 +1,4 @@
 {% for s in spools %}
   {% include "_spool_row.html" %}
 {% endfor %}
+<span id="stock-value" hx-swap-oob="true">{{ stock_value }}</span>
