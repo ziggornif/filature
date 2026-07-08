@@ -1,0 +1,71 @@
+<div id="spool-card" hx-target="this" hx-swap="outerHTML">
+  {% if error_key %}
+    <p class="form-error">{{ t(key=error_key) }}</p>
+  {% endif %}
+
+  <dl class="spool-detail">
+    <dt>{{ t(key="spools.col.colour") }}</dt>
+    <dd>
+      <span class="colour-swatch"
+            style="background:{{ spool.colour_hex }}; display:inline-block; width:14px; height:14px; border-radius:3px;"
+            title="{{ spool.colour_label }}"></span>
+      {% if spool.has_colour_name %}{{ spool.colour_label }}{% else %}{{ spool.colour_hex }}{% endif %}
+    </dd>
+
+    <dt>{{ t(key="spools.col.material") }}</dt>
+    <dd>{{ spool.material_name }}</dd>
+
+    <dt>{{ t(key="spools.col.diameter") }}</dt>
+    <dd>{{ spool.diameter }}</dd>
+
+    <dt>{{ t(key="spools.col.net_weight") }}</dt>
+    <dd>{{ spool.net_weight }}</dd>
+
+    <dt>{{ t(key="spools.col.remaining_weight") }}</dt>
+    <dd>{{ spool.remaining_weight }}</dd>
+
+    <dt>{{ t(key="spools.col.remaining_pct") }}</dt>
+    <dd>{{ spool.remaining_pct }}%</dd>
+
+    <dt>{{ t(key="spools.col.remaining_length") }}</dt>
+    <dd>{{ spool.remaining_length_m }}</dd>
+
+    <dt>{{ t(key="spools.new.price_paid") }}</dt>
+    <dd>{{ spool.price_paid }}</dd>
+
+    <dt>{{ t(key="spools.col.status") }}</dt>
+    <dd>
+      {% if spool.status == "Sealed" %}{{ t(key="spools.status.sealed") }}
+      {% elif spool.status == "Open" %}{{ t(key="spools.status.open") }}
+      {% elif spool.status == "Empty" %}{{ t(key="spools.status.empty") }}
+      {% elif spool.status == "Archived" %}{{ t(key="spools.status.archived") }}
+      {% endif %}
+    </dd>
+  </dl>
+
+  {% if spool.status != "Archived" %}
+    <form class="spool-op-form spool-op-form--remaining" hx-post="/spools/{{ spool.id }}/remaining">
+      <label>
+        {{ t(key="spools.action.set_remaining") }}
+        <input type="number" name="remaining" step="0.1" min="0" required>
+      </label>
+      <button type="submit">{{ t(key="spools.action.set_remaining_submit") }}</button>
+    </form>
+
+    <form class="spool-op-form spool-op-form--consume" hx-post="/spools/{{ spool.id }}/consume">
+      <label>
+        {{ t(key="spools.action.consume") }}
+        <input type="number" name="amount" step="0.1" min="0" required>
+      </label>
+      <button type="submit">{{ t(key="spools.action.consume_submit") }}</button>
+    </form>
+
+    <form class="spool-op-form spool-op-form--archive" hx-post="/spools/{{ spool.id }}/archive">
+      <button type="submit">{{ t(key="spools.action.archive") }}</button>
+    </form>
+  {% else %}
+    <form class="spool-op-form spool-op-form--restore" hx-post="/spools/{{ spool.id }}/restore">
+      <button type="submit">{{ t(key="spools.action.restore") }}</button>
+    </form>
+  {% endif %}
+</div>
