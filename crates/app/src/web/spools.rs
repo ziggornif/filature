@@ -590,16 +590,12 @@ async fn finish_op(
 /// Parses a raw form weight field (`remaining`/`amount`) into a valid
 /// `Grams`, rejecting non-numeric input the same way `Grams::new` rejects
 /// negative values — both collapse to the caller's generic
-/// `spools.op.error.weight` message. Also rejects non-finite floats
-/// (`NaN`/`Infinity`) up front: `Grams::new` only rejects `< 0.0`, so those
-/// would otherwise pass validation and corrupt `remaining_weight` (a NaN
-/// write, or a `consume` that silently floors the spool at zero via `NaN`
-/// comparisons).
+/// `spools.op.error.weight` message. Non-finite floats (`NaN`/`Infinity`)
+/// are rejected by `Grams::new` itself, at the domain root.
 fn parse_grams(raw: &str) -> Option<Grams> {
     raw.trim()
         .parse::<f64>()
         .ok()
-        .filter(|v| v.is_finite())
         .and_then(|v| Grams::new(v).ok())
 }
 
@@ -1604,8 +1600,8 @@ mod tests {
 
         // --- Review fix 1: non-finite weight input (NaN/Inf) must be
         // rejected the same way a negative or non-numeric weight is —
-        // `Grams::new` only rejects `< 0.0`, so `"nan"`/`"inf"` sailed
-        // through unless `parse_grams` also checks finiteness.
+        // `Grams::new` rejects non-finite values at the domain root, so
+        // `"nan"`/`"inf"` are caught by `parse_grams`'s `Grams::new` call.
         #[tokio::test]
         async fn post_consume_nan_amount_returns_422_and_does_not_change_spool() {
             let (st, material_id) = test_state().await;

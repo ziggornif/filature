@@ -30,6 +30,8 @@ impl MaterialId {
 pub enum DomainError {
     #[error("weight must be non-negative, got {0}")]
     NegativeWeight(f64),
+    #[error("weight must be finite, got {0}")]
+    NonFiniteWeight(f64),
     #[error("density must be > 0 g/cm³, got {0}")]
     NonPositiveDensity(f64),
     #[error("unknown sensitivity: {0}")]
@@ -56,6 +58,9 @@ pub enum DomainError {
 
 impl Grams {
     pub fn new(value: f64) -> Result<Self, DomainError> {
+        if !value.is_finite() {
+            return Err(DomainError::NonFiniteWeight(value));
+        }
         if value < 0.0 {
             return Err(DomainError::NegativeWeight(value));
         }
@@ -101,6 +106,19 @@ mod tests {
     #[test]
     fn grams_rejects_negative() {
         assert_eq!(Grams::new(-1.0), Err(DomainError::NegativeWeight(-1.0)));
+    }
+
+    #[test]
+    fn grams_rejects_infinity() {
+        assert!(matches!(
+            Grams::new(f64::INFINITY),
+            Err(DomainError::NonFiniteWeight(v)) if v == f64::INFINITY
+        ));
+    }
+
+    #[test]
+    fn grams_rejects_nan() {
+        assert!(Grams::new(f64::NAN).is_err());
     }
 
     #[test]
