@@ -4,6 +4,7 @@
   "nav.spools": "Spools",
   "nav.humidity": "Humidity",
   "nav.materials": "Materials",
+  "nav.locations": "Locations",
   "shell.tagline": "Zig Factory · self-hosted",
   "materials.title": "Materials",
   "materials.col.material": "Material",
@@ -72,5 +73,18 @@
   "spools.edit.submit": "Save changes",
   "spools.edit.not_found": "Spool not found",
   "spools.detail.title": "Spool detail",
-  "spools.detail.back": "Back to spools"
+  "spools.detail.back": "Back to spools",
+  "locations.title": "Locations",
+  "locations.col.name": "Name",
+  "locations.col.note": "Note",
+  "locations.col.spool_count": "Spools",
+  "locations.col.actions": "Actions",
+  "locations.name": "Name",
+  "locations.note": "Note",
+  "locations.add": "Add location",
+  "locations.edit": "Edit",
+  "locations.delete": "Delete",
+  "locations.delete.confirm": "Delete this location?",
+  "locations.delete.blocked": "This location has {count} spool(s) assigned and cannot be deleted.",
+  "locations.not_found": "Location not found"
 }

@@ -20,6 +20,15 @@ impl LocationsUseCases for LocationsService {
     async fn list(&self) -> Result<Vec<Location>, RepositoryError> {
         self.repo.list().await
     }
+    async fn list_with_spool_counts(&self) -> Result<Vec<(Location, u64)>, RepositoryError> {
+        let locations = self.repo.list().await?;
+        let mut out = Vec::with_capacity(locations.len());
+        for location in locations {
+            let count = self.repo.count_spools(&location.id).await?;
+            out.push((location, count));
+        }
+        Ok(out)
+    }
     async fn add(&self, l: NewLocation) -> Result<Location, RepositoryError> {
         self.repo.insert(l).await
     }
@@ -86,6 +95,25 @@ mod tests {
         s.delete(created.id.clone()).await.unwrap();
         let all = s.list().await.unwrap();
         assert!(all.is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_with_spool_counts_pairs_each_location_with_its_count() {
+        let repo = Arc::new(StubLocationRepository::new());
+        repo.set_spool_count(2);
+        let s = LocationsService::new(repo);
+        let created = s.add(new_location("Shelf A")).await.unwrap();
+
+        let all = s.list_with_spool_counts().await.unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].0.id, created.id);
+        assert_eq!(all[0].1, 2);
+    }
+
+    #[tokio::test]
+    async fn list_with_spool_counts_is_empty_when_no_locations() {
+        let s = svc();
+        assert!(s.list_with_spool_counts().await.unwrap().is_empty());
     }
 
     #[tokio::test]

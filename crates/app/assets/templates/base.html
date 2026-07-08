@@ -3,6 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- htmx's default responseHandling never swaps non-2xx bodies, which
+       would silently drop the localized error fragments this app returns
+       on 4xx (e.g. materials/spools/locations 422 validation errors, the
+       locations 409 delete-blocked row). 5xx stays swap:false (still an
+       unhandled server error), everything else swaps. -->
+  <meta name="htmx-config" content='{"responseHandling":[
+    {"code":"204", "swap": false},
+    {"code":"[23]..", "swap": true},
+    {"code":"[4]..", "swap": true},
+    {"code":"[5]..", "swap": false, "error": true},
+    {"code":"...", "swap": true}
+  ]}'>
   <title>{{ t(key="app.name") }}</title>
   <link rel="stylesheet" href="/static/app.css">
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
@@ -14,6 +26,7 @@
       <a href="/">{{ t(key="nav.dashboard") }}</a>
       <a href="/spools">{{ t(key="nav.spools") }}</a>
       <a href="/materials">{{ t(key="nav.materials") }}</a>
+      <a href="/locations">{{ t(key="nav.locations") }}</a>
     </nav>
     <div class="sidebar-foot">{{ t(key="shell.tagline") }}</div>
   </aside>

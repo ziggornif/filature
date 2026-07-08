@@ -1,0 +1,24 @@
+<tr id="location-row-{{ l.id }}" class="location-row">
+  <td>
+    <input type="text" name="name" value="{{ l.name }}"
+           hx-put="/locations/{{ l.id }}" hx-target="closest tr" hx-swap="outerHTML"
+           hx-trigger="change" hx-include="closest tr">
+  </td>
+  <td>
+    <input type="text" name="note" value="{{ l.note }}"
+           hx-put="/locations/{{ l.id }}" hx-target="closest tr" hx-swap="outerHTML"
+           hx-trigger="change" hx-include="closest tr">
+  </td>
+  <td class="location-spool-count">{{ l.spool_count }}</td>
+  <td class="location-row-actions">
+    <button type="button"
+            hx-delete="/locations/{{ l.id }}"
+            hx-target="closest tr" hx-swap="outerHTML"
+            hx-confirm="{{ t(key="locations.delete.confirm") }}">
+      {{ t(key="locations.delete") }}
+    </button>
+    {% if blocked_message is defined and blocked_message %}
+      <span class="form-error">{{ blocked_message }}</span>
+    {% endif %}
+  </td>
+</tr>

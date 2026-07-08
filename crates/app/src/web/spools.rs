@@ -1166,6 +1166,8 @@ mod tests {
         use super::*;
         use crate::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
         use axum::body::to_bytes;
+        use domain::locations::stubs::StubLocationRepository;
+        use domain::locations::{LocationsService, LocationsUseCases};
         use domain::materials::stubs::StubMaterialRepository;
         use domain::materials::{
             Density, DryingParams, MaterialName, MaterialRepository, MaterialsService,
@@ -1204,6 +1206,10 @@ mod tests {
             let spools_repo: Arc<dyn SpoolRepository> = Arc::new(StubSpoolRepository::new());
             let spools: Arc<dyn SpoolsUseCases> = Arc::new(SpoolsService::new(spools_repo));
 
+            let locations: Arc<dyn LocationsUseCases> = Arc::new(LocationsService::new(Arc::new(
+                StubLocationRepository::new(),
+            )));
+
             let db = PgPool::connect_lazy("postgres://user:pass@localhost/db").unwrap();
             let cfg = Config {
                 server: ServerConfig {
@@ -1217,7 +1223,7 @@ mod tests {
                 },
             };
             (
-                AppState::new(db, &cfg, materials, spools),
+                AppState::new(db, &cfg, materials, spools, locations),
                 seeded.id.as_str().to_string(),
             )
         }
