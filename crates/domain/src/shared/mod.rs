@@ -26,6 +26,22 @@ impl MaterialId {
     }
 }
 
+/// Opaque identifier for a `Location`. Lives in the shared kernel (rather
+/// than the `locations` slice) because other slices (e.g. `spools`)
+/// reference a location by id — a cross-slice import of a sibling slice's
+/// own module would violate slice isolation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocationId(pub String);
+
+impl LocationId {
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub enum DomainError {
     #[error("weight must be non-negative, got {0}")]
@@ -54,6 +70,10 @@ pub enum DomainError {
     SpoolAlreadyArchived,
     #[error("spool is not archived")]
     SpoolNotArchived,
+    #[error("location name must not be blank")]
+    BlankLocationName,
+    #[error("location has {count} spools and cannot be deleted")]
+    LocationInUse { count: u64 },
 }
 
 impl Grams {
@@ -150,5 +170,35 @@ mod tests {
         let m = Money::from_decimal(Decimal::from_str_exact("24.99").unwrap()).unwrap();
         assert_eq!(m.to_string(), "24.99");
         assert_eq!(m.value(), Decimal::from_str_exact("24.99").unwrap());
+    }
+
+    #[test]
+    fn location_id_new_and_as_str() {
+        let id = LocationId::new("warehouse-1");
+        assert_eq!(id.as_str(), "warehouse-1");
+    }
+
+    #[test]
+    fn location_id_from_string() {
+        let id = LocationId::new("location".to_string());
+        assert_eq!(id.as_str(), "location");
+    }
+
+    #[test]
+    fn blank_location_name_error() {
+        let err = DomainError::BlankLocationName;
+        assert_eq!(err.to_string(), "location name must not be blank");
+    }
+
+    #[test]
+    fn location_in_use_error() {
+        let err = DomainError::LocationInUse { count: 5 };
+        assert_eq!(err.to_string(), "location has 5 spools and cannot be deleted");
+    }
+
+    #[test]
+    fn location_in_use_error_single_spool() {
+        let err = DomainError::LocationInUse { count: 1 };
+        assert_eq!(err.to_string(), "location has 1 spools and cannot be deleted");
     }
 }
