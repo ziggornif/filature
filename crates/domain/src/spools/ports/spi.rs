@@ -1,4 +1,4 @@
-use crate::shared::MaterialId;
+use crate::shared::{DomainError, MaterialId, Money};
 use crate::spools::model::{NewSpool, Spool, SpoolId, SpoolStatus};
 use crate::spools::read_models::{SpoolDetail, SpoolListItem};
 use async_trait::async_trait;
@@ -14,6 +14,8 @@ pub enum RepositoryError {
     NotFound(SpoolId),
     #[error("no material with id '{}'", .0.as_str())]
     UnknownMaterial(MaterialId),
+    #[error("{0}")]
+    Domain(#[from] DomainError),
 }
 
 /// Filter applied when listing spools.
@@ -42,4 +44,10 @@ pub trait SpoolRepository: Send + Sync {
         sort: SpoolSort,
     ) -> Result<Vec<SpoolListItem>, RepositoryError>;
     async fn get(&self, id: &SpoolId) -> Result<Option<SpoolDetail>, RepositoryError>;
+    /// Loads the aggregate (not a read model) for load -> mutate -> save
+    /// use cases.
+    async fn find(&self, id: &SpoolId) -> Result<Option<Spool>, RepositoryError>;
+    /// Sum of `(remaining/net) * price_paid` over non-archived spools
+    /// matching `filter`.
+    async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError>;
 }

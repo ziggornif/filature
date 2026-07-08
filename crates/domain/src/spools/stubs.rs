@@ -1,7 +1,9 @@
+use crate::shared::Money;
 use crate::spools::model::{NewSpool, Spool, SpoolId, SpoolStatus};
 use crate::spools::ports::spi::{RepositoryError, SpoolFilter, SpoolRepository, SpoolSort};
 use crate::spools::read_models::{SpoolDetail, SpoolListItem};
 use async_trait::async_trait;
+use rust_decimal::Decimal;
 use std::sync::Mutex;
 
 /// The stub has no materials table to join against, so list/detail rows
@@ -106,6 +108,9 @@ impl SpoolRepository for StubSpoolRepository {
                     .is_none_or(|mid| mid == &r.material_id)
             })
             .filter(|r| filter.status.is_none_or(|st| st == r.status))
+            .filter(|r| {
+                filter.status == Some(SpoolStatus::Archived) || r.status != SpoolStatus::Archived
+            })
             .map(to_list_item)
             .collect();
         match sort {
@@ -132,5 +137,40 @@ impl SpoolRepository for StubSpoolRepository {
             .iter()
             .find(|r| &r.id == id)
             .map(to_detail))
+    }
+
+    async fn find(&self, id: &SpoolId) -> Result<Option<Spool>, RepositoryError> {
+        Ok(self
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|r| &r.id == id)
+            .cloned())
+    }
+
+    async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError> {
+        let rows = self.rows.lock().unwrap();
+        let sum: Decimal = rows
+            .iter()
+            .filter(|r| {
+                filter
+                    .material_id
+                    .as_ref()
+                    .is_none_or(|mid| mid == &r.material_id)
+            })
+            .filter(|r| filter.status.is_none_or(|st| st == r.status))
+            .filter(|r| r.status != SpoolStatus::Archived)
+            .map(|r| {
+                let net = r.net_weight.value();
+                let ratio = if net <= 0.0 {
+                    0.0
+                } else {
+                    r.remaining_weight.value() / net
+                };
+                Decimal::try_from(ratio).unwrap() * r.price_paid.value()
+            })
+            .fold(Decimal::ZERO, |acc, v| acc + v);
+        Money::from_decimal(sum).map_err(RepositoryError::Domain)
     }
 }

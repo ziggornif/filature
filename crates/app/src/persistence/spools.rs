@@ -267,4 +267,14 @@ impl SpoolRepository for SqlxSpoolRepository {
             density: r.density,
         }))
     }
+
+    // TODO(task 6): real impl
+    async fn find(&self, _id: &SpoolId) -> Result<Option<Spool>, RepositoryError> {
+        Err(RepositoryError::Backend("not implemented".into()))
+    }
+
+    // TODO(task 6): real impl
+    async fn stock_value(&self, _filter: SpoolFilter) -> Result<Money, RepositoryError> {
+        Err(RepositoryError::Backend("not implemented".into()))
+    }
 }
