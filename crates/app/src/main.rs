@@ -1,6 +1,8 @@
+use domain::dashboard::{DashboardRepository, DashboardService, DashboardUseCases};
 use domain::locations::{LocationRepository, LocationsService, LocationsUseCases};
 use domain::materials::{MaterialRepository, MaterialsService, MaterialsUseCases};
 use domain::spools::{SpoolRepository, SpoolsService, SpoolsUseCases};
+use filature::persistence::dashboard::SqlxDashboardRepository;
 use filature::persistence::locations::SqlxLocationRepository;
 use filature::persistence::materials::SqlxMaterialRepository;
 use filature::persistence::spools::SqlxSpoolRepository;
@@ -25,7 +27,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(SqlxLocationRepository::new(db.clone()));
     let locations: Arc<dyn LocationsUseCases> = Arc::new(LocationsService::new(location_repo));
 
-    let app = web::router(web::AppState::new(db, &cfg, materials, spools, locations));
+    let dash_repo: Arc<dyn DashboardRepository> =
+        Arc::new(SqlxDashboardRepository::new(db.clone()));
+    let dashboard: Arc<dyn DashboardUseCases> = Arc::new(DashboardService::new(dash_repo));
+
+    let app = web::router(web::AppState::new(
+        db, &cfg, materials, spools, locations, dashboard,
+    ));
     let listener = tokio::net::TcpListener::bind(&cfg.server.bind).await?;
     tracing::info!(bind = %cfg.server.bind, "filature listening");
     axum::serve(listener, app).await?;

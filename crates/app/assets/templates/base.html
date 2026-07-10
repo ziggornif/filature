@@ -18,7 +18,7 @@
   <aside class="sidebar">
     <div class="wordmark">{{ t(key="app.name") }}</div>
     <nav>
-      <a href="/">{{ t(key="nav.dashboard") }}</a>
+      <a href="/"{% if page | default(value="") == "dashboard" %} class="active"{% endif %}>{{ t(key="nav.dashboard") }}</a>
       <a href="/spools">{{ t(key="nav.spools") }}</a>
       <a href="/materials">{{ t(key="nav.materials") }}</a>
       <a href="/locations">{{ t(key="nav.locations") }}</a>

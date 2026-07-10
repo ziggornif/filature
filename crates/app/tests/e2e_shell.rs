@@ -2,6 +2,8 @@ mod support;
 
 use axum::body::to_bytes;
 use axum::http::{Request, StatusCode, header};
+use domain::dashboard::stubs::StubDashboardRepository;
+use domain::dashboard::{DashboardService, DashboardUseCases};
 use domain::locations::stubs::StubLocationRepository;
 use domain::locations::{LocationsService, LocationsUseCases};
 use domain::materials::stubs::StubMaterialRepository;
@@ -38,12 +40,16 @@ async fn app() -> axum::Router {
     let locations: Arc<dyn LocationsUseCases> = Arc::new(LocationsService::new(Arc::new(
         StubLocationRepository::new(),
     )));
+    let dashboard: Arc<dyn DashboardUseCases> = Arc::new(DashboardService::new(Arc::new(
+        StubDashboardRepository::new(),
+    )));
     web::router(web::AppState::new(
         db,
         &test_config(&url),
         materials,
         spools,
         locations,
+        dashboard,
     ))
 }
 

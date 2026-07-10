@@ -1,6 +1,7 @@
 use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 
+pub mod dashboard;
 pub mod locations;
 pub mod materials;
 pub mod spools;

@@ -2,16 +2,17 @@ use crate::config::Config;
 use crate::persistence::Db;
 use crate::web::i18n::Catalog;
 use crate::web::templates::Renderer;
+use domain::dashboard::DashboardUseCases;
 use domain::locations::LocationsUseCases;
 use domain::materials::MaterialsUseCases;
 use domain::spools::SpoolsUseCases;
 use std::sync::Arc;
 
-/// Wires the DB pool + renderer + default locale + materials/spools/locations
-/// use cases into the driving (Axum) adapter. Cloned per request by Axum's
-/// `State` extractor — cheap: the pool is a handle, the renderer's `Tera`
-/// engine is `Arc`-shared, and `materials`/`spools`/`locations` are
-/// `Arc<dyn _>`.
+/// Wires the DB pool + renderer + default locale +
+/// materials/spools/locations/dashboard use cases into the driving (Axum)
+/// adapter. Cloned per request by Axum's `State` extractor — cheap: the pool
+/// is a handle, the renderer's `Tera` engine is `Arc`-shared, and
+/// `materials`/`spools`/`locations`/`dashboard` are `Arc<dyn _>`.
 #[derive(Clone)]
 pub struct AppState {
     pub db: Db,
@@ -20,6 +21,7 @@ pub struct AppState {
     pub materials: Arc<dyn MaterialsUseCases>,
     pub spools: Arc<dyn SpoolsUseCases>,
     pub locations: Arc<dyn LocationsUseCases>,
+    pub dashboard: Arc<dyn DashboardUseCases>,
 }
 
 impl AppState {
@@ -29,6 +31,7 @@ impl AppState {
         materials: Arc<dyn MaterialsUseCases>,
         spools: Arc<dyn SpoolsUseCases>,
         locations: Arc<dyn LocationsUseCases>,
+        dashboard: Arc<dyn DashboardUseCases>,
     ) -> Self {
         let catalog = Catalog::load(&cfg.i18n.default_locale);
         Self {
@@ -38,6 +41,7 @@ impl AppState {
             materials,
             spools,
             locations,
+            dashboard,
         }
     }
 }

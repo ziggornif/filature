@@ -1,0 +1,416 @@
+//! The driving (Axum) adapter for the dashboard slice: a single read-only,
+//! static server render (`GET /`) showing stock at a glance. No htmx
+//! interactivity, no fragment routes — mirrors `web::materials`/`web::spools`
+//! for locale/theme resolution and Tera rendering, but has exactly one
+//! handler since the whole page is one aggregate read
+//! (`DashboardUseCases::overview`).
+
+use crate::web::router::{internal_error, resolve_locale, resolve_theme};
+use crate::web::state::AppState;
+use axum::{
+    Router,
+    extract::State,
+    http::HeaderMap,
+    response::{Html, IntoResponse, Response},
+    routing::get,
+};
+use domain::dashboard::{DashboardOverview, MaterialStockRow, SoonEmptyItem};
+use serde::Serialize;
+use tera::Context;
+
+/// Template-shaped view of a `MaterialStockRow`: plain strings/numbers plus
+/// the derived `bar_pct` (the domain exposes a `bar_fraction` in `0.0..=1.0`;
+/// the template wants a `width: N%` — same "derive the display value in Rust,
+/// not in Tera" convention as `SpoolView::remaining_pct`).
+#[derive(Serialize)]
+pub struct MaterialBreakdownView {
+    pub material_name: String,
+    pub spool_count: usize,
+    pub remaining_kg: f64,
+    pub bar_pct: u8,
+}
+
+impl From<MaterialStockRow> for MaterialBreakdownView {
+    fn from(row: MaterialStockRow) -> Self {
+        Self {
+            material_name: row.material_name,
+            spool_count: row.spool_count,
+            remaining_kg: to_kg(row.remaining_weight.value()),
+            bar_pct: pct(row.bar_fraction),
+        }
+    }
+}
+
+/// Template-shaped view of a `SoonEmptyItem`.
+#[derive(Serialize)]
+pub struct SoonEmptyView {
+    pub spool_id: String,
+    pub material_name: String,
+    pub colour_hex: String,
+    /// The colour's human name if set, else the hex code — same convention
+    /// as `SpoolView::colour_label`.
+    pub colour_label: String,
+    pub location_name: Option<String>,
+    pub remaining_g: f64,
+    pub remaining_pct: u8,
+}
+
+impl From<SoonEmptyItem> for SoonEmptyView {
+    fn from(item: SoonEmptyItem) -> Self {
+        Self {
+            spool_id: item.spool_id,
+            material_name: item.material_name,
+            colour_label: item
+                .colour_name
+                .clone()
+                .unwrap_or_else(|| item.colour_hex.clone()),
+            colour_hex: item.colour_hex,
+            location_name: item.location_name,
+            remaining_g: round1(item.remaining_weight.value()),
+            remaining_pct: pct(item.remaining_ratio),
+        }
+    }
+}
+
+/// Template-shaped view of the whole `DashboardOverview`.
+#[derive(Serialize)]
+pub struct DashboardView {
+    /// Formatted exactly like the spools list's Stock Value stat
+    /// (`Money`'s `Display`, no currency symbol appended — matches
+    /// `web::spools::list_page`'s `stock_value.to_string()`).
+    pub stock_value: String,
+    pub remaining_kg: f64,
+    pub total_count: usize,
+    pub active_count: usize,
+    pub empty_count: usize,
+    pub alert_count: usize,
+    pub material_breakdown: Vec<MaterialBreakdownView>,
+    pub soon_empty: Vec<SoonEmptyView>,
+}
+
+impl From<DashboardOverview> for DashboardView {
+    fn from(o: DashboardOverview) -> Self {
+        Self {
+            stock_value: o.stock_value.to_string(),
+            remaining_kg: to_kg(o.total_remaining.value()),
+            total_count: o.total_count,
+            active_count: o.active_count,
+            empty_count: o.empty_count,
+            alert_count: o.alert_count,
+            material_breakdown: o.material_breakdown.into_iter().map(Into::into).collect(),
+            soon_empty: o.soon_empty.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Grams -> kg, rounded to 2 decimals — kg figures are small enough (single-
+/// to double-digit) that 1-decimal rounding (the g/m convention elsewhere)
+/// would lose too much precision.
+fn to_kg(grams: f64) -> f64 {
+    (grams / 1000.0 * 100.0).round() / 100.0
+}
+
+fn round1(v: f64) -> f64 {
+    (v * 10.0).round() / 10.0
+}
+
+/// Percent 0..=100 from a `0.0..=1.0` fraction. `as u8` on a float is a
+/// saturating cast in Rust (no UB, no panic) — same guard-by-cast convention
+/// as `SpoolView::remaining_pct` for an out-of-range ratio.
+fn pct(fraction: f64) -> u8 {
+    (fraction * 100.0).round() as u8
+}
+
+fn render(st: &AppState, locale: &str, theme_attr: &str, overview: DashboardOverview) -> Response {
+    let view: DashboardView = overview.into();
+    let mut ctx = Context::new();
+    ctx.insert("stock_value", &view.stock_value);
+    ctx.insert("remaining_kg", &view.remaining_kg);
+    ctx.insert("total_count", &view.total_count);
+    ctx.insert("active_count", &view.active_count);
+    ctx.insert("empty_count", &view.empty_count);
+    ctx.insert("alert_count", &view.alert_count);
+    ctx.insert("material_breakdown", &view.material_breakdown);
+    ctx.insert("soon_empty", &view.soon_empty);
+    // Read by `base.html` to mark the "Tableau de bord" nav item active.
+    ctx.insert("page", "dashboard");
+    match st
+        .renderer
+        .render("dashboard.html", locale, theme_attr, ctx)
+    {
+        Ok(html) => Html(html).into_response(),
+        Err(e) => internal_error(e),
+    }
+}
+
+async fn index(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let theme = resolve_theme(&headers);
+    match st.dashboard.overview().await {
+        Ok(overview) => render(&st, &locale, theme.data_attr(), overview),
+        Err(e) => internal_error(e),
+    }
+}
+
+pub fn routes() -> Router<AppState> {
+    Router::new().route("/", get(index))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::web::i18n::Catalog;
+    use crate::web::templates::Renderer;
+    use domain::shared::{Grams, MaterialId, Money};
+
+    fn breakdown_row() -> MaterialBreakdownView {
+        MaterialBreakdownView {
+            material_name: "PLA".into(),
+            spool_count: 3,
+            remaining_kg: 2.4,
+            bar_pct: 100,
+        }
+    }
+
+    fn soon_empty_row() -> SoonEmptyView {
+        SoonEmptyView {
+            spool_id: "01HSP".into(),
+            material_name: "PETG".into(),
+            colour_hex: "#1A9E4B".into(),
+            colour_label: "vert sapin".into(),
+            location_name: Some("Shelf A".into()),
+            remaining_g: 42.0,
+            remaining_pct: 4,
+        }
+    }
+
+    fn full_ctx() -> Context {
+        let mut ctx = Context::new();
+        ctx.insert("stock_value", "137.50");
+        ctx.insert("remaining_kg", &4.2);
+        ctx.insert("total_count", &5usize);
+        ctx.insert("active_count", &3usize);
+        ctx.insert("empty_count", &2usize);
+        ctx.insert("alert_count", &1usize);
+        ctx.insert("material_breakdown", &vec![breakdown_row()]);
+        ctx.insert("soon_empty", &vec![soon_empty_row()]);
+        ctx.insert("page", "dashboard");
+        ctx
+    }
+
+    fn empty_ctx() -> Context {
+        let mut ctx = Context::new();
+        ctx.insert("stock_value", "0.00");
+        ctx.insert("remaining_kg", &0.0);
+        ctx.insert("total_count", &0usize);
+        ctx.insert("active_count", &0usize);
+        ctx.insert("empty_count", &0usize);
+        ctx.insert("alert_count", &0usize);
+        ctx.insert("material_breakdown", &Vec::<MaterialBreakdownView>::new());
+        ctx.insert("soon_empty", &Vec::<SoonEmptyView>::new());
+        ctx.insert("page", "dashboard");
+        ctx
+    }
+
+    #[test]
+    fn seeded_page_shows_kpis_breakdown_and_soon_empty_no_raw_keys() {
+        let r = Renderer::new(Catalog::load("en"));
+        let html = r.render("dashboard.html", "en", "", full_ctx()).unwrap();
+        assert!(html.contains("137.50"));
+        assert!(html.contains("4.2 kg"));
+        assert!(html.contains(r#"id="kpi-spools""#));
+        assert!(html.contains("PLA"));
+        assert!(html.contains("width: 100%"));
+        assert!(html.contains("PETG"));
+        assert!(html.contains("Shelf A"));
+        assert!(html.contains("42.0 g"));
+        assert!(html.contains("4%"));
+        assert!(html.contains("/spools/01HSP"));
+        assert!(!html.contains("dashboard.kpi."));
+        assert!(!html.contains("dashboard.breakdown."));
+        assert!(!html.contains("dashboard.soon_empty."));
+        assert!(!html.contains("spools.location."));
+    }
+
+    #[test]
+    fn nav_dashboard_item_is_marked_active() {
+        let r = Renderer::new(Catalog::load("en"));
+        let html = r.render("dashboard.html", "en", "", full_ctx()).unwrap();
+        assert!(html.contains(r#"href="/" class="active""#));
+    }
+
+    #[test]
+    fn empty_stock_renders_all_zeros_and_empty_states_no_panic() {
+        let r = Renderer::new(Catalog::load("en"));
+        let html = r.render("dashboard.html", "en", "", empty_ctx()).unwrap();
+        assert!(html.contains("0.00"));
+        assert!(html.contains("0 kg"));
+        assert!(html.contains("No stock yet."));
+        assert!(html.contains("Nothing running low."));
+        assert!(!html.contains("dashboard.breakdown."));
+        assert!(!html.contains("dashboard.soon_empty."));
+    }
+
+    #[test]
+    fn page_localises_to_french_no_raw_keys() {
+        let r = Renderer::new(Catalog::load("en"));
+        let html = r.render("dashboard.html", "fr", "", empty_ctx()).unwrap();
+        assert!(html.contains("Tableau de bord"));
+        assert!(html.contains("Répartition par matériau"));
+        assert!(html.contains("Bientôt vides"));
+        assert!(html.contains("Aucun stock pour le moment."));
+        assert!(!html.contains("dashboard.breakdown."));
+        assert!(!html.contains("dashboard.soon_empty."));
+    }
+
+    #[test]
+    fn no_humidity_section_rendered() {
+        let r = Renderer::new(Catalog::load("en"));
+        let html = r.render("dashboard.html", "en", "", full_ctx()).unwrap();
+        assert!(!html.to_lowercase().contains("humid"));
+        assert!(!html.to_lowercase().contains("drybox"));
+    }
+
+    // --- View-mapping unit tests: `DashboardOverview` -> `DashboardView`.
+
+    fn sample_overview() -> DashboardOverview {
+        DashboardOverview {
+            stock_value: Money::new(2500, 2).unwrap(),
+            total_remaining: Grams::new(1234.0).unwrap(),
+            total_count: 2,
+            active_count: 1,
+            empty_count: 1,
+            alert_count: 1,
+            material_breakdown: vec![MaterialStockRow {
+                material_name: "PLA".into(),
+                spool_count: 2,
+                remaining_weight: Grams::new(500.0).unwrap(),
+                bar_fraction: 1.0,
+            }],
+            soon_empty: vec![SoonEmptyItem {
+                spool_id: "01HSP".into(),
+                material_name: "PLA".into(),
+                colour_hex: "#1A9E4B".into(),
+                colour_name: None,
+                location_name: None,
+                remaining_weight: Grams::new(50.0).unwrap(),
+                remaining_ratio: 0.05,
+            }],
+        }
+    }
+
+    #[test]
+    fn view_maps_kg_percent_and_money_formatting() {
+        let view: DashboardView = sample_overview().into();
+        assert_eq!(view.stock_value, "25.00");
+        assert_eq!(view.remaining_kg, 1.23);
+        assert_eq!(view.material_breakdown[0].remaining_kg, 0.5);
+        assert_eq!(view.material_breakdown[0].bar_pct, 100);
+        assert_eq!(view.soon_empty[0].remaining_pct, 5);
+        assert_eq!(view.soon_empty[0].colour_label, "#1A9E4B"); // no name -> hex
+    }
+
+    #[test]
+    fn view_of_empty_overview_is_all_zeros() {
+        let overview = DashboardOverview::from_rows(Vec::new());
+        let view: DashboardView = overview.into();
+        // `DashboardOverview::from_rows`'s zero-stock fallback is
+        // `Money::new(0, 0)` (scale 0), same as `SpoolsUseCases::stock_value`
+        // on an empty scope — `Money`'s `Display` renders that as "0", not
+        // "0.00" (only a non-zero/priced amount carries decimal places).
+        assert_eq!(view.stock_value, "0");
+        assert_eq!(view.remaining_kg, 0.0);
+        assert_eq!(view.total_count, 0);
+        assert!(view.material_breakdown.is_empty());
+        assert!(view.soon_empty.is_empty());
+    }
+
+    // --- Handler-level test: exercises `index` directly against a stub-backed
+    // `AppState`, mirroring `web::spools`'s `handlers` test module.
+    mod handlers {
+        use super::*;
+        use crate::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
+        use axum::body::to_bytes;
+        use domain::dashboard::stubs::StubDashboardRepository;
+        use domain::dashboard::{DashboardService, DashboardUseCases, SpoolStockRow, StockStatus};
+        use domain::locations::stubs::StubLocationRepository;
+        use domain::locations::{LocationsService, LocationsUseCases};
+        use domain::materials::stubs::StubMaterialRepository;
+        use domain::materials::{MaterialsService, MaterialsUseCases};
+        use domain::spools::stubs::StubSpoolRepository;
+        use domain::spools::{SpoolsService, SpoolsUseCases};
+        use sqlx::PgPool;
+        use std::sync::Arc;
+
+        fn test_state(dashboard: Arc<dyn DashboardUseCases>) -> AppState {
+            let materials: Arc<dyn MaterialsUseCases> = Arc::new(MaterialsService::new(Arc::new(
+                StubMaterialRepository::new(),
+            )));
+            let spools: Arc<dyn SpoolsUseCases> =
+                Arc::new(SpoolsService::new(Arc::new(StubSpoolRepository::new())));
+            let locations: Arc<dyn LocationsUseCases> = Arc::new(LocationsService::new(Arc::new(
+                StubLocationRepository::new(),
+            )));
+            let db = PgPool::connect_lazy("postgres://user:pass@localhost/db").unwrap();
+            let cfg = Config {
+                server: ServerConfig {
+                    bind: "127.0.0.1:0".into(),
+                },
+                database: DatabaseConfig {
+                    url: "postgres://user:pass@localhost/db".into(),
+                },
+                i18n: I18nConfig {
+                    default_locale: "en".into(),
+                },
+            };
+            AppState::new(db, &cfg, materials, spools, locations, dashboard)
+        }
+
+        async fn body_of(res: Response) -> String {
+            let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+            String::from_utf8(bytes.to_vec()).unwrap()
+        }
+
+        #[tokio::test]
+        async fn get_root_on_empty_stock_returns_200_with_all_zeros_no_panic() {
+            let repo = StubDashboardRepository::new();
+            let dashboard: Arc<dyn DashboardUseCases> =
+                Arc::new(DashboardService::new(Arc::new(repo)));
+            let st = test_state(dashboard);
+            let res = index(State(st), HeaderMap::new()).await;
+            assert_eq!(res.status(), axum::http::StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains("No stock yet."));
+            assert!(html.contains("Nothing running low."));
+            assert!(!html.contains("dashboard.breakdown."));
+            assert!(!html.contains("dashboard.soon_empty."));
+        }
+
+        #[tokio::test]
+        async fn get_root_on_seeded_stock_renders_kpis_and_regions() {
+            let row = SpoolStockRow {
+                spool_id: "01HSP".to_string(),
+                material_id: MaterialId::new("m1"),
+                material_name: "PLA".to_string(),
+                colour_hex: "#1A9E4B".to_string(),
+                colour_name: Some("vert sapin".to_string()),
+                status: StockStatus::Open,
+                remaining_weight: Grams::new(50.0).unwrap(),
+                net_weight: Grams::new(1000.0).unwrap(),
+                price_paid: Money::new(2000, 2).unwrap(),
+                location_name: None,
+            };
+            let repo = StubDashboardRepository::with(vec![row]);
+            let dashboard: Arc<dyn DashboardUseCases> =
+                Arc::new(DashboardService::new(Arc::new(repo)));
+            let st = test_state(dashboard);
+            let res = index(State(st), HeaderMap::new()).await;
+            assert_eq!(res.status(), axum::http::StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains("PLA"));
+            assert!(html.contains("/spools/01HSP"));
+            assert!(html.contains(r#"id="kpi-alerts""#));
+            assert!(!html.contains("dashboard.kpi."));
+        }
+    }
+}
