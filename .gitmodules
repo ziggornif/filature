@@ -1,0 +1,3 @@
+[submodule ".claude/harness"]
+	path = .claude/harness
+	url = git@github.com:ziggornif/craftmanship-harness.git
