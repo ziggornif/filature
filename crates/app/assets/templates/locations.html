@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{ t(key="locations.title") }}</h1>
+  <div id="locations-msg"></div>
+  <table class="locations-table" hx-ext="response-targets">
+    <thead>
+      <tr>
+        <th>{{ t(key="locations.col.name") }}</th>
+        <th>{{ t(key="locations.col.note") }}</th>
+        <th>{{ t(key="locations.col.spool_count") }}</th>
+        <th>{{ t(key="locations.col.actions") }}</th>
+      </tr>
+    </thead>
+    <tbody id="locations-table-body">
+      {% for l in locations %}
+        {% include "_location_row.html" %}
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <form class="location-add-form"
+        hx-post="/locations"
+        hx-target="#locations-table-body"
+        hx-swap="beforeend">
+    <input type="text" name="name" placeholder="{{ t(key="locations.col.name") }}" required>
+    <input type="text" name="note" placeholder="{{ t(key="locations.note") }}">
+    <button type="submit">{{ t(key="locations.add") }}</button>
+  </form>
+{% endblock content %}

@@ -350,6 +350,8 @@ impl SpoolForm {
             diameter: f.diameter,
             net_weight: f.net_weight,
             price_paid: f.price_paid,
+            // The add-spool form has no location field yet (Task 9).
+            location_id: None,
         })
     }
 
@@ -373,6 +375,11 @@ impl SpoolForm {
             remaining_weight,
             price_paid: f.price_paid,
             status,
+            // The edit form has no location field yet (Task 9), and
+            // `SpoolDetail` only carries a display-only `location_name`, not
+            // the id, so there's nothing to carry over here yet. Task 8/9
+            // will wire real location persistence through this path.
+            location_id: None,
         })
     }
 }
@@ -1166,6 +1173,8 @@ mod tests {
         use super::*;
         use crate::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
         use axum::body::to_bytes;
+        use domain::locations::stubs::StubLocationRepository;
+        use domain::locations::{LocationsService, LocationsUseCases};
         use domain::materials::stubs::StubMaterialRepository;
         use domain::materials::{
             Density, DryingParams, MaterialName, MaterialRepository, MaterialsService,
@@ -1204,6 +1213,10 @@ mod tests {
             let spools_repo: Arc<dyn SpoolRepository> = Arc::new(StubSpoolRepository::new());
             let spools: Arc<dyn SpoolsUseCases> = Arc::new(SpoolsService::new(spools_repo));
 
+            let locations: Arc<dyn LocationsUseCases> = Arc::new(LocationsService::new(Arc::new(
+                StubLocationRepository::new(),
+            )));
+
             let db = PgPool::connect_lazy("postgres://user:pass@localhost/db").unwrap();
             let cfg = Config {
                 server: ServerConfig {
@@ -1217,7 +1230,7 @@ mod tests {
                 },
             };
             (
-                AppState::new(db, &cfg, materials, spools),
+                AppState::new(db, &cfg, materials, spools, locations),
                 seeded.id.as_str().to_string(),
             )
         }

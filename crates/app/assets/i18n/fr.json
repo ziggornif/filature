@@ -4,6 +4,7 @@
   "nav.spools": "Bobines",
   "nav.humidity": "Humidité",
   "nav.materials": "Matériaux",
+  "nav.locations": "Emplacements",
   "shell.tagline": "Zig Factory · auto-hébergé",
   "materials.title": "Matériaux",
   "materials.col.material": "Matériau",
@@ -72,5 +73,18 @@
   "spools.edit.submit": "Enregistrer les modifications",
   "spools.edit.not_found": "Bobine introuvable",
   "spools.detail.title": "Détail de la bobine",
-  "spools.detail.back": "Retour aux bobines"
+  "spools.detail.back": "Retour aux bobines",
+  "locations.title": "Emplacements",
+  "locations.col.name": "Nom",
+  "locations.col.note": "Remarque",
+  "locations.col.spool_count": "Bobines",
+  "locations.col.actions": "Actions",
+  "locations.name": "Nom",
+  "locations.note": "Remarque",
+  "locations.add": "Ajouter un emplacement",
+  "locations.edit": "Modifier",
+  "locations.delete": "Supprimer",
+  "locations.delete.confirm": "Supprimer cet emplacement ?",
+  "locations.delete.blocked": "Cet emplacement contient {count} bobine(s) et ne peut pas être supprimé.",
+  "locations.not_found": "Emplacement introuvable"
 }

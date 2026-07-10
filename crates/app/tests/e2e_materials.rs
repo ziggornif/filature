@@ -7,9 +7,11 @@ mod support;
 
 use axum::body::{Body, to_bytes};
 use axum::http::{Request, StatusCode};
+use domain::locations::{LocationRepository, LocationsService, LocationsUseCases};
 use domain::materials::{MaterialRepository, MaterialsService, MaterialsUseCases};
 use domain::spools::{SpoolRepository, SpoolsService, SpoolsUseCases};
 use filature::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
+use filature::persistence::locations::SqlxLocationRepository;
 use filature::persistence::materials::SqlxMaterialRepository;
 use filature::persistence::spools::SqlxSpoolRepository;
 use filature::{persistence, web};
@@ -42,11 +44,15 @@ async fn seeded_app() -> axum::Router {
     materials.seed_defaults().await.unwrap(); // idempotent — safe under the shared container
     let spool_repo: Arc<dyn SpoolRepository> = Arc::new(SqlxSpoolRepository::new(db.clone()));
     let spools: Arc<dyn SpoolsUseCases> = Arc::new(SpoolsService::new(spool_repo));
+    let location_repo: Arc<dyn LocationRepository> =
+        Arc::new(SqlxLocationRepository::new(db.clone()));
+    let locations: Arc<dyn LocationsUseCases> = Arc::new(LocationsService::new(location_repo));
     web::router(web::AppState::new(
         db,
         &test_config(&url),
         materials,
         spools,
+        locations,
     ))
 }
 

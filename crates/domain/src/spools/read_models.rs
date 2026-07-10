@@ -19,6 +19,7 @@ pub struct SpoolListItem {
     pub net_weight: Grams,
     pub status: SpoolStatus,
     pub density: f64,
+    pub location_name: Option<String>,
 }
 
 impl SpoolListItem {
@@ -48,6 +49,7 @@ pub struct SpoolDetail {
     pub price_paid: Money,
     pub status: SpoolStatus,
     pub density: f64,
+    pub location_name: Option<String>,
 }
 
 impl SpoolDetail {

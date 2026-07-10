@@ -46,6 +46,10 @@ fn to_list_item(s: &Spool) -> SpoolListItem {
         net_weight: s.net_weight,
         status: s.status,
         density: STUB_DENSITY,
+        // The stub has no locations table to join against; the real
+        // location_name comes from the SQL join in the persistence
+        // adapter (Task 8). None is enough to exercise use-case behaviour.
+        location_name: None,
     }
 }
 
@@ -61,6 +65,9 @@ fn to_detail(s: &Spool) -> SpoolDetail {
         price_paid: s.price_paid,
         status: s.status,
         density: STUB_DENSITY,
+        // Task 8 will populate from the SQL join; the stub has no
+        // locations table.
+        location_name: None,
     }
 }
 
@@ -77,6 +84,7 @@ impl SpoolRepository for StubSpoolRepository {
             remaining_weight: s.net_weight,
             price_paid: s.price_paid,
             status: SpoolStatus::Sealed,
+            location_id: s.location_id,
         };
         rows.push(spool.clone());
         Ok(spool)

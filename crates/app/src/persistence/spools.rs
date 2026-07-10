@@ -72,6 +72,8 @@ fn to_list_item(
         net_weight: build_grams(net_weight)?,
         status: build_status(&status)?,
         density,
+        // Task 8 will populate this from a LEFT JOIN onto locations.
+        location_name: None,
     })
 }
 
@@ -104,6 +106,9 @@ impl SpoolRepository for SqlxSpoolRepository {
             remaining_weight: s.net_weight,
             price_paid: s.price_paid,
             status: SpoolStatus::Sealed,
+            // Task 8 will populate this from the real `location_id` column
+            // (not yet written by this INSERT).
+            location_id: None,
         })
     }
 
@@ -271,6 +276,8 @@ impl SpoolRepository for SqlxSpoolRepository {
                 .map_err(|e| RepositoryError::Backend(e.to_string()))?,
             status: build_status(&r.status)?,
             density: r.density,
+            // Task 8 will populate this from a LEFT JOIN onto locations.
+            location_name: None,
         }))
     }
 
@@ -299,6 +306,8 @@ impl SpoolRepository for SqlxSpoolRepository {
             price_paid: Money::from_decimal(r.price_paid)
                 .map_err(|e| RepositoryError::Backend(e.to_string()))?,
             status: build_status(&r.status)?,
+            // Task 8 will select and map the real `location_id` column.
+            location_id: None,
         }))
     }
 

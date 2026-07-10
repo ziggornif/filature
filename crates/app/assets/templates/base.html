@@ -6,6 +6,13 @@
   <title>{{ t(key="app.name") }}</title>
   <link rel="stylesheet" href="/static/app.css">
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
+  <!-- response-targets: lets a control route a specific non-2xx status code
+       to a dedicated target element instead of htmx's default (non-2xx
+       bodies are never swapped into the primary hx-target). Loaded here
+       alongside htmx core so it's available everywhere, but it only takes
+       effect where a template opts in via hx-ext="response-targets" (the
+       locations delete control) — inert everywhere else, incl. materials. -->
+  <script src="https://cdn.jsdelivr.net/npm/htmx-ext-response-targets@2.0.4" integrity="sha384-T41oglUPvXLGBVyRdZsVRxNWnOOqCynaPubjUVjxhsjFTKrFJGEMm3/0KGmNQ+Pg" crossorigin="anonymous"></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -14,6 +21,7 @@
       <a href="/">{{ t(key="nav.dashboard") }}</a>
       <a href="/spools">{{ t(key="nav.spools") }}</a>
       <a href="/materials">{{ t(key="nav.materials") }}</a>
+      <a href="/locations">{{ t(key="nav.locations") }}</a>
     </nav>
     <div class="sidebar-foot">{{ t(key="shell.tagline") }}</div>
   </aside>

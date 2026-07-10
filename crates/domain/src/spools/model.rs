@@ -1,4 +1,4 @@
-use crate::shared::{DomainError, Grams, MaterialId, Money};
+use crate::shared::{DomainError, Grams, LocationId, MaterialId, Money};
 use std::f64::consts::PI;
 
 /// A spool colour: a validated `#RRGGBB` hex string plus an optional
@@ -118,6 +118,7 @@ pub struct NewSpool {
     pub diameter: Diameter,
     pub net_weight: Grams,
     pub price_paid: Money,
+    pub location_id: Option<LocationId>,
 }
 
 /// A physical spool of filament: net weight at purchase, current
@@ -132,6 +133,7 @@ pub struct Spool {
     pub remaining_weight: Grams,
     pub price_paid: Money,
     pub status: SpoolStatus,
+    pub location_id: Option<LocationId>,
 }
 
 impl Spool {
@@ -196,6 +198,16 @@ impl Spool {
         self.status = status_for(self.remaining_weight, self.net_weight);
         Ok(())
     }
+
+    /// Assigns (or clears, with `None`) the spool's storage location. Pure
+    /// field assignment: no status/weight side effects, and no lifecycle
+    /// restriction — a spool's physical location is independent of whether
+    /// it's sealed, open, empty, or archived, so this is allowed regardless
+    /// of `status` (unlike `set_remaining`/`consume`, which reject archived
+    /// spools).
+    pub fn assign_location(&mut self, location: Option<LocationId>) {
+        self.location_id = location;
+    }
 }
 
 /// Derives lifecycle status from remaining and net weight. `remaining` is
@@ -235,6 +247,7 @@ mod tests {
             remaining_weight: remaining,
             price_paid: Money::new(2500, 2).unwrap(),
             status: SpoolStatus::Open,
+            location_id: None,
         }
     }
 
@@ -394,5 +407,33 @@ mod tests {
     fn restore_when_not_archived_errs() {
         let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(400.0).unwrap());
         assert_eq!(s.restore(), Err(DomainError::SpoolNotArchived));
+    }
+
+    #[test]
+    fn assign_location_sets_and_clears_field() {
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(400.0).unwrap());
+        assert_eq!(s.location_id, None);
+        s.assign_location(Some(crate::shared::LocationId::new("warehouse-1")));
+        assert_eq!(
+            s.location_id,
+            Some(crate::shared::LocationId::new("warehouse-1"))
+        );
+        s.assign_location(None);
+        assert_eq!(s.location_id, None);
+    }
+
+    #[test]
+    fn assign_location_allowed_on_archived_spool() {
+        // Location assignment is independent of lifecycle: an archived
+        // spool's storage location may still be changed (e.g. moving
+        // retired spools to a scrap shelf), unlike set_remaining/consume
+        // which reject archived spools.
+        let mut s = sample_spool(Grams::new(1000.0).unwrap(), Grams::new(400.0).unwrap());
+        s.status = SpoolStatus::Archived;
+        s.assign_location(Some(crate::shared::LocationId::new("shelf-9")));
+        assert_eq!(
+            s.location_id,
+            Some(crate::shared::LocationId::new("shelf-9"))
+        );
     }
 }
