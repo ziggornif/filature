@@ -390,4 +390,20 @@ mod tests {
             .unwrap_err();
         assert!(matches!(err, RepositoryError::NotFound(_)));
     }
+
+    #[tokio::test]
+    async fn view_reflects_assigned_location_id() {
+        let s = svc();
+        let created = s.add(sample_new_spool("material-1")).await.unwrap();
+        let before = s.view(created.id.clone()).await.unwrap();
+        assert_eq!(before.location_id, None);
+
+        let location = LocationId::new("warehouse-1");
+        s.assign_location(created.id.clone(), Some(location.clone()))
+            .await
+            .unwrap();
+
+        let detail = s.view(created.id.clone()).await.unwrap();
+        assert_eq!(detail.location_id, Some(location.as_str().to_string()));
+    }
 }

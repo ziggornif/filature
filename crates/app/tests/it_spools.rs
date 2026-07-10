@@ -449,6 +449,7 @@ async fn insert_with_location_persists_id_and_joins_name_in_get_and_list() {
 
     let detail = spools.get(&created.id).await.unwrap().unwrap();
     assert_eq!(detail.location_name, Some("Shelf A".to_string()));
+    assert_eq!(detail.location_id, Some(location.id.as_str().to_string()));
 
     let list = spools
         .list(
@@ -487,6 +488,7 @@ async fn insert_without_location_shows_none_location_name_in_get_and_list() {
 
     let detail = spools.get(&created.id).await.unwrap().unwrap();
     assert_eq!(detail.location_name, None);
+    assert_eq!(detail.location_id, None);
 
     let list = spools
         .list(

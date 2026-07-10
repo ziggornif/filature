@@ -18,7 +18,7 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
 };
-use domain::shared::{DomainError, Grams, MaterialId, Money};
+use domain::shared::{DomainError, Grams, LocationId, MaterialId, Money};
 use domain::spools::{
     Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolDetail, SpoolFilter, SpoolId,
     SpoolListItem, SpoolSort, SpoolStatus,
@@ -97,6 +97,12 @@ pub struct SpoolDetailView {
     pub remaining_length_m: f64,
     pub price_paid: String,
     pub status: String, // "Sealed" | "Open" | "Empty" | "Archived"
+    /// The assigned location's display name, or `None` when unassigned —
+    /// the detail card shows this (or the "unassigned" label).
+    pub location_name: Option<String>,
+    /// The assigned location's id, or `None` when unassigned — used to
+    /// preselect the current option in the reassign `<select>`.
+    pub location_id: Option<String>,
 }
 
 impl From<SpoolDetail> for SpoolDetailView {
@@ -120,6 +126,8 @@ impl From<SpoolDetail> for SpoolDetailView {
             remaining_length_m,
             price_paid: d.price_paid.to_string(),
             status: d.status.as_str().to_string(),
+            location_name: d.location_name.clone(),
+            location_id: d.location_id.clone(),
         }
     }
 }
@@ -128,6 +136,16 @@ impl From<SpoolDetail> for SpoolDetailView {
 /// composition of `AppState::materials`, not a domain read model.
 #[derive(Serialize)]
 pub struct MaterialOption {
+    pub id: String,
+    pub name: String,
+}
+
+/// A location option for the assignment `<select>` — the web layer's own
+/// composition of `AppState::locations`, mirroring `MaterialOption`. The
+/// `spools` domain never depends on `locations` (slice isolation); this is
+/// web-layer composition across two driving-adapter handlers.
+#[derive(Serialize)]
+pub struct LocationOption {
     pub id: String,
     pub name: String,
 }
@@ -187,6 +205,21 @@ async fn material_options(st: &AppState) -> Result<Vec<MaterialOption>, Response
                 .map(|m| MaterialOption {
                     id: m.id.as_str().to_string(),
                     name: m.name.as_str().to_string(),
+                })
+                .collect()
+        })
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response())
+}
+
+async fn location_options(st: &AppState) -> Result<Vec<LocationOption>, Response> {
+    st.locations
+        .list()
+        .await
+        .map(|ls| {
+            ls.into_iter()
+                .map(|l| LocationOption {
+                    id: l.id.as_str().to_string(),
+                    name: l.name.as_str().to_string(),
                 })
                 .collect()
         })
@@ -287,6 +320,12 @@ pub struct SpoolForm {
     pub net_weight: String,
     #[serde(default)]
     pub price_paid: String,
+    /// The `<select name="location_id">` value — blank (the leading empty
+    /// `<option>`) means unassigned, matching `SpoolQuery::material_id`'s
+    /// "blank = no filter" convention. `#[serde(default)]` so a form payload
+    /// posted without this field at all (defensive) still deserializes.
+    #[serde(default)]
+    pub location_id: String,
 }
 
 /// The fields shared by `NewSpool` (create) and an edited `Spool` (update) —
@@ -298,6 +337,23 @@ struct SpoolFormFields {
     diameter: Diameter,
     net_weight: Grams,
     price_paid: Money,
+    location_id: Option<LocationId>,
+}
+
+/// Maps a raw `location_id` form value to the domain optional id: blank or
+/// whitespace-only ⇒ unassigned (`None`), matching the "blank select ⇒
+/// unassigned" convention used across all three assignment surfaces (add
+/// form, edit form, detail-card reassign). No format validation happens
+/// here — an unknown-but-non-blank id is caught defensively by the
+/// persistence adapter's FK constraint (`RepositoryError::UnknownLocation`),
+/// not by this parse step.
+fn parse_location_id(raw: &str) -> Option<LocationId> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(LocationId::new(trimmed.to_string()))
+    }
 }
 
 impl SpoolForm {
@@ -338,10 +394,12 @@ impl SpoolForm {
             diameter,
             net_weight,
             price_paid,
+            location_id: parse_location_id(&self.location_id),
         })
     }
 
-    /// Maps the raw form into a domain `NewSpool` (create path).
+    /// Maps the raw form into a domain `NewSpool` (create path). Blank
+    /// `location_id` ⇒ unassigned.
     fn to_new(&self) -> Result<NewSpool, &'static str> {
         let f = self.parse()?;
         Ok(NewSpool {
@@ -350,8 +408,7 @@ impl SpoolForm {
             diameter: f.diameter,
             net_weight: f.net_weight,
             price_paid: f.price_paid,
-            // The add-spool form has no location field yet (Task 9).
-            location_id: None,
+            location_id: f.location_id,
         })
     }
 
@@ -359,6 +416,9 @@ impl SpoolForm {
     /// `remaining_weight` and `status` from the spool's current state —
     /// this form never edits those, so the caller supplies them from a
     /// prior `SpoolsUseCases::view` rather than trusting the form for them.
+    /// `location_id` IS taken from the submitted form (preselected from the
+    /// spool's current location by the caller — see `edit_page`); blank ⇒
+    /// unassign.
     fn to_edit(
         &self,
         id: SpoolId,
@@ -375,11 +435,7 @@ impl SpoolForm {
             remaining_weight,
             price_paid: f.price_paid,
             status,
-            // The edit form has no location field yet (Task 9), and
-            // `SpoolDetail` only carries a display-only `location_name`, not
-            // the id, so there's nothing to carry over here yet. Task 8/9
-            // will wire real location persistence through this path.
-            location_id: None,
+            location_id: f.location_id,
         })
     }
 }
@@ -401,9 +457,15 @@ async fn render_form(
         Ok(ms) => ms,
         Err(resp) => return resp,
     };
+    let locations = match location_options(st).await {
+        Ok(ls) => ls,
+        Err(resp) => return resp,
+    };
     let mut ctx = Context::new();
     ctx.insert("materials", &materials);
+    ctx.insert("locations", &locations);
     ctx.insert("material_id", &form.material_id);
+    ctx.insert("location_id", &form.location_id);
     ctx.insert("colour_hex", &form.colour_hex);
     ctx.insert("colour_name", &form.colour_name);
     ctx.insert("diameter", &form.diameter);
@@ -465,6 +527,11 @@ async fn create(
             )
             .await
         }
+        // An unknown location id from a rendered <select> is defensive
+        // (never happens through normal use) — surface it as not-found,
+        // mirroring how `NotFound` is handled elsewhere, rather than
+        // misreporting it as an unknown material or 500-ing.
+        Err(RepositoryError::UnknownLocation(_)) => not_found(&st, &locale),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
@@ -497,10 +564,18 @@ async fn detail_page(
         Err(RepositoryError::NotFound(_)) => return not_found(&st, &locale),
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     };
+    // The page includes `_spool_detail_card.html`, which references
+    // `locations` for its reassign `<select>` — fetch it the same way
+    // `render_card` does for the op-handler render path.
+    let locations = match location_options(&st).await {
+        Ok(ls) => ls,
+        Err(resp) => return resp,
+    };
 
     let view: SpoolDetailView = detail.into();
     let mut ctx = Context::new();
     ctx.insert("spool", &view);
+    ctx.insert("locations", &locations);
     // The page includes `_spool_detail_card.html`, which always references
     // `error_key` (to show/hide its op-error line) — insert `None` here so
     // that include doesn't hit an undefined variable on a fresh page load.
@@ -526,9 +601,18 @@ async fn render_card(
     detail: SpoolDetail,
     error_key: Option<&str>,
 ) -> Response {
+    // The card is re-rendered by every op handler (weight/consume/archive/
+    // restore/reassign), not just the reassign one — so it fetches the
+    // locations list itself rather than relying on a caller to have done
+    // so, keeping every render path consistent.
+    let locations = match location_options(st).await {
+        Ok(ls) => ls,
+        Err(resp) => return resp,
+    };
     let view: SpoolDetailView = detail.into();
     let mut ctx = Context::new();
     ctx.insert("spool", &view);
+    ctx.insert("locations", &locations);
     ctx.insert("error_key", &error_key);
     match st
         .renderer
@@ -722,10 +806,16 @@ async fn render_edit_form(
         Ok(ms) => ms,
         Err(resp) => return resp,
     };
+    let locations = match location_options(st).await {
+        Ok(ls) => ls,
+        Err(resp) => return resp,
+    };
     let mut ctx = Context::new();
     ctx.insert("id", opts.id);
     ctx.insert("materials", &materials);
+    ctx.insert("locations", &locations);
     ctx.insert("material_id", &form.material_id);
+    ctx.insert("location_id", &form.location_id);
     ctx.insert("colour_hex", &form.colour_hex);
     ctx.insert("colour_name", &form.colour_name);
     ctx.insert("diameter", &form.diameter);
@@ -764,6 +854,7 @@ async fn edit_page(
         diameter: detail.diameter.as_str().to_string(),
         net_weight: detail.net_weight.value().to_string(),
         price_paid: detail.price_paid.to_string(),
+        location_id: detail.location_id.clone().unwrap_or_default(),
     };
     render_edit_form(
         &st,
@@ -844,7 +935,46 @@ async fn update(
             )
             .await
         }
+        // Same defensive-404 rationale as `create`'s `UnknownLocation` arm.
+        Err(RepositoryError::UnknownLocation(_)) => not_found(&st, &locale),
         Err(RepositoryError::NotFound(_)) => not_found(&st, &locale),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
+}
+
+/// The `POST /spools/{id}/location` form payload — the detail card's
+/// reassign control. Blank `location_id` (the leading empty `<option>`) ⇒
+/// unassign, same convention as `SpoolForm::location_id`.
+#[derive(Debug, Deserialize, Default)]
+pub struct LocationAssignForm {
+    #[serde(default)]
+    pub location_id: String,
+}
+
+/// `POST /spools/{id}/location` — reassigns (or, on a blank submission,
+/// unassigns) the spool's Location via `SpoolsUseCases::assign_location`
+/// (load -> mutate -> save happens inside the use case; this handler never
+/// reloads-then-mutates itself). Re-renders the detail-card fragment on
+/// success, same `outerHTML` swap pattern as the weight/archive ops.
+/// Both an unknown spool id and an unknown location id (defensive — ids
+/// come from rendered selects) 404, never a 500 or a "wrong slice" error.
+async fn reassign_location(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Form(form): Form<LocationAssignForm>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let spool_id = SpoolId::new(id);
+    let location_id = parse_location_id(&form.location_id);
+    match st
+        .spools
+        .assign_location(spool_id.clone(), location_id)
+        .await
+    {
+        Ok(_) => render_card_for(&st, &locale, spool_id, StatusCode::OK, None).await,
+        Err(RepositoryError::NotFound(_)) => not_found(&st, &locale),
+        Err(RepositoryError::UnknownLocation(_)) => not_found(&st, &locale),
         Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
     }
 }
@@ -860,6 +990,7 @@ pub fn routes() -> Router<AppState> {
         .route("/spools/{id}/consume", post(consume))
         .route("/spools/{id}/archive", post(archive))
         .route("/spools/{id}/restore", post(restore))
+        .route("/spools/{id}/location", post(reassign_location))
 }
 
 #[cfg(test)]
@@ -887,6 +1018,13 @@ mod tests {
         MaterialOption {
             id: "01HMAT".into(),
             name: "PLA".into(),
+        }
+    }
+
+    fn location_option() -> LocationOption {
+        LocationOption {
+            id: "01HLOC".into(),
+            name: "Shelf A".into(),
         }
     }
 
@@ -973,6 +1111,8 @@ mod tests {
             remaining_length_m: 268.2,
             price_paid: "24.99".into(),
             status: "Open".into(),
+            location_name: Some("Shelf A".into()),
+            location_id: Some("01HLOC".into()),
         }
     }
 
@@ -980,6 +1120,7 @@ mod tests {
         let r = Renderer::new(Catalog::load("en"));
         let mut ctx = Context::new();
         ctx.insert("spool", &detail_view("01HSP"));
+        ctx.insert("locations", &vec![location_option()]);
         r.render("spools_detail.html", locale, "", ctx).unwrap()
     }
 
@@ -996,9 +1137,11 @@ mod tests {
         assert!(html.contains("268.2"));
         assert!(html.contains("24.99"));
         assert!(html.contains("/spools/01HSP/edit"));
+        assert!(html.contains("Shelf A")); // assigned location name shown
         assert!(!html.contains("spools.col."));
         assert!(!html.contains("spools.detail."));
         assert!(!html.contains("spools.status."));
+        assert!(!html.contains("spools.location."));
     }
 
     #[test]
@@ -1036,7 +1179,9 @@ mod tests {
         let r = Renderer::new(Catalog::load("en"));
         let mut ctx = Context::new();
         ctx.insert("materials", &vec![material_option()]);
+        ctx.insert("locations", &vec![location_option()]);
         ctx.insert("material_id", "");
+        ctx.insert("location_id", "");
         ctx.insert("colour_hex", "");
         ctx.insert("colour_name", "");
         ctx.insert("diameter", "1.75");
@@ -1052,6 +1197,16 @@ mod tests {
         assert!(html.contains("PLA"));
         assert!(html.contains(r#"value="01HMAT""#));
         assert!(!html.contains("spools.new.")); // no raw i18n key leaks
+    }
+
+    #[test]
+    fn new_form_lists_location_option_and_blank_unassigned_choice() {
+        let html = render_new_form("en");
+        assert!(html.contains("Shelf A"));
+        assert!(html.contains(r#"value="01HLOC""#));
+        assert!(html.contains(r#"<option value="">"#)); // blank = unassigned
+        assert!(!html.contains("spools.new.")); // no raw i18n key leaks
+        assert!(!html.contains("spools.location."));
     }
 
     #[test]
@@ -1086,6 +1241,7 @@ mod tests {
             diameter: "1.75".to_string(),
             net_weight: "1000".to_string(),
             price_paid: "24.99".to_string(),
+            location_id: "".to_string(),
         }
     }
 
@@ -1164,6 +1320,58 @@ mod tests {
         assert_eq!(f.to_new(), Err("spools.new.error.material"));
     }
 
+    #[test]
+    fn to_new_maps_selected_location_to_some() {
+        let mut f = valid_form("01HMAT");
+        f.location_id = "01HLOC".to_string();
+        let new = f.to_new().unwrap();
+        assert_eq!(new.location_id, Some(LocationId::new("01HLOC")));
+    }
+
+    #[test]
+    fn to_new_maps_blank_location_to_none() {
+        let mut f = valid_form("01HMAT");
+        f.location_id = "".to_string();
+        let new = f.to_new().unwrap();
+        assert_eq!(new.location_id, None);
+    }
+
+    #[test]
+    fn to_new_maps_whitespace_location_to_none() {
+        let mut f = valid_form("01HMAT");
+        f.location_id = "   ".to_string();
+        let new = f.to_new().unwrap();
+        assert_eq!(new.location_id, None);
+    }
+
+    #[test]
+    fn to_edit_maps_selected_location_to_some() {
+        let mut f = valid_form("01HMAT");
+        f.location_id = "01HLOC".to_string();
+        let spool = f
+            .to_edit(
+                SpoolId::new("01HSP"),
+                Grams::new(1000.0).unwrap(),
+                SpoolStatus::Sealed,
+            )
+            .unwrap();
+        assert_eq!(spool.location_id, Some(LocationId::new("01HLOC")));
+    }
+
+    #[test]
+    fn to_edit_maps_blank_location_to_none() {
+        let mut f = valid_form("01HMAT");
+        f.location_id = "".to_string();
+        let spool = f
+            .to_edit(
+                SpoolId::new("01HSP"),
+                Grams::new(1000.0).unwrap(),
+                SpoolStatus::Sealed,
+            )
+            .unwrap();
+        assert_eq!(spool.location_id, None);
+    }
+
     // --- Handler-level tests: exercise `new_page`/`create` directly against
     // an in-memory `AppState` (stub repositories + a lazily-connected pool
     // that is never queried by these handlers) — mirrors materials' render
@@ -1174,7 +1382,7 @@ mod tests {
         use crate::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
         use axum::body::to_bytes;
         use domain::locations::stubs::StubLocationRepository;
-        use domain::locations::{LocationsService, LocationsUseCases};
+        use domain::locations::{LocationName, LocationsService, LocationsUseCases, NewLocation};
         use domain::materials::stubs::StubMaterialRepository;
         use domain::materials::{
             Density, DryingParams, MaterialName, MaterialRepository, MaterialsService,
@@ -1238,6 +1446,22 @@ mod tests {
         async fn body_of(res: Response) -> String {
             let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
             String::from_utf8(bytes.to_vec()).unwrap()
+        }
+
+        /// Seeds a Location via the real use case (not a bespoke stub
+        /// bypass), returning its id — used by the location-assignment
+        /// handler tests below to get a real, list-able option.
+        async fn seed_location(st: &AppState, name: &str) -> String {
+            st.locations
+                .add(NewLocation {
+                    name: LocationName::new(name).unwrap(),
+                    note: None,
+                })
+                .await
+                .unwrap()
+                .id
+                .as_str()
+                .to_string()
         }
 
         #[tokio::test]
@@ -1664,6 +1888,217 @@ mod tests {
             assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
             let html = body_of(res).await;
             assert!(html.contains("This spool is archived."));
+        }
+
+        // --- Task 9: web location assignment (add/edit selects + detail
+        // reassign).
+
+        #[tokio::test]
+        async fn post_valid_form_with_location_persists_location_id() {
+            let (st, material_id) = test_state().await;
+            let location_id = seed_location(&st, "Shelf A").await;
+            let spools = st.spools.clone();
+            let mut form = valid_form(&material_id);
+            form.location_id = location_id.clone();
+
+            let res = create(State(st), HeaderMap::new(), Form(form)).await;
+            assert_eq!(res.status(), StatusCode::SEE_OTHER);
+
+            let created = spools
+                .list(SpoolFilter::default(), SpoolSort::CreatedDesc)
+                .await
+                .unwrap();
+            assert_eq!(created.len(), 1);
+            let detail = spools.view(created[0].id.clone()).await.unwrap();
+            assert_eq!(detail.location_id, Some(location_id));
+        }
+
+        #[tokio::test]
+        async fn post_valid_form_blank_location_persists_unassigned() {
+            let (st, material_id) = test_state().await;
+            seed_location(&st, "Shelf A").await; // a real location exists but isn't selected
+            let spools = st.spools.clone();
+            let form = valid_form(&material_id); // location_id: "" (default)
+
+            let res = create(State(st), HeaderMap::new(), Form(form)).await;
+            assert_eq!(res.status(), StatusCode::SEE_OTHER);
+
+            let created = spools
+                .list(SpoolFilter::default(), SpoolSort::CreatedDesc)
+                .await
+                .unwrap();
+            let detail = spools.view(created[0].id.clone()).await.unwrap();
+            assert_eq!(detail.location_id, None);
+        }
+
+        #[tokio::test]
+        async fn get_new_lists_location_option() {
+            let (st, _material_id) = test_state().await;
+            let location_id = seed_location(&st, "Shelf A").await;
+            let res = new_page(State(st), HeaderMap::new()).await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains("Shelf A"));
+            assert!(html.contains(&format!(r#"value="{location_id}""#)));
+        }
+
+        #[tokio::test]
+        async fn get_edit_prefills_location_from_stored_spool() {
+            let (st, material_id) = test_state().await;
+            let location_id = seed_location(&st, "Shelf A").await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+            spools
+                .assign_location(
+                    created.id.clone(),
+                    Some(LocationId::new(location_id.clone())),
+                )
+                .await
+                .unwrap();
+
+            let res = edit_page(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains(&format!(r#"value="{location_id}" selected"#)));
+        }
+
+        #[tokio::test]
+        async fn put_without_changing_location_preserves_it() {
+            let (st, material_id) = test_state().await;
+            let location_id = seed_location(&st, "Shelf A").await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+            spools
+                .assign_location(
+                    created.id.clone(),
+                    Some(LocationId::new(location_id.clone())),
+                )
+                .await
+                .unwrap();
+
+            let mut form = valid_form(&material_id);
+            form.location_id = location_id.clone(); // resubmit the same location
+            let res = update(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+                Form(form),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::OK);
+
+            let detail = spools.view(created.id.clone()).await.unwrap();
+            assert_eq!(detail.location_id, Some(location_id));
+        }
+
+        #[tokio::test]
+        async fn put_blank_location_unassigns() {
+            let (st, material_id) = test_state().await;
+            let location_id = seed_location(&st, "Shelf A").await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+            spools
+                .assign_location(
+                    created.id.clone(),
+                    Some(LocationId::new(location_id.clone())),
+                )
+                .await
+                .unwrap();
+
+            let form = valid_form(&material_id); // location_id: "" (default) => unassign
+            let res = update(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+                Form(form),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::OK);
+
+            let detail = spools.view(created.id.clone()).await.unwrap();
+            assert_eq!(detail.location_id, None);
+        }
+
+        #[tokio::test]
+        async fn post_reassign_location_sets_location_and_returns_fragment() {
+            let (st, material_id) = test_state().await;
+            let location_id = seed_location(&st, "Shelf A").await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+
+            let res = reassign_location(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+                Form(LocationAssignForm {
+                    location_id: location_id.clone(),
+                }),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(!html.contains("<html")); // fragment only, no page shell
+            assert!(html.contains("Shelf A"));
+
+            let detail = spools.view(created.id.clone()).await.unwrap();
+            assert_eq!(detail.location_id, Some(location_id));
+        }
+
+        #[tokio::test]
+        async fn post_reassign_location_blank_unassigns_and_returns_fragment() {
+            let (st, material_id) = test_state().await;
+            let location_id = seed_location(&st, "Shelf A").await;
+            let spools = st.spools.clone();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+            spools
+                .assign_location(
+                    created.id.clone(),
+                    Some(LocationId::new(location_id.clone())),
+                )
+                .await
+                .unwrap();
+
+            let res = reassign_location(
+                State(st),
+                HeaderMap::new(),
+                Path(created.id.as_str().to_string()),
+                Form(LocationAssignForm {
+                    location_id: "".to_string(),
+                }),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            // The location option is still listed (it still exists — a
+            // spool just isn't assigned to it anymore), but must no longer
+            // be the selected one, and the display falls back to the
+            // "unassigned" label rather than the location's name.
+            assert!(html.contains(&format!(r#"value="{location_id}""#)));
+            assert!(!html.contains(&format!(r#"value="{location_id}" selected"#)));
+            assert!(html.contains("Unassigned"));
+
+            let detail = spools.view(created.id.clone()).await.unwrap();
+            assert_eq!(detail.location_id, None);
+        }
+
+        #[tokio::test]
+        async fn post_reassign_location_unknown_spool_id_returns_404() {
+            let (st, _material_id) = test_state().await;
+            let res = reassign_location(
+                State(st),
+                HeaderMap::new(),
+                Path("does-not-exist".to_string()),
+                Form(LocationAssignForm {
+                    location_id: "".to_string(),
+                }),
+            )
+            .await;
+            assert_eq!(res.status(), StatusCode::NOT_FOUND);
         }
 
         #[test]

@@ -537,3 +537,221 @@ async fn stock_value_stat_respects_material_filter() {
     assert!(html.contains("50.00"));
     assert!(!html.contains("8.00"));
 }
+
+/// The Location-assignment journey across all three web surfaces (Task 9):
+/// add a spool with a location selected, confirm the edit form round-trips
+/// it (unchanged on resubmission, unassigned on a blank resubmission), then
+/// drive the detail-card reassign control (assign, unassign, and the
+/// defensive unknown-location/unknown-spool 404s). Runs as a single test —
+/// same rationale as the other journeys in this file: one spool's identity
+/// threads through every step without racing other tests over the shared
+/// testcontainer database.
+#[tokio::test]
+async fn spool_location_assignment_journey() {
+    let app = seeded_app().await;
+
+    let url = support::postgres_url().await;
+    let db = persistence::connect_and_migrate(&url).await.unwrap();
+    let material_repo: Arc<dyn MaterialRepository> =
+        Arc::new(SqlxMaterialRepository::new(db.clone()));
+    let materials_uc: Arc<dyn MaterialsUseCases> = Arc::new(MaterialsService::new(material_repo));
+    let all_materials = materials_uc.list().await.unwrap();
+    let material = all_materials
+        .first()
+        .expect("materials seeded by seeded_app()");
+    let material_id = material.id.as_str().to_string();
+
+    let location_repo = SqlxLocationRepository::new(db.clone());
+    let location = location_repo
+        .insert(domain::locations::NewLocation {
+            name: domain::locations::LocationName::new("E2E Shelf").unwrap(),
+            note: None,
+        })
+        .await
+        .unwrap();
+    let location_id = location.id.as_str().to_string();
+
+    // --- 1. POST /spools with a location selected -> persists, and the
+    // detail page shows the assigned location's name.
+    let form = format!(
+        "material_id={material_id}&colour_hex=%23ABCDEF&colour_name=Loc+Journey&diameter=1.75&net_weight=1000&price_paid=15.00&location_id={location_id}"
+    );
+    let res = app
+        .clone()
+        .oneshot(
+            Request::post("/spools")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(form))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::SEE_OTHER);
+
+    let spool_repo = SqlxSpoolRepository::new(db.clone());
+    let items = spool_repo
+        .list(
+            SpoolFilter {
+                material_id: Some(MaterialId::new(material_id.clone())),
+                status: None,
+            },
+            SpoolSort::CreatedDesc,
+        )
+        .await
+        .unwrap();
+    let created = items
+        .iter()
+        .find(|i| i.colour.hex() == "#ABCDEF")
+        .expect("the spool just posted is present in the filtered list");
+    let spool_id = created.id.as_str().to_string();
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::get(format!("/spools/{spool_id}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(body_of(res).await.contains("E2E Shelf"));
+
+    // --- 2. GET /spools/{id}/edit -> the edit form preselects the current
+    // location.
+    let res = app
+        .clone()
+        .oneshot(
+            Request::get(format!("/spools/{spool_id}/edit"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let edit_html = body_of(res).await;
+    assert!(edit_html.contains(&format!(r#"value="{location_id}" selected"#)));
+
+    // --- 3. PUT /spools/{id} resubmitting the SAME location -> the location
+    // is NOT wiped by an edit that doesn't touch it.
+    let form = format!(
+        "material_id={material_id}&colour_hex=%23ABCDEF&colour_name=Loc+Journey&diameter=1.75&net_weight=1000&price_paid=15.00&location_id={location_id}"
+    );
+    let res = app
+        .clone()
+        .oneshot(
+            Request::put(format!("/spools/{spool_id}"))
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(form))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::get(format!("/spools/{spool_id}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert!(body_of(res).await.contains("E2E Shelf"));
+
+    // --- 4. PUT /spools/{id} with a BLANK location -> unassigns.
+    let form = format!(
+        "material_id={material_id}&colour_hex=%23ABCDEF&colour_name=Loc+Journey&diameter=1.75&net_weight=1000&price_paid=15.00&location_id="
+    );
+    let res = app
+        .clone()
+        .oneshot(
+            Request::put(format!("/spools/{spool_id}"))
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(form))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::get(format!("/spools/{spool_id}"))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let html = body_of(res).await;
+    // The location still exists (still listed as a reassign option), but
+    // must no longer be the *selected* one, and the display falls back to
+    // the "unassigned" label rather than the location's name.
+    assert!(html.contains("E2E Shelf")); // still a selectable option
+    assert!(!html.contains(&format!(r#"value="{location_id}" selected"#)));
+    assert!(html.contains("Unassigned"));
+
+    // --- 5. POST /spools/{id}/location (detail-card reassign) with the real
+    // location id -> reassigns and returns the swapped card fragment.
+    let res = app
+        .clone()
+        .oneshot(
+            Request::post(format!("/spools/{spool_id}/location"))
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(format!("location_id={location_id}")))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let html = body_of(res).await;
+    assert!(!html.contains("<html")); // fragment only, no page shell
+    assert!(html.contains(&format!(r#"value="{location_id}" selected"#)));
+
+    // --- 6. POST /spools/{id}/location with a BLANK value -> unassigns via
+    // the reassign control too.
+    let res = app
+        .clone()
+        .oneshot(
+            Request::post(format!("/spools/{spool_id}/location"))
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("location_id="))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let html = body_of(res).await;
+    assert!(!html.contains(&format!(r#"value="{location_id}" selected"#)));
+    assert!(html.contains("Unassigned"));
+
+    // --- 7. POST /spools/{id}/location with an UNKNOWN location id -> 404,
+    // never a 500 and never misreported as an unknown material (ids come
+    // from a rendered <select>, so this is defensive).
+    let res = app
+        .clone()
+        .oneshot(
+            Request::post(format!("/spools/{spool_id}/location"))
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("location_id=does-not-exist"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+
+    // --- 8. POST /spools/{id}/location on an unknown SPOOL id -> 404.
+    let res = app
+        .clone()
+        .oneshot(
+            Request::post("/spools/does-not-exist/location")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("location_id="))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}

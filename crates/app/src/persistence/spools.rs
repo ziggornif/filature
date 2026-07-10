@@ -290,6 +290,7 @@ impl SpoolRepository for SqlxSpoolRepository {
         let row = sqlx::query!(
             r#"SELECT s.id, s.material_id, s.colour_hex, s.colour_name, s.diameter,
                       s.net_weight, s.remaining_weight, s.price_paid, s.status,
+                      s.location_id,
                       m.name AS material_name, m.density,
                       l.name AS "location_name?"
                FROM spools s
@@ -319,6 +320,7 @@ impl SpoolRepository for SqlxSpoolRepository {
             status: build_status(&r.status)?,
             density: r.density,
             location_name: r.location_name,
+            location_id: r.location_id,
         }))
     }
 

@@ -43,5 +43,15 @@
     <input type="number" name="price_paid" step="0.01" min="0" value="{{ price_paid }}" required>
   </label>
 
+  <label>
+    {{ t(key="spools.new.location") }}
+    <select name="location_id">
+      <option value="">{{ t(key="spools.location.unassigned") }}</option>
+      {% for l in locations | default(value=[]) %}
+        <option value="{{ l.id }}"{% if l.id == location_id | default(value="") %} selected{% endif %}>{{ l.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
   <button type="submit">{{ t(key="spools.edit.submit") }}</button>
 </form>

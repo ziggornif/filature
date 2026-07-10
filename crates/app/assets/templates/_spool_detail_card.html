@@ -41,7 +41,23 @@
       {% elif spool.status == "Archived" %}{{ t(key="spools.status.archived") }}
       {% endif %}
     </dd>
+
+    <dt>{{ t(key="spools.col.location") }}</dt>
+    <dd>{% if spool.location_name %}{{ spool.location_name }}{% else %}{{ t(key="spools.location.unassigned") }}{% endif %}</dd>
   </dl>
+
+  <form class="spool-op-form spool-op-form--location" hx-post="/spools/{{ spool.id }}/location">
+    <label>
+      {{ t(key="spools.new.location") }}
+      <select name="location_id">
+        <option value="">{{ t(key="spools.location.unassigned") }}</option>
+        {% for l in locations | default(value=[]) %}
+          <option value="{{ l.id }}"{% if l.id == spool.location_id | default(value="") %} selected{% endif %}>{{ l.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">{{ t(key="spools.action.reassign_location_submit") }}</button>
+  </form>
 
   {% if spool.status != "Archived" %}
     <form class="spool-op-form spool-op-form--remaining" hx-post="/spools/{{ spool.id }}/remaining">
