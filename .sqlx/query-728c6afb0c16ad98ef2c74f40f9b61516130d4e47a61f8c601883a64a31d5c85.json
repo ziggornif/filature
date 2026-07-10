@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id, s.colour_hex, s.colour_name, s.diameter,\n                              s.net_weight, s.remaining_weight, s.status,\n                              m.name AS material_name, m.density\n                       FROM spools s JOIN materials m ON m.id = s.material_id\n                       WHERE ($1::text IS NULL OR s.material_id = $1)\n                         AND ($2::text IS NULL OR s.status = $2)\n                         AND (s.status <> 'Archived' OR $2 = 'Archived')\n                       ORDER BY (s.remaining_weight / s.net_weight) ASC",
+  "query": "SELECT s.id, s.colour_hex, s.colour_name, s.diameter,\n                              s.net_weight, s.remaining_weight, s.status,\n                              m.name AS material_name, m.density,\n                              l.name AS \"location_name?\"\n                       FROM spools s\n                       JOIN materials m ON m.id = s.material_id\n                       LEFT JOIN locations l ON l.id = s.location_id\n                       WHERE ($1::text IS NULL OR s.material_id = $1)\n                         AND ($2::text IS NULL OR s.status = $2)\n                         AND (s.status <> 'Archived' OR $2 = 'Archived')\n                       ORDER BY s.created_at DESC",
   "describe": {
     "columns": [
       {
@@ -101,6 +101,17 @@
             "name": "density"
           }
         }
+      },
+      {
+        "ordinal": 9,
+        "name": "location_name?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "locations",
+            "name": "name"
+          }
+        }
       }
     ],
     "parameters": {
@@ -118,8 +129,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "fe065d995afb158aa4e3ee59878566a7e6831aea26eb301d34700f73a8f43ffd"
+  "hash": "728c6afb0c16ad98ef2c74f40f9b61516130d4e47a61f8c601883a64a31d5c85"
 }
