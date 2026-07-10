@@ -50,6 +50,10 @@ pub struct SpoolDetail {
     pub status: SpoolStatus,
     pub density: f64,
     pub location_name: Option<String>,
+    /// The assigned location's id (`None` when unassigned) — carried
+    /// alongside the display-only `location_name` so a web edit form can
+    /// preselect the current location on the rendered `<select>`.
+    pub location_id: Option<String>,
 }
 
 impl SpoolDetail {

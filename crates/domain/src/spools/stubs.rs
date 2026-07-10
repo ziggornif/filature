@@ -65,9 +65,11 @@ fn to_detail(s: &Spool) -> SpoolDetail {
         price_paid: s.price_paid,
         status: s.status,
         density: STUB_DENSITY,
-        // Task 8 will populate from the SQL join; the stub has no
-        // locations table.
+        // Task 8 will populate `location_name` from the SQL join; the stub
+        // has no locations table so it stays None. `location_id`, however,
+        // is known straight from the stored `Spool` (no join needed).
         location_name: None,
+        location_id: s.location_id.as_ref().map(|l| l.as_str().to_string()),
     }
 }
 

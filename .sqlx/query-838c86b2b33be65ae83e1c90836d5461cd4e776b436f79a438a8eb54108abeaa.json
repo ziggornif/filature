@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id, s.material_id, s.colour_hex, s.colour_name, s.diameter,\n                      s.net_weight, s.remaining_weight, s.price_paid, s.status,\n                      m.name AS material_name, m.density,\n                      l.name AS \"location_name?\"\n               FROM spools s\n               JOIN materials m ON m.id = s.material_id\n               LEFT JOIN locations l ON l.id = s.location_id\n               WHERE s.id = $1",
+  "query": "SELECT s.id, s.material_id, s.colour_hex, s.colour_name, s.diameter,\n                      s.net_weight, s.remaining_weight, s.price_paid, s.status,\n                      s.location_id,\n                      m.name AS material_name, m.density,\n                      l.name AS \"location_name?\"\n               FROM spools s\n               JOIN materials m ON m.id = s.material_id\n               LEFT JOIN locations l ON l.id = s.location_id\n               WHERE s.id = $1",
   "describe": {
     "columns": [
       {
@@ -104,6 +104,17 @@
       },
       {
         "ordinal": 9,
+        "name": "location_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spools",
+            "name": "location_id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
         "name": "material_name",
         "type_info": "Text",
         "origin": {
@@ -114,7 +125,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "density",
         "type_info": "Float8",
         "origin": {
@@ -125,7 +136,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 12,
         "name": "location_name?",
         "type_info": "Text",
         "origin": {
@@ -151,10 +162,11 @@
       false,
       false,
       false,
+      true,
       false,
       false,
       true
     ]
   },
-  "hash": "7c1fcae4cd738b644efe18811a54382bef07a3adc216e327b7558d0de3b01067"
+  "hash": "838c86b2b33be65ae83e1c90836d5461cd4e776b436f79a438a8eb54108abeaa"
 }
