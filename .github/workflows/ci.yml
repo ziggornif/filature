@@ -85,6 +85,9 @@ jobs:
     # Computational security sensor: scan the diff/history for leaked secrets
     # (the DB connection string is the one real secret). See docs/security/.
     runs-on: ubuntu-latest
+    permissions:
+      contents: read          # checkout
+      pull-requests: write    # gitleaks-action lists PR commits + annotates on a find
     steps:
       - uses: actions/checkout@v5
         with:
