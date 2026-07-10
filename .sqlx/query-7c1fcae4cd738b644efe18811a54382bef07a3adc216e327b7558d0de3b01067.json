@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, material_id, colour_hex, colour_name, diameter,\n                      net_weight, remaining_weight, price_paid, status\n               FROM spools WHERE id = $1",
+  "query": "SELECT s.id, s.material_id, s.colour_hex, s.colour_name, s.diameter,\n                      s.net_weight, s.remaining_weight, s.price_paid, s.status,\n                      m.name AS material_name, m.density,\n                      l.name AS \"location_name?\"\n               FROM spools s\n               JOIN materials m ON m.id = s.material_id\n               LEFT JOIN locations l ON l.id = s.location_id\n               WHERE s.id = $1",
   "describe": {
     "columns": [
       {
@@ -101,6 +101,39 @@
             "name": "status"
           }
         }
+      },
+      {
+        "ordinal": 9,
+        "name": "material_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "materials",
+            "name": "name"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "density",
+        "type_info": "Float8",
+        "origin": {
+          "Table": {
+            "table": "materials",
+            "name": "density"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "location_name?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "locations",
+            "name": "name"
+          }
+        }
       }
     ],
     "parameters": {
@@ -117,8 +150,11 @@
       false,
       false,
       false,
-      false
+      false,
+      false,
+      false,
+      true
     ]
   },
-  "hash": "3fa5b5ef0e36614ef5c74c3b76760bff887b092ffde93bb26bb89ed927c18919"
+  "hash": "7c1fcae4cd738b644efe18811a54382bef07a3adc216e327b7558d0de3b01067"
 }

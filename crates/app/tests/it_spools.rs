@@ -1,17 +1,26 @@
 mod support;
 
+use domain::locations::{LocationName, LocationRepository, NewLocation};
 use domain::materials::{
     Density, DryingParams, MaterialName, MaterialRepository, NewMaterial, Sensitivity, Temperature,
 };
-use domain::shared::{Grams, MaterialId, Money};
+use domain::shared::{Grams, LocationId, MaterialId, Money};
 use domain::spools::{
     Colour, Diameter, NewSpool, RepositoryError, SpoolFilter, SpoolRepository, SpoolSort,
     SpoolStatus,
 };
 use filature::persistence::connect_and_migrate;
+use filature::persistence::locations::SqlxLocationRepository;
 use filature::persistence::materials::SqlxMaterialRepository;
 use filature::persistence::spools::SqlxSpoolRepository;
 use rust_decimal::Decimal;
+
+fn sample_location(name: &str) -> NewLocation {
+    NewLocation {
+        name: LocationName::new(name).unwrap(),
+        note: None,
+    }
+}
 
 fn sample_material(name: &str) -> NewMaterial {
     NewMaterial {
@@ -413,4 +422,144 @@ async fn list_default_excludes_archived_and_status_filter_includes_it() {
         .await
         .unwrap();
     assert!(archived_list.iter().any(|i| i.id == archived.id));
+}
+
+#[tokio::test]
+async fn insert_with_location_persists_id_and_joins_name_in_get_and_list() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let locations = SqlxLocationRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+
+    let material = materials
+        .insert(sample_material("PLA-Location"))
+        .await
+        .unwrap();
+    let location = locations.insert(sample_location("Shelf A")).await.unwrap();
+
+    let mut new_spool = sample_spool(material.id.clone(), 1000.0, "10.00");
+    new_spool.location_id = Some(location.id.clone());
+
+    let created = spools.insert(new_spool).await.unwrap();
+    assert_eq!(created.location_id, Some(location.id.clone()));
+
+    let found = spools.find(&created.id).await.unwrap().unwrap();
+    assert_eq!(found.location_id, Some(location.id.clone()));
+
+    let detail = spools.get(&created.id).await.unwrap().unwrap();
+    assert_eq!(detail.location_name, Some("Shelf A".to_string()));
+
+    let list = spools
+        .list(
+            SpoolFilter {
+                material_id: Some(material.id.clone()),
+                status: None,
+            },
+            SpoolSort::CreatedDesc,
+        )
+        .await
+        .unwrap();
+    let item = list.iter().find(|i| i.id == created.id).unwrap();
+    assert_eq!(item.location_name, Some("Shelf A".to_string()));
+}
+
+#[tokio::test]
+async fn insert_without_location_shows_none_location_name_in_get_and_list() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+
+    let material = materials
+        .insert(sample_material("PLA-NoLocation"))
+        .await
+        .unwrap();
+
+    let created = spools
+        .insert(sample_spool(material.id.clone(), 1000.0, "10.00"))
+        .await
+        .unwrap();
+    assert_eq!(created.location_id, None);
+
+    let found = spools.find(&created.id).await.unwrap().unwrap();
+    assert_eq!(found.location_id, None);
+
+    let detail = spools.get(&created.id).await.unwrap().unwrap();
+    assert_eq!(detail.location_name, None);
+
+    let list = spools
+        .list(
+            SpoolFilter {
+                material_id: Some(material.id.clone()),
+                status: None,
+            },
+            SpoolSort::CreatedDesc,
+        )
+        .await
+        .unwrap();
+    let item = list.iter().find(|i| i.id == created.id).unwrap();
+    assert_eq!(item.location_name, None);
+}
+
+#[tokio::test]
+async fn update_sets_and_then_clears_location_id() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let locations = SqlxLocationRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+
+    let material = materials
+        .insert(sample_material("PLA-Reassign"))
+        .await
+        .unwrap();
+    let location = locations
+        .insert(sample_location("Shelf Reassign"))
+        .await
+        .unwrap();
+
+    let created = spools
+        .insert(sample_spool(material.id.clone(), 1000.0, "10.00"))
+        .await
+        .unwrap();
+    assert_eq!(created.location_id, None);
+
+    let mut assigned = created.clone();
+    assigned.location_id = Some(location.id.clone());
+    spools.update(assigned.clone()).await.unwrap();
+
+    let found = spools.find(&created.id).await.unwrap().unwrap();
+    assert_eq!(found.location_id, Some(location.id.clone()));
+
+    let mut cleared = found.clone();
+    cleared.location_id = None;
+    spools.update(cleared).await.unwrap();
+
+    let found_after_clear = spools.find(&created.id).await.unwrap().unwrap();
+    assert_eq!(found_after_clear.location_id, None);
+}
+
+#[tokio::test]
+async fn insert_with_unknown_location_maps_to_unknown_location_not_unknown_material() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+
+    let material = materials
+        .insert(sample_material("PLA-BogusLocation"))
+        .await
+        .unwrap();
+
+    let bogus_location = LocationId::new("01BOGUSLOCATIONIDXXXXXXXXX");
+    let mut new_spool = sample_spool(material.id.clone(), 500.0, "10.00");
+    new_spool.location_id = Some(bogus_location.clone());
+
+    let err = spools.insert(new_spool).await.unwrap_err();
+
+    match err {
+        RepositoryError::UnknownLocation(id) => assert_eq!(id, bogus_location),
+        other => panic!("expected UnknownLocation, got {other:?}"),
+    }
 }
