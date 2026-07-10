@@ -1,21 +1,30 @@
-<tr id="spool-row-{{ s.id }}" class="spool-row spool-row--{{ s.status | lower }}">
+<tr id="spool-row-{{ s.id }}" class="spool-row spool-row--{{ s.status | lower }}" style="--row-colour:{{ s.colour_hex }}">
   <td>
     <span class="colour-swatch"
-          style="background:{{ s.colour_hex }}; display:inline-block; width:14px; height:14px; border-radius:3px;"
+          style="background:{{ s.colour_hex }}"
           title="{{ s.colour_label }}"></span>
   </td>
   <td><a href="/spools/{{ s.id }}">{{ s.material_name }}</a></td>
   <td>{{ s.diameter }}</td>
   <td>{{ s.remaining_weight }}</td>
   <td>{{ s.net_weight }}</td>
-  <td>{{ s.remaining_pct }}%</td>
+  <td>
+    <span class="spool-remaining-cell">
+      <span class="gauge{% if s.remaining_pct == 0 %} gauge--empty{% elif s.remaining_pct < 10 %} gauge--crit{% elif s.remaining_pct <= 15 %} gauge--low{% endif %}">
+        <span class="gauge-fill" style="width:{{ s.remaining_pct }}%"></span>
+      </span>
+      <span class="spool-remaining-pct">{{ s.remaining_pct }}%</span>
+    </span>
+  </td>
   <td>{{ s.remaining_length_m }}</td>
   <td>
-    {% if s.status == "Sealed" %}{{ t(key="spools.status.sealed") }}
-    {% elif s.status == "Open" %}{{ t(key="spools.status.open") }}
-    {% elif s.status == "Empty" %}{{ t(key="spools.status.empty") }}
-    {% elif s.status == "Archived" %}{{ t(key="spools.status.archived") }}
-    {% endif %}
+    <span class="pill pill--{{ s.status | lower }}">
+      {% if s.status == "Sealed" %}{{ t(key="spools.status.sealed") }}
+      {% elif s.status == "Open" %}{{ t(key="spools.status.open") }}
+      {% elif s.status == "Empty" %}{{ t(key="spools.status.empty") }}
+      {% elif s.status == "Archived" %}{{ t(key="spools.status.archived") }}
+      {% endif %}
+    </span>
   </td>
   <td class="spool-row-actions">
     <a href="/spools/{{ s.id }}">{{ t(key="spools.action.view") }}</a>

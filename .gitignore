@@ -23,3 +23,6 @@ Cargo.lock.orig
 # Claude Code local settings + transient temp files
 .claude/settings.local.json
 .claude/*.tmp.*
+
+# local dev runtime config (db url, bind)
+filature.toml

@@ -4,6 +4,8 @@
    slices that own those screens. */
 
 :root {
+  --sans: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
   /* Dark values as the OS-default fallback (prefers-color-scheme below
      narrows this further); html[data-theme] always wins when set. */
   --bg: #211f1c;
@@ -105,7 +107,23 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: var(--sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .sidebar {
@@ -287,5 +305,454 @@ body {
 
   .dashboard-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   Shared primitives (handoff: warm-neutral, technical-instrument;
+   mono for all numbers/units, colour reserved for status)
+   ============================================================ */
+
+.content h1 {
+  font-size: 19px;
+  font-weight: 600;
+  margin: 0 0 18px;
+}
+
+.content h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+
+/* Buttons */
+button,
+.spools-add {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 7px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: 8px 14px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  line-height: 1.2;
+  transition: filter 0.12s ease;
+}
+
+button:hover,
+.spools-add:hover {
+  filter: brightness(1.08);
+}
+
+/* Secondary / row-action buttons read as quiet links, not primary CTAs */
+.spool-row-actions a,
+.location-row-actions button {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--muted);
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.spool-row-actions a:hover,
+.location-row-actions button:hover {
+  color: var(--text);
+  background: var(--hover-bg);
+  filter: none;
+}
+
+/* Inputs & selects — discreet: surface fill, quiet border, accent on focus */
+input,
+select,
+textarea {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 7px 9px;
+  outline: none;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* numbers/units everywhere read as mono */
+input[type="number"] {
+  font-family: var(--mono);
+}
+
+a {
+  color: var(--text);
+}
+
+.form-error {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+
+/* Colour chip (transverse component): circle, always ringed so white/black
+   read on either theme; background = the spool's real hex (set inline). */
+.colour-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  flex: 0 0 auto;
+  vertical-align: middle;
+}
+
+/* Status pill */
+.pill {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  padding: 2px 9px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.pill--sealed {
+  color: var(--ok);
+  background: var(--ok-bg);
+  border-color: color-mix(in srgb, var(--ok) 35%, transparent);
+}
+.pill--open {
+  color: var(--muted);
+  background: var(--active-bg);
+  border-color: var(--border-strong);
+}
+.pill--empty {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.pill--archived {
+  color: var(--faint);
+  background: transparent;
+  border-color: var(--border);
+}
+
+/* Remaining-weight gauge (signature component): track + fill width=%; fill
+   colour is semantic — neutral normal, amber low, red <10%, grey if empty. */
+.gauge {
+  display: block;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--active-bg);
+  overflow: hidden;
+  min-width: 54px;
+}
+.gauge-fill {
+  display: block;
+  height: 100%;
+  background: var(--muted);
+  border-radius: 4px;
+}
+.gauge--low .gauge-fill {
+  background: var(--warn);
+}
+.gauge--crit .gauge-fill {
+  background: var(--danger);
+}
+.gauge--empty .gauge-fill {
+  background: var(--border-strong);
+}
+
+/* Dense data tables (spools / materials / locations) */
+.spools-table,
+.materials-table,
+.locations-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.spools-table thead th,
+.materials-table thead th,
+.locations-table thead th {
+  text-align: left;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--faint);
+  padding: 0 12px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.spools-table tbody td,
+.materials-table tbody td,
+.locations-table tbody td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.spools-table tbody tr:hover,
+.locations-table tbody tr:hover {
+  background: var(--hover-bg);
+}
+
+/* mono numeric columns */
+.spools-table td:nth-child(3),
+.spools-table td:nth-child(5),
+.spools-table td:nth-child(7),
+.material-threshold,
+.location-spool-count {
+  font-family: var(--mono);
+}
+
+/* Table inputs (materials / locations inline-edit) — borderless until focus */
+.materials-table input,
+.materials-table select,
+.locations-table input {
+  width: 100%;
+  background: var(--surface);
+  border-color: transparent;
+  padding: 5px 7px;
+}
+.materials-table input:focus,
+.materials-table select:focus,
+.locations-table input:focus {
+  background: var(--raised);
+  border-color: var(--accent);
+}
+
+/* ============================================================
+   Spools list
+   ============================================================ */
+
+.spools-stock-value {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 16px;
+}
+.spools-stock-value #stock-value {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  margin-left: 8px;
+}
+
+/* Filter bar — sticky, surface, mono caps labels above each control */
+.spools-filter-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: end;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.spools-filter-bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--faint);
+}
+.spools-filter-bar select {
+  min-width: 150px;
+}
+
+.spools-add {
+  margin-bottom: 16px;
+}
+
+/* filament colour liseré on the row (left 3px = the spool's hex, set inline
+   as --row-colour); status tints the empty/archived rows faintly */
+.spool-row {
+  box-shadow: inset 3px 0 0 var(--row-colour, transparent);
+}
+.spool-row--empty td:first-child,
+.spool-row--archived {
+  color: var(--muted);
+}
+
+.spool-remaining-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.spool-remaining-pct {
+  font-family: var(--mono);
+  min-width: 38px;
+}
+
+/* ============================================================
+   Materials referential
+   ============================================================ */
+
+.material-row--low td:first-child {
+  box-shadow: inset 3px 0 0 var(--ok);
+}
+.material-row--medium td:first-child {
+  box-shadow: inset 3px 0 0 var(--warn);
+}
+.material-row--high td:first-child {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+
+/* sensitivity select reads in its semantic colour */
+.material-row--low select[name="sensitivity"] {
+  color: var(--ok);
+}
+.material-row--medium select[name="sensitivity"] {
+  color: var(--warn);
+}
+.material-row--high select[name="sensitivity"] {
+  color: var(--danger);
+}
+
+.material-threshold {
+  color: var(--muted);
+}
+
+/* Add-forms shared shape (materials / locations): a raised strip of inputs */
+.material-add-form,
+.location-add-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 16px;
+}
+.material-add-form input,
+.material-add-form select {
+  flex: 1 1 90px;
+  min-width: 0;
+}
+.location-add-form input[name="name"] {
+  flex: 0 0 200px;
+}
+.location-add-form input[name="note"] {
+  flex: 1 1 240px;
+}
+
+/* ============================================================
+   Locations
+   ============================================================ */
+
+#locations-msg:not(:empty) {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+  color: var(--warn);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+/* ============================================================
+   Spool add/edit form + detail card
+   ============================================================ */
+
+.spool-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 520px;
+}
+.spool-add-form label,
+.spool-op-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--faint);
+}
+.spool-add-form > button {
+  align-self: start;
+}
+
+#spool-card {
+  max-width: 640px;
+}
+.spool-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 8px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin: 0 0 16px;
+}
+.spool-detail dt {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--faint);
+  align-self: center;
+}
+.spool-detail dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spool-op-form {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  flex-wrap: wrap;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.spool-op-form--archive,
+.spool-op-form--restore {
+  border-top: none;
+}
+.spool-op-form--archive button {
+  background: transparent;
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+@media (max-width: 760px) {
+  .content {
+    padding: 16px 15px;
+  }
+  .spools-filter-bar select {
+    min-width: 120px;
   }
 }

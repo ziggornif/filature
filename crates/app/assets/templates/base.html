@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ t(key="app.name") }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="/static/app.css">
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.10/dist/htmx.min.js" integrity="sha384-H5SrcfygHmAuTDZphMHqBJLc3FhssKjG7w/CeCpFReSfwBWDTKpkzPP8c+cLsK+V" crossorigin="anonymous"></script>
   <!-- response-targets: lets a control route a specific non-2xx status code
@@ -19,9 +22,9 @@
     <div class="wordmark">{{ t(key="app.name") }}</div>
     <nav>
       <a href="/"{% if page | default(value="") == "dashboard" %} class="active"{% endif %}>{{ t(key="nav.dashboard") }}</a>
-      <a href="/spools">{{ t(key="nav.spools") }}</a>
-      <a href="/materials">{{ t(key="nav.materials") }}</a>
-      <a href="/locations">{{ t(key="nav.locations") }}</a>
+      <a href="/spools"{% if page | default(value="") == "spools" %} class="active"{% endif %}>{{ t(key="nav.spools") }}</a>
+      <a href="/materials"{% if page | default(value="") == "materials" %} class="active"{% endif %}>{{ t(key="nav.materials") }}</a>
+      <a href="/locations"{% if page | default(value="") == "locations" %} class="active"{% endif %}>{{ t(key="nav.locations") }}</a>
     </nav>
     <div class="sidebar-foot">{{ t(key="shell.tagline") }}</div>
   </aside>

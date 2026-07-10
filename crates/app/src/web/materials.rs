@@ -100,6 +100,7 @@ async fn list_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
             let views: Vec<MaterialView> = items.into_iter().map(Into::into).collect();
             let mut ctx = Context::new();
             ctx.insert("materials", &views);
+            ctx.insert("page", "materials");
             match st
                 .renderer
                 .render("materials.html", &locale, theme.data_attr(), ctx)

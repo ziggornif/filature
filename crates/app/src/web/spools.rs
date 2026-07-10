@@ -271,6 +271,7 @@ async fn list_page(
             ctx.insert("selected_status", q.status.as_deref().unwrap_or(""));
             ctx.insert("selected_sort", q.selected_sort());
             ctx.insert("stock_value", &stock_value);
+            ctx.insert("page", "spools");
             match st
                 .renderer
                 .render("spools.html", &locale, theme.data_attr(), ctx)
