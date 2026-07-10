@@ -2,7 +2,7 @@
 //! table (`GET /materials`) whose rows are edited/created in place via
 //! row-fragment responses (`POST /materials`, `PUT /materials/{id}`).
 
-use crate::web::router::{resolve_locale, resolve_theme};
+use crate::web::router::{internal_error, resolve_locale, resolve_theme};
 use crate::web::state::AppState;
 use axum::{
     Router,
@@ -88,7 +88,7 @@ fn render_row(st: &AppState, locale: &str, m: Material) -> Response {
     ctx.insert("m", &view);
     match st.renderer.render("_material_row.html", locale, "", ctx) {
         Ok(html) => Html(html).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -105,10 +105,10 @@ async fn list_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
                 .render("materials.html", &locale, theme.data_attr(), ctx)
             {
                 Ok(html) => Html(html).into_response(),
-                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+                Err(e) => internal_error(e),
             }
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -129,7 +129,7 @@ async fn create(
             format!("a material named '{name}' already exists"),
         )
             .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -160,7 +160,7 @@ async fn edit(
             format!("a material named '{name}' already exists"),
         )
             .into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 

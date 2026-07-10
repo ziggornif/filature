@@ -30,6 +30,17 @@ pub(crate) fn resolve_theme(headers: &HeaderMap) -> Theme {
     Theme::from_cookie(read_cookie(headers, "theme").as_deref())
 }
 
+/// Logs an internal error server-side (`tracing::error!`) and returns a generic
+/// 500 to the client. Raw error detail (e.g. sqlx text) must never reach the
+/// response body — the operator reads it from the server logs instead (AR-002).
+///
+/// `pub(crate)`: the single 500-path builder shared by every driving-adapter
+/// handler, so no call site reconstructs the leak by hand.
+pub(crate) fn internal_error<E: std::fmt::Display>(e: E) -> Response {
+    tracing::error!(error = %e, "internal server error");
+    (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
+}
+
 pub(crate) fn read_cookie(headers: &HeaderMap, name: &str) -> Option<String> {
     let raw = headers.get(header::COOKIE)?.to_str().ok()?;
     raw.split(';')
@@ -46,7 +57,7 @@ async fn index(State(st): State<AppState>, headers: HeaderMap) -> impl IntoRespo
         .render("index.html", &locale, theme.data_attr(), Context::new())
     {
         Ok(html) => Html(html).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
