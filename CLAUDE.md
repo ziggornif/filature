@@ -10,7 +10,11 @@ This repo uses the **craft harness** — a set of skills and a documented projec
 
 ## Skills installed
 
-All skills are in `.claude/skills/`. Claude Code loads them automatically at session start. The key ones:
+The skills live in the **`craftmanship-harness` git submodule** at `.claude/harness`
+(pinned to a release tag — currently **v0.2.0**), surfaced as symlinks under
+`.claude/skills/`. On a fresh clone run `git submodule update --init` or the symlinks
+dangle. Bump the harness by moving the submodule to a new tag and committing the
+gitlink. The key skills:
 
 | Skill | When it triggers |
 |---|---|
@@ -23,6 +27,8 @@ All skills are in `.claude/skills/`. Claude Code loads them automatically at ses
 | `security-review` | Any backend surface, authn/authz, secrets, or dependency review |
 | `prototype` | Spiking the riskiest assumption (throwaway code) |
 | `handoff` | Compacting context across sessions or agents |
+| `codebase-design` | Designing/structuring an existing codebase (v0.2.0) |
+| `improve-codebase-architecture` | Reviewing & improving architecture of existing code (v0.2.0) |
 
 **superpowers** is installed as a plugin and owns the lifecycle engine: brainstorming, plan, subagent-driven-development, TDD loop, code-review, finish. Our skills plug into superpowers' ordered phases.
 
