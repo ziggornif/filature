@@ -314,11 +314,9 @@ mod tests {
     fn view_of_empty_overview_is_all_zeros() {
         let overview = DashboardOverview::from_rows(Vec::new());
         let view: DashboardView = overview.into();
-        // `DashboardOverview::from_rows`'s zero-stock fallback is
-        // `Money::new(0, 0)` (scale 0), same as `SpoolsUseCases::stock_value`
-        // on an empty scope — `Money`'s `Display` renders that as "0", not
-        // "0.00" (only a non-zero/priced amount carries decimal places).
-        assert_eq!(view.stock_value, "0");
+        // `Money`'s `Display` always renders to the cent (TD-011), so zero
+        // stock shows "0.00", not a raw "0".
+        assert_eq!(view.stock_value, "0.00");
         assert_eq!(view.remaining_kg, 0.0);
         assert_eq!(view.total_count, 0);
         assert!(view.material_breakdown.is_empty());
