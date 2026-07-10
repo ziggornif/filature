@@ -80,3 +80,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-deny
       - run: cargo deny check
+
+  secrets:
+    # Computational security sensor: scan the diff/history for leaked secrets
+    # (the DB connection string is the one real secret). See docs/security/.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # full history so PR scans see the whole range
+      - name: gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # gitleaks-action is free for personal accounts and public repos;
+          # set GITLEAKS_LICENSE as a repo secret only if this moves under an org.
