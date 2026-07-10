@@ -3,7 +3,7 @@
 //! via row-fragment responses (`POST /locations`, `PUT /locations/{id}`,
 //! `DELETE /locations/{id}`) — mirrors `web::materials`.
 
-use crate::web::router::{resolve_locale, resolve_theme};
+use crate::web::router::{internal_error, resolve_locale, resolve_theme};
 use crate::web::state::AppState;
 use axum::{
     Router,
@@ -74,7 +74,7 @@ fn render_row(st: &AppState, locale: &str, status: StatusCode, view: LocationVie
     ctx.insert("l", &view);
     match st.renderer.render("_location_row.html", locale, "", ctx) {
         Ok(html) => (status, Html(html)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -87,7 +87,7 @@ fn render_message(st: &AppState, locale: &str, status: StatusCode, message: Stri
     ctx.insert("message", &message);
     match st.renderer.render("_locations_msg.html", locale, "", ctx) {
         Ok(html) => (status, Html(html)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -117,10 +117,10 @@ async fn list_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
                 .render("locations.html", &locale, theme.data_attr(), ctx)
             {
                 Ok(html) => Html(html).into_response(),
-                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+                Err(e) => internal_error(e),
             }
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -139,7 +139,7 @@ async fn create(
             let view: LocationView = (l, 0u64).into(); // freshly created: no spools yet
             render_row(&st, &locale, StatusCode::OK, view)
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -166,7 +166,7 @@ async fn edit(
             render_row(&st, &locale, StatusCode::OK, view)
         }
         Err(RepositoryError::NotFound(_)) => not_found(&st, &locale),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -197,7 +197,7 @@ async fn delete(
                 .replace("{count}", &count.to_string());
             render_message(&st, &locale, StatusCode::CONFLICT, message)
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 

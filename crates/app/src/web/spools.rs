@@ -8,7 +8,7 @@
 //! web-layer composition across two driving-adapter handlers, not a domain
 //! import across slices (the spools domain never depends on materials).
 
-use crate::web::router::{resolve_locale, resolve_theme};
+use crate::web::router::{internal_error, resolve_locale, resolve_theme};
 use crate::web::state::AppState;
 use axum::{
     Router,
@@ -208,7 +208,7 @@ async fn material_options(st: &AppState) -> Result<Vec<MaterialOption>, Response
                 })
                 .collect()
         })
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response())
+        .map_err(internal_error)
 }
 
 async fn location_options(st: &AppState) -> Result<Vec<LocationOption>, Response> {
@@ -223,7 +223,7 @@ async fn location_options(st: &AppState) -> Result<Vec<LocationOption>, Response
                 })
                 .collect()
         })
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response())
+        .map_err(internal_error)
 }
 
 fn render_rows(
@@ -238,7 +238,7 @@ fn render_rows(
     ctx.insert("stock_value", stock_value);
     match st.renderer.render("_spool_rows.html", locale, "", ctx) {
         Ok(html) => Html(html).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -258,7 +258,7 @@ async fn list_page(
     let filter = q.to_filter();
     let stock_value = match st.spools.stock_value(filter.clone()).await {
         Ok(v) => v.to_string(),
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => return internal_error(e),
     };
 
     match st.spools.list(filter, q.to_sort()).await {
@@ -276,10 +276,10 @@ async fn list_page(
                 .render("spools.html", &locale, theme.data_attr(), ctx)
             {
                 Ok(html) => Html(html).into_response(),
-                Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+                Err(e) => internal_error(e),
             }
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -292,11 +292,11 @@ async fn rows(
     let filter = q.to_filter();
     let stock_value = match st.spools.stock_value(filter.clone()).await {
         Ok(v) => v.to_string(),
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => return internal_error(e),
     };
     match st.spools.list(filter, q.to_sort()).await {
         Ok(items) => render_rows(&st, &locale, items, &stock_value),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -477,7 +477,7 @@ async fn render_form(
         .render("spools_new.html", locale, theme_attr, ctx)
     {
         Ok(html) => (status, Html(html)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -532,7 +532,7 @@ async fn create(
         // mirroring how `NotFound` is handled elsewhere, rather than
         // misreporting it as an unknown material or 500-ing.
         Err(RepositoryError::UnknownLocation(_)) => not_found(&st, &locale),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -562,7 +562,7 @@ async fn detail_page(
     let detail = match st.spools.view(SpoolId::new(id)).await {
         Ok(d) => d,
         Err(RepositoryError::NotFound(_)) => return not_found(&st, &locale),
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => return internal_error(e),
     };
     // The page includes `_spool_detail_card.html`, which references
     // `locations` for its reassign `<select>` — fetch it the same way
@@ -585,7 +585,7 @@ async fn detail_page(
         .render("spools_detail.html", &locale, theme.data_attr(), ctx)
     {
         Ok(html) => Html(html).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -619,7 +619,7 @@ async fn render_card(
         .render("_spool_detail_card.html", locale, "", ctx)
     {
         Ok(html) => (status, Html(html)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -637,7 +637,7 @@ async fn render_card_for(
     match st.spools.view(id).await {
         Ok(detail) => render_card(st, locale, status, detail, error_key).await,
         Err(RepositoryError::NotFound(_)) => not_found(st, locale),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -659,8 +659,8 @@ fn op_error_key(e: &DomainError) -> &'static str {
 
 /// Maps an op's `Result<Spool, RepositoryError>` to a response: success and
 /// domain-error both re-render the card fragment (200 / 422 respectively),
-/// `NotFound` 404s, anything else 500s (TD-005's existing `e.to_string()`
-/// pattern, unchanged).
+/// `NotFound` 404s, anything else is a generic 500 via `internal_error`
+/// (detail logged server-side, never sent to the client).
 async fn finish_op(
     st: &AppState,
     locale: &str,
@@ -674,7 +674,7 @@ async fn finish_op(
             let key = op_error_key(&e);
             render_card_for(st, locale, id, StatusCode::UNPROCESSABLE_ENTITY, Some(key)).await
         }
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -829,7 +829,7 @@ async fn render_edit_form(
     };
     match st.renderer.render(template, locale, theme_attr, ctx) {
         Ok(html) => (opts.status, Html(html)).into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -844,7 +844,7 @@ async fn edit_page(
     let detail = match st.spools.view(SpoolId::new(id.clone())).await {
         Ok(d) => d,
         Err(RepositoryError::NotFound(_)) => return not_found(&st, &locale),
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => return internal_error(e),
     };
 
     let form = SpoolForm {
@@ -889,7 +889,7 @@ async fn update(
     let current = match st.spools.view(spool_id.clone()).await {
         Ok(d) => d,
         Err(RepositoryError::NotFound(_)) => return not_found(&st, &locale),
-        Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => return internal_error(e),
     };
 
     let spool = match form.to_edit(spool_id, current.remaining_weight, current.status) {
@@ -938,7 +938,7 @@ async fn update(
         // Same defensive-404 rationale as `create`'s `UnknownLocation` arm.
         Err(RepositoryError::UnknownLocation(_)) => not_found(&st, &locale),
         Err(RepositoryError::NotFound(_)) => not_found(&st, &locale),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
@@ -975,7 +975,7 @@ async fn reassign_location(
         Ok(_) => render_card_for(&st, &locale, spool_id, StatusCode::OK, None).await,
         Err(RepositoryError::NotFound(_)) => not_found(&st, &locale),
         Err(RepositoryError::UnknownLocation(_)) => not_found(&st, &locale),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+        Err(e) => internal_error(e),
     }
 }
 
