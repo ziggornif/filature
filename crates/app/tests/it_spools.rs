@@ -34,6 +34,7 @@ fn sample_spool(material_id: MaterialId, net: f64, price: &str) -> NewSpool {
         diameter: Diameter::Mm1_75,
         net_weight: Grams::new(net).unwrap(),
         price_paid: Money::from_decimal(Decimal::from_str_exact(price).unwrap()).unwrap(),
+        location_id: None,
     }
 }
 
@@ -287,6 +288,7 @@ async fn update_unknown_id_returns_not_found() {
         remaining_weight: Grams::new(500.0).unwrap(),
         price_paid: Money::from_decimal(Decimal::from_str_exact("5.00").unwrap()).unwrap(),
         status: SpoolStatus::Sealed,
+        location_id: None,
     };
 
     let err = spools.update(fake.clone()).await.unwrap_err();

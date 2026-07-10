@@ -1,4 +1,4 @@
-use crate::shared::{Grams, Money};
+use crate::shared::{Grams, LocationId, Money};
 use crate::spools::model::{NewSpool, Spool, SpoolId};
 use crate::spools::ports::spi::{RepositoryError, SpoolFilter, SpoolSort};
 use crate::spools::read_models::{SpoolDetail, SpoolListItem};
@@ -18,5 +18,10 @@ pub trait SpoolsUseCases: Send + Sync {
     async fn consume(&self, id: SpoolId, amount: Grams) -> Result<Spool, RepositoryError>;
     async fn archive(&self, id: SpoolId) -> Result<Spool, RepositoryError>;
     async fn restore(&self, id: SpoolId) -> Result<Spool, RepositoryError>;
+    async fn assign_location(
+        &self,
+        id: SpoolId,
+        location: Option<LocationId>,
+    ) -> Result<Spool, RepositoryError>;
     async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError>;
 }

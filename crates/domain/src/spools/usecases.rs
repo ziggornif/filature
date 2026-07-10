@@ -1,4 +1,4 @@
-use crate::shared::{Grams, Money};
+use crate::shared::{Grams, LocationId, Money};
 use crate::spools::model::{NewSpool, Spool, SpoolId};
 use crate::spools::ports::api::SpoolsUseCases;
 use crate::spools::ports::spi::{RepositoryError, SpoolFilter, SpoolRepository, SpoolSort};
@@ -83,6 +83,20 @@ impl SpoolsUseCases for SpoolsService {
         self.repo.update(s).await
     }
 
+    async fn assign_location(
+        &self,
+        id: SpoolId,
+        location: Option<LocationId>,
+    ) -> Result<Spool, RepositoryError> {
+        let mut s = self
+            .repo
+            .find(&id)
+            .await?
+            .ok_or(RepositoryError::NotFound(id))?;
+        s.assign_location(location);
+        self.repo.update(s).await
+    }
+
     async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError> {
         self.repo.stock_value(filter).await
     }
@@ -91,7 +105,7 @@ impl SpoolsUseCases for SpoolsService {
 #[cfg(all(test, feature = "stubs"))]
 mod tests {
     use super::*;
-    use crate::shared::{DomainError, Grams, MaterialId, Money};
+    use crate::shared::{DomainError, Grams, LocationId, MaterialId, Money};
     use crate::spools::model::{Colour, Diameter, SpoolStatus};
     use crate::spools::stubs::StubSpoolRepository;
 
@@ -106,6 +120,7 @@ mod tests {
             diameter: Diameter::Mm1_75,
             net_weight: Grams::new(1000.0).unwrap(),
             price_paid: Money::new(2500, 2).unwrap(),
+            location_id: None,
         }
     }
 
@@ -332,5 +347,47 @@ mod tests {
 
         let value = s.stock_value(SpoolFilter::default()).await.unwrap();
         assert_eq!(value, Money::new(3750, 2).unwrap());
+    }
+
+    #[tokio::test]
+    async fn assign_location_sets_location_on_the_spool() {
+        let s = svc();
+        let created = s.add(sample_new_spool("material-1")).await.unwrap();
+        assert_eq!(created.location_id, None);
+
+        let location = LocationId::new("warehouse-1");
+        let assigned = s
+            .assign_location(created.id.clone(), Some(location.clone()))
+            .await
+            .unwrap();
+        assert_eq!(assigned.location_id, Some(location.clone()));
+
+        let found = s.view(created.id.clone()).await.unwrap();
+        assert_eq!(found.id, created.id);
+    }
+
+    #[tokio::test]
+    async fn assign_location_none_unassigns() {
+        let s = svc();
+        let created = s.add(sample_new_spool("material-1")).await.unwrap();
+        s.assign_location(created.id.clone(), Some(LocationId::new("warehouse-1")))
+            .await
+            .unwrap();
+
+        let unassigned = s.assign_location(created.id.clone(), None).await.unwrap();
+        assert_eq!(unassigned.location_id, None);
+    }
+
+    #[tokio::test]
+    async fn assign_location_on_unknown_id_is_not_found() {
+        let s = svc();
+        let err = s
+            .assign_location(
+                SpoolId::new("does-not-exist"),
+                Some(LocationId::new("warehouse-1")),
+            )
+            .await
+            .unwrap_err();
+        assert!(matches!(err, RepositoryError::NotFound(_)));
     }
 }

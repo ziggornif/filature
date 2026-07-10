@@ -350,6 +350,8 @@ impl SpoolForm {
             diameter: f.diameter,
             net_weight: f.net_weight,
             price_paid: f.price_paid,
+            // The add-spool form has no location field yet (Task 9).
+            location_id: None,
         })
     }
 
@@ -373,6 +375,11 @@ impl SpoolForm {
             remaining_weight,
             price_paid: f.price_paid,
             status,
+            // The edit form has no location field yet (Task 9), and
+            // `SpoolDetail` only carries a display-only `location_name`, not
+            // the id, so there's nothing to carry over here yet. Task 8/9
+            // will wire real location persistence through this path.
+            location_id: None,
         })
     }
 }
