@@ -2,13 +2,12 @@ use crate::web::state::AppState;
 use crate::web::theme::Theme;
 use axum::{
     Router,
-    extract::{Path, State},
+    extract::Path,
     http::{HeaderMap, StatusCode, header},
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
     routing::get,
 };
 use rust_embed::RustEmbed;
-use tera::Context;
 
 #[derive(RustEmbed)]
 #[folder = "assets/static"]
@@ -49,18 +48,6 @@ pub(crate) fn read_cookie(headers: &HeaderMap, name: &str) -> Option<String> {
         .map(|(_, v)| v.to_string())
 }
 
-async fn index(State(st): State<AppState>, headers: HeaderMap) -> impl IntoResponse {
-    let locale = resolve_locale(&headers, &st);
-    let theme = resolve_theme(&headers);
-    match st
-        .renderer
-        .render("index.html", &locale, theme.data_attr(), Context::new())
-    {
-        Ok(html) => Html(html).into_response(),
-        Err(e) => internal_error(e),
-    }
-}
-
 async fn static_handler(Path(path): Path<String>) -> Response {
     match StaticAssets::get(&path) {
         Some(file) => {
@@ -73,7 +60,7 @@ async fn static_handler(Path(path): Path<String>) -> Response {
 
 pub fn router(state: AppState) -> Router {
     Router::new()
-        .route("/", get(index))
+        .merge(crate::web::dashboard::routes())
         .merge(crate::web::materials::routes())
         .merge(crate::web::locations::routes())
         .merge(crate::web::spools::routes())

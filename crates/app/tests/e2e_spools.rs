@@ -10,6 +10,7 @@ mod support;
 
 use axum::body::{Body, to_bytes};
 use axum::http::{Request, StatusCode};
+use domain::dashboard::{DashboardRepository, DashboardService, DashboardUseCases};
 use domain::locations::{LocationRepository, LocationsService, LocationsUseCases};
 use domain::materials::{MaterialRepository, MaterialsService, MaterialsUseCases};
 use domain::shared::{Grams, MaterialId};
@@ -18,6 +19,7 @@ use domain::spools::{
     remaining_length_m,
 };
 use filature::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
+use filature::persistence::dashboard::SqlxDashboardRepository;
 use filature::persistence::locations::SqlxLocationRepository;
 use filature::persistence::materials::SqlxMaterialRepository;
 use filature::persistence::spools::SqlxSpoolRepository;
@@ -55,12 +57,16 @@ async fn seeded_app() -> axum::Router {
     let location_repo: Arc<dyn LocationRepository> =
         Arc::new(SqlxLocationRepository::new(db.clone()));
     let locations: Arc<dyn LocationsUseCases> = Arc::new(LocationsService::new(location_repo));
+    let dash_repo: Arc<dyn DashboardRepository> =
+        Arc::new(SqlxDashboardRepository::new(db.clone()));
+    let dashboard: Arc<dyn DashboardUseCases> = Arc::new(DashboardService::new(dash_repo));
     web::router(web::AppState::new(
         db,
         &test_config(&url),
         materials,
         spools,
         locations,
+        dashboard,
     ))
 }
 

@@ -3,6 +3,7 @@
 //! `router` (routes + handlers), `state` (`AppState`), `templates` (Tera),
 //! `i18n` (translation catalog), `theme` (light/dark cookie).
 
+pub mod dashboard;
 pub mod i18n;
 pub mod locations;
 pub mod materials;

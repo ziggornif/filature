@@ -86,10 +86,27 @@ mod tests {
         Renderer::new(Catalog::load("en"))
     }
 
+    /// A minimal-but-complete context for `dashboard.html` — the page shell's
+    /// own render tests exercise it (rather than the deleted `index.html`
+    /// placeholder) as the shell smoke test, since it's the real `GET /`
+    /// page now. All-zero/empty values, matching an empty-stock render.
+    fn dashboard_ctx() -> Context {
+        let mut ctx = Context::new();
+        ctx.insert("stock_value", "0.00");
+        ctx.insert("remaining_kg", &0.0);
+        ctx.insert("total_count", &0usize);
+        ctx.insert("active_count", &0usize);
+        ctx.insert("empty_count", &0usize);
+        ctx.insert("alert_count", &0usize);
+        ctx.insert("material_breakdown", &Vec::<serde_json::Value>::new());
+        ctx.insert("soon_empty", &Vec::<serde_json::Value>::new());
+        ctx
+    }
+
     #[test]
     fn renders_shell_in_french() {
         let html = renderer()
-            .render("index.html", "fr", "dark", Context::new())
+            .render("dashboard.html", "fr", "dark", dashboard_ctx())
             .unwrap();
         assert!(html.contains("Tableau de bord")); // fr nav label
         assert!(html.contains(r#"lang="fr""#));
@@ -99,7 +116,7 @@ mod tests {
     #[test]
     fn renders_shell_in_english_auto_theme() {
         let html = renderer()
-            .render("index.html", "en", "", Context::new())
+            .render("dashboard.html", "en", "", dashboard_ctx())
             .unwrap();
         assert!(html.contains("Dashboard"));
         assert!(!html.contains("data-theme")); // Auto => no attribute
@@ -109,7 +126,7 @@ mod tests {
     fn defined_keys_do_not_leak_raw() {
         // The shell references only defined keys, so no raw key must appear.
         let html = renderer()
-            .render("index.html", "en", "", Context::new())
+            .render("dashboard.html", "en", "", dashboard_ctx())
             .unwrap();
         assert!(!html.contains("nav.dashboard")); // the raw key must NOT leak
     }

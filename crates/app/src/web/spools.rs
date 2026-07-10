@@ -1381,6 +1381,8 @@ mod tests {
         use super::*;
         use crate::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
         use axum::body::to_bytes;
+        use domain::dashboard::stubs::StubDashboardRepository;
+        use domain::dashboard::{DashboardService, DashboardUseCases};
         use domain::locations::stubs::StubLocationRepository;
         use domain::locations::{LocationName, LocationsService, LocationsUseCases, NewLocation};
         use domain::materials::stubs::StubMaterialRepository;
@@ -1425,6 +1427,10 @@ mod tests {
                 StubLocationRepository::new(),
             )));
 
+            let dashboard: Arc<dyn DashboardUseCases> = Arc::new(DashboardService::new(Arc::new(
+                StubDashboardRepository::new(),
+            )));
+
             let db = PgPool::connect_lazy("postgres://user:pass@localhost/db").unwrap();
             let cfg = Config {
                 server: ServerConfig {
@@ -1438,7 +1444,7 @@ mod tests {
                 },
             };
             (
-                AppState::new(db, &cfg, materials, spools, locations),
+                AppState::new(db, &cfg, materials, spools, locations, dashboard),
                 seeded.id.as_str().to_string(),
             )
         }
