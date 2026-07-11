@@ -44,12 +44,10 @@ impl Default for StubSpoolRepository {
 fn matches_filter(s: &Spool, f: &SpoolFilter) -> bool {
     f.material_id.as_ref().is_none_or(|m| m == &s.material_id)
         && f.status.is_none_or(|st| st == s.status)
-        && f
-            .manufacturer_id
+        && f.manufacturer_id
             .as_ref()
             .is_none_or(|m| s.manufacturer_id.as_ref() == Some(m))
-        && f
-            .location_id
+        && f.location_id
             .as_ref()
             .is_none_or(|l| s.location_id.as_ref() == Some(l))
         && f.search.as_ref().is_none_or(|term| {

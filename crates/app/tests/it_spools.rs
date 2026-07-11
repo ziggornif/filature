@@ -224,7 +224,10 @@ async fn list_filters_by_manufacturer_location_and_search() {
     let locations = SqlxLocationRepository::new(pool.clone());
     let spools = SqlxSpoolRepository::new(pool);
 
-    let mat = materials.insert(sample_material("PLA-Facets")).await.unwrap();
+    let mat = materials
+        .insert(sample_material("PLA-Facets"))
+        .await
+        .unwrap();
     // Distinctive names/colours so assertions survive the shared testcontainer
     // DB (other tests in this binary insert concurrently).
     let brand_x = manufacturers
@@ -241,8 +244,14 @@ async fn list_filters_by_manufacturer_location_and_search() {
         })
         .await
         .unwrap();
-    let shelf = locations.insert(sample_location("ZZ-Shelf-Uno")).await.unwrap();
-    let dry = locations.insert(sample_location("ZZ-Shelf-Duo")).await.unwrap();
+    let shelf = locations
+        .insert(sample_location("ZZ-Shelf-Uno"))
+        .await
+        .unwrap();
+    let dry = locations
+        .insert(sample_location("ZZ-Shelf-Duo"))
+        .await
+        .unwrap();
 
     let spool_with = |mfr: &ManufacturerId, loc: &LocationId, colour_name: &str| NewSpool {
         material_id: mat.id.clone(),
