@@ -24,7 +24,8 @@
   <form class="material-add-form"
         hx-post="/materials"
         hx-target="#materials-table-body"
-        hx-swap="beforeend">
+        hx-swap="beforeend"
+        hx-on::after-request="if(event.detail.successful) this.reset()">
     <input type="text" name="name" placeholder="{{ t(key="materials.col.material") }}" required>
     <input type="number" name="density" step="0.01" placeholder="{{ t(key="materials.col.density") }}" required>
     <input type="number" name="drying_temp_c" placeholder="{{ t(key="materials.col.temp") }}" required>
