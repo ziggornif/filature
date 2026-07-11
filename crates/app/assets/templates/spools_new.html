@@ -17,11 +17,32 @@
       </select>
     </label>
 
-    <label>
-      {{ t(key="spools.new.colour_hex") }}
-      <input type="text" name="colour_hex" placeholder="#RRGGBB" pattern="#[0-9A-Fa-f]{6}"
-             value="{{ colour_hex }}" required>
-    </label>
+    <div class="colour-field">
+      <label>
+        {{ t(key="spools.new.colour_hex") }}
+        <span class="colour-input-row">
+          <input type="color" class="colour-picker"
+                 value="{% if colour_hex %}{{ colour_hex }}{% else %}#000000{% endif %}"
+                 aria-label="{{ t(key='spools.new.colour_picker') }}">
+          <input type="text" name="colour_hex" placeholder="#RRGGBB" pattern="#[0-9A-Fa-f]{6}"
+                 value="{{ colour_hex }}" required>
+        </span>
+      </label>
+      <div class="colour-presets" role="group" aria-label="{{ t(key='spools.new.colour_presets') }}">
+        <button type="button" class="colour-preset" data-hex="#000000" style="--swatch:#000000" data-name="{{ t(key='spools.colour.preset.black') }}" title="{{ t(key='spools.colour.preset.black') }}"></button>
+        <button type="button" class="colour-preset" data-hex="#FFFFFF" style="--swatch:#FFFFFF" data-name="{{ t(key='spools.colour.preset.white') }}" title="{{ t(key='spools.colour.preset.white') }}"></button>
+        <button type="button" class="colour-preset" data-hex="#808080" style="--swatch:#808080" data-name="{{ t(key='spools.colour.preset.grey') }}" title="{{ t(key='spools.colour.preset.grey') }}"></button>
+        <button type="button" class="colour-preset" data-hex="#EDE6D6" style="--swatch:#EDE6D6" data-name="{{ t(key='spools.colour.preset.natural') }}" title="{{ t(key='spools.colour.preset.natural') }}"></button>
+        <button type="button" class="colour-preset" data-hex="#E1121C" style="--swatch:#E1121C" data-name="{{ t(key='spools.colour.preset.red') }}" title="{{ t(key='spools.colour.preset.red') }}"></button>
+        <button type="button" class="colour-preset" data-hex="#FF6A00" style="--swatch:#FF6A00" data-name="{{ t(key='spools.colour.preset.orange') }}" title="{{ t(key='spools.colour.preset.orange') }}"></button>
+        <button type="button" class="colour-preset" data-hex="#FFD400" style="--swatch:#FFD400" data-name="{{ t(key='spools.colour.preset.yellow') }}" title="{{ t(key='spools.colour.preset.yellow') }}"></button>
+        <button type="button" class="colour-preset" data-hex="#2BB673" style="--swatch:#2BB673" data-name="{{ t(key='spools.colour.preset.green') }}" title="{{ t(key='spools.colour.preset.green') }}"></button>
+        <button type="button" class="colour-preset" data-hex="#1560BD" style="--swatch:#1560BD" data-name="{{ t(key='spools.colour.preset.blue') }}" title="{{ t(key='spools.colour.preset.blue') }}"></button>
+        <button type="button" class="colour-preset" data-hex="#00AEEF" style="--swatch:#00AEEF" data-name="{{ t(key='spools.colour.preset.cyan') }}" title="{{ t(key='spools.colour.preset.cyan') }}"></button>
+        <button type="button" class="colour-preset" data-hex="#7A3EA1" style="--swatch:#7A3EA1" data-name="{{ t(key='spools.colour.preset.purple') }}" title="{{ t(key='spools.colour.preset.purple') }}"></button>
+        <button type="button" class="colour-preset" data-hex="#D4AF37" style="--swatch:#D4AF37" data-name="{{ t(key='spools.colour.preset.gold') }}" title="{{ t(key='spools.colour.preset.gold') }}"></button>
+      </div>
+    </div>
 
     <label>
       {{ t(key="spools.new.colour_name") }}
