@@ -6,3 +6,11 @@ url = "postgres://filature:filature@127.0.0.1:5432/filature"
 
 [i18n]
 default_locale = "fr"
+
+# Demo-auth gate (slice 08). The gate is always active. `password_hash` is an
+# argon2 PHC string — generate one with `filature hash-password <password>`.
+# This dev default is the password "demo"; override in prod via env
+# (FILATURE_AUTH__USERNAME / FILATURE_AUTH__PASSWORD_HASH).
+[auth]
+username = "demo"
+password_hash = "$argon2id$v=19$m=19456,t=2,p=1$ZI/zIEPRZ1LQxDYXfE6g7w$nCipnmBghRYtZp3gg4Jkh2PTXaGCMKnLxQsbTF8ogCg"

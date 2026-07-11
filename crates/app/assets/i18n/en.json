@@ -1,5 +1,11 @@
 {
   "app.name": "Filature",
+  "auth.title": "Sign in",
+  "auth.subtitle": "Sign in to access this demo instance.",
+  "auth.username": "Username",
+  "auth.password": "Password",
+  "auth.submit": "Sign in",
+  "auth.error": "Invalid username or password.",
   "nav.dashboard": "Dashboard",
   "nav.spools": "Spools",
   "nav.humidity": "Humidity",

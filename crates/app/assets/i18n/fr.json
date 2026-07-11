@@ -1,5 +1,11 @@
 {
   "app.name": "Filature",
+  "auth.title": "Connexion",
+  "auth.subtitle": "Connecte-toi pour accéder à cette instance de démo.",
+  "auth.username": "Identifiant",
+  "auth.password": "Mot de passe",
+  "auth.submit": "Se connecter",
+  "auth.error": "Identifiant ou mot de passe invalide.",
   "nav.dashboard": "Tableau de bord",
   "nav.spools": "Bobines",
   "nav.humidity": "Humidité",
