@@ -7,7 +7,7 @@
     <dt>{{ t(key="spools.col.colour") }}</dt>
     <dd>
       <span class="colour-swatch"
-            style="background:{{ spool.colour_hex }}; display:inline-block; width:14px; height:14px; border-radius:3px;"
+            style="background:{{ spool.colour_hex }}"
             title="{{ spool.colour_label }}"></span>
       {% if spool.has_colour_name %}{{ spool.colour_label }}{% else %}{{ spool.colour_hex }}{% endif %}
     </dd>
@@ -35,11 +35,13 @@
 
     <dt>{{ t(key="spools.col.status") }}</dt>
     <dd>
-      {% if spool.status == "Sealed" %}{{ t(key="spools.status.sealed") }}
-      {% elif spool.status == "Open" %}{{ t(key="spools.status.open") }}
-      {% elif spool.status == "Empty" %}{{ t(key="spools.status.empty") }}
-      {% elif spool.status == "Archived" %}{{ t(key="spools.status.archived") }}
-      {% endif %}
+      <span class="pill pill--{{ spool.status | lower }}">
+        {% if spool.status == "Sealed" %}{{ t(key="spools.status.sealed") }}
+        {% elif spool.status == "Open" %}{{ t(key="spools.status.open") }}
+        {% elif spool.status == "Empty" %}{{ t(key="spools.status.empty") }}
+        {% elif spool.status == "Archived" %}{{ t(key="spools.status.archived") }}
+        {% endif %}
+      </span>
     </dd>
 
     <dt>{{ t(key="spools.col.location") }}</dt>

@@ -112,6 +112,7 @@ async fn list_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
             let views: Vec<LocationView> = items.into_iter().map(Into::into).collect();
             let mut ctx = Context::new();
             ctx.insert("locations", &views);
+            ctx.insert("page", "locations");
             match st
                 .renderer
                 .render("locations.html", &locale, theme.data_attr(), ctx)
