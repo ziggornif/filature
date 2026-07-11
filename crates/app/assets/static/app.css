@@ -588,6 +588,30 @@ a {
 .spools-filter-bar select {
   min-width: 150px;
 }
+.spools-filter-bar input[type="search"] {
+  min-width: 210px;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+/* Header title block + "X sur Y affichées" result counter */
+.spools-head-title h1 {
+  margin: 0;
+}
+.spools-count {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.spools-count #spools-filtered-count,
+.spools-count #spools-total-count {
+  font-family: var(--mono);
+}
 
 .spools-add {
   margin-bottom: 16px;

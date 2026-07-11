@@ -187,6 +187,7 @@ async fn overview_from_rows_matches_stock_value_for_all_stock_scope() {
         .stock_value(SpoolFilter {
             material_id: Some(mat.id.clone()),
             status: None,
+            ..Default::default()
         })
         .await
         .unwrap();
