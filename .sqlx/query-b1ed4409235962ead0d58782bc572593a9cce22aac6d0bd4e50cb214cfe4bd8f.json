@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(SUM((CAST(s.remaining_weight AS NUMERIC)/CAST(s.net_weight AS NUMERIC)) * s.price_paid), 0)::numeric AS value\n               FROM spools s\n               LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id\n               WHERE s.status <> 'Archived'\n                 AND ($1::text IS NULL OR s.material_id = $1)\n                 AND ($2::text IS NULL OR s.status = $2)\n                 AND ($3::text IS NULL OR s.manufacturer_id = $3)\n                 AND ($4::text IS NULL OR s.location_id = $4)\n                 AND ($5::text IS NULL\n                      OR mf.name ILIKE '%' || $5 || '%'\n                      OR s.colour_name ILIKE '%' || $5 || '%')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "value",
+        "type_info": "Numeric",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b1ed4409235962ead0d58782bc572593a9cce22aac6d0bd4e50cb214cfe4bd8f"
+}

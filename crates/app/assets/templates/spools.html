@@ -7,7 +7,15 @@
   <input class="spools-view-input" type="radio" name="spools-view" id="spools-view-table">
 
   <div class="spools-head">
-    <h1>{{ t(key="spools.title") }}</h1>
+    <div class="spools-head-title">
+      <h1>{{ t(key="spools.title") }}</h1>
+      <p class="spools-count">
+        <span id="spools-filtered-count">{{ filtered_count }}</span>
+        {{ t(key="spools.count.separator") }}
+        <span id="spools-total-count">{{ total_count }}</span>
+        {{ t(key="spools.count.suffix") }}
+      </p>
+    </div>
     <div class="spools-head-actions">
       <div class="view-toggle" role="group">
         <label class="view-toggle-btn" for="spools-view-table" title="{{ t(key='spools.view.table') }}">
@@ -32,13 +40,43 @@
         hx-get="/spools/rows"
         hx-target="#spools-table-body"
         hx-swap="innerHTML"
-        hx-trigger="change">
+        hx-trigger="change from:select, keyup changed delay:400ms from:#spool-search">
+    <label class="spools-filter-search">
+      {{ t(key="spools.filter.search") }}
+      <input id="spool-search"
+             type="search"
+             name="search"
+             value="{{ search }}"
+             placeholder="{{ t(key='spools.filter.search_placeholder') }}"
+             autocomplete="off">
+    </label>
+
     <label>
       {{ t(key="spools.filter.material") }}
       <select name="material_id">
         <option value="">{{ t(key="spools.filter.all_materials") }}</option>
         {% for m in materials %}
           <option value="{{ m.id }}"{% if m.id == selected_material %} selected{% endif %}>{{ m.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      {{ t(key="spools.filter.manufacturer") }}
+      <select name="manufacturer_id">
+        <option value="">{{ t(key="spools.filter.all_manufacturers") }}</option>
+        {% for mf in manufacturers %}
+          <option value="{{ mf.id }}"{% if mf.id == selected_manufacturer %} selected{% endif %}>{{ mf.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>
+      {{ t(key="spools.filter.location") }}
+      <select name="location_id">
+        <option value="">{{ t(key="spools.filter.all_locations") }}</option>
+        {% for l in locations %}
+          <option value="{{ l.id }}"{% if l.id == selected_location %} selected{% endif %}>{{ l.name }}</option>
         {% endfor %}
       </select>
     </label>

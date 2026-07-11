@@ -1,16 +1,18 @@
 mod support;
 
 use domain::locations::{LocationName, LocationRepository, NewLocation};
+use domain::manufacturers::{ManufacturerName, ManufacturerRepository, NewManufacturer};
 use domain::materials::{
     Density, DryingParams, MaterialName, MaterialRepository, NewMaterial, Sensitivity, Temperature,
 };
-use domain::shared::{Grams, LocationId, MaterialId, Money};
+use domain::shared::{Grams, LocationId, ManufacturerId, MaterialId, Money};
 use domain::spools::{
     Colour, Diameter, NewSpool, RepositoryError, SpoolFilter, SpoolRepository, SpoolSort,
     SpoolStatus,
 };
 use filature::persistence::connect_and_migrate;
 use filature::persistence::locations::SqlxLocationRepository;
+use filature::persistence::manufacturers::SqlxManufacturerRepository;
 use filature::persistence::materials::SqlxMaterialRepository;
 use filature::persistence::spools::SqlxSpoolRepository;
 use rust_decimal::Decimal;
@@ -186,6 +188,7 @@ async fn list_filters_by_material_and_status() {
             SpoolFilter {
                 material_id: Some(mat_a.id.clone()),
                 status: None,
+                ..Default::default()
             },
             SpoolSort::CreatedDesc,
         )
@@ -202,6 +205,7 @@ async fn list_filters_by_material_and_status() {
             SpoolFilter {
                 material_id: None,
                 status: Some(SpoolStatus::Open),
+                ..Default::default()
             },
             SpoolSort::CreatedDesc,
         )
@@ -209,6 +213,118 @@ async fn list_filters_by_material_and_status() {
         .unwrap();
     assert!(by_status.iter().any(|i| i.id == s1.id));
     assert!(!by_status.iter().any(|i| i.id == _s2.id));
+}
+
+#[tokio::test]
+async fn list_filters_by_manufacturer_location_and_search() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let manufacturers = SqlxManufacturerRepository::new(pool.clone());
+    let locations = SqlxLocationRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+
+    let mat = materials.insert(sample_material("PLA-Facets")).await.unwrap();
+    // Distinctive names/colours so assertions survive the shared testcontainer
+    // DB (other tests in this binary insert concurrently).
+    let brand_x = manufacturers
+        .insert(NewManufacturer {
+            name: ManufacturerName::new("ZZ-Brand-Xylo").unwrap(),
+            country: None,
+        })
+        .await
+        .unwrap();
+    let brand_y = manufacturers
+        .insert(NewManufacturer {
+            name: ManufacturerName::new("ZZ-Brand-Yotta").unwrap(),
+            country: None,
+        })
+        .await
+        .unwrap();
+    let shelf = locations.insert(sample_location("ZZ-Shelf-Uno")).await.unwrap();
+    let dry = locations.insert(sample_location("ZZ-Shelf-Duo")).await.unwrap();
+
+    let spool_with = |mfr: &ManufacturerId, loc: &LocationId, colour_name: &str| NewSpool {
+        material_id: mat.id.clone(),
+        colour: Colour::new("#123456".into(), Some(colour_name.into())).unwrap(),
+        diameter: Diameter::Mm1_75,
+        net_weight: Grams::new(1000.0).unwrap(),
+        price_paid: Money::from_decimal(Decimal::from_str_exact("10.00").unwrap()).unwrap(),
+        location_id: Some(loc.clone()),
+        manufacturer_id: Some(mfr.clone()),
+    };
+
+    let sp_a = spools
+        .insert(spool_with(&brand_x.id, &shelf.id, "ZZMagentaOne"))
+        .await
+        .unwrap();
+    let sp_b = spools
+        .insert(spool_with(&brand_y.id, &dry.id, "ZZCyanTwo"))
+        .await
+        .unwrap();
+    let sp_c = spools
+        .insert(spool_with(&brand_x.id, &shelf.id, "plainthree"))
+        .await
+        .unwrap();
+
+    // Manufacturer filter: only brand_x's spools (a, c), never brand_y's (b).
+    let by_mfr = spools
+        .list(
+            SpoolFilter {
+                manufacturer_id: Some(brand_x.id.clone()),
+                ..Default::default()
+            },
+            SpoolSort::CreatedDesc,
+        )
+        .await
+        .unwrap();
+    assert!(by_mfr.iter().any(|i| i.id == sp_a.id));
+    assert!(by_mfr.iter().any(|i| i.id == sp_c.id));
+    assert!(!by_mfr.iter().any(|i| i.id == sp_b.id));
+
+    // Location filter: only the drybox spool (b).
+    let by_loc = spools
+        .list(
+            SpoolFilter {
+                location_id: Some(dry.id.clone()),
+                ..Default::default()
+            },
+            SpoolSort::CreatedDesc,
+        )
+        .await
+        .unwrap();
+    assert!(by_loc.iter().any(|i| i.id == sp_b.id));
+    assert!(!by_loc.iter().any(|i| i.id == sp_a.id));
+    assert!(!by_loc.iter().any(|i| i.id == sp_c.id));
+
+    // Search matches the colour name (case-insensitive substring).
+    let by_colour = spools
+        .list(
+            SpoolFilter {
+                search: Some("zzmagenta".into()),
+                ..Default::default()
+            },
+            SpoolSort::CreatedDesc,
+        )
+        .await
+        .unwrap();
+    assert!(by_colour.iter().any(|i| i.id == sp_a.id));
+    assert!(!by_colour.iter().any(|i| i.id == sp_b.id));
+    assert!(!by_colour.iter().any(|i| i.id == sp_c.id));
+
+    // Search also matches the manufacturer name.
+    let by_brand_name = spools
+        .list(
+            SpoolFilter {
+                search: Some("brand-yotta".into()),
+                ..Default::default()
+            },
+            SpoolSort::CreatedDesc,
+        )
+        .await
+        .unwrap();
+    assert!(by_brand_name.iter().any(|i| i.id == sp_b.id));
+    assert!(!by_brand_name.iter().any(|i| i.id == sp_a.id));
 }
 
 #[tokio::test]
@@ -373,6 +489,7 @@ async fn stock_value_sums_non_archived_and_excludes_archived() {
         .stock_value(SpoolFilter {
             material_id: Some(material.id.clone()),
             status: None,
+            ..Default::default()
         })
         .await
         .unwrap();
@@ -406,6 +523,7 @@ async fn list_default_excludes_archived_and_status_filter_includes_it() {
             SpoolFilter {
                 material_id: Some(material.id.clone()),
                 status: None,
+                ..Default::default()
             },
             SpoolSort::CreatedDesc,
         )
@@ -418,6 +536,7 @@ async fn list_default_excludes_archived_and_status_filter_includes_it() {
             SpoolFilter {
                 material_id: Some(material.id.clone()),
                 status: Some(SpoolStatus::Archived),
+                ..Default::default()
             },
             SpoolSort::CreatedDesc,
         )
@@ -458,6 +577,7 @@ async fn insert_with_location_persists_id_and_joins_name_in_get_and_list() {
             SpoolFilter {
                 material_id: Some(material.id.clone()),
                 status: None,
+                ..Default::default()
             },
             SpoolSort::CreatedDesc,
         )
@@ -497,6 +617,7 @@ async fn insert_without_location_shows_none_location_name_in_get_and_list() {
             SpoolFilter {
                 material_id: Some(material.id.clone()),
                 status: None,
+                ..Default::default()
             },
             SpoolSort::CreatedDesc,
         )

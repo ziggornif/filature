@@ -82,6 +82,16 @@ fn build_status(s: &str) -> Result<SpoolStatus, RepositoryError> {
     SpoolStatus::parse(s).map_err(|e| RepositoryError::Backend(e.to_string()))
 }
 
+/// Escape the LIKE/ILIKE metacharacters (`\`, `%`, `_`) in a user-supplied
+/// search term so they match literally instead of acting as wildcards.
+/// Postgres uses `\` as the default escape character, so no explicit `ESCAPE`
+/// clause is needed.
+fn escape_like(term: &str) -> String {
+    term.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
 fn build_grams(v: f64) -> Result<Grams, RepositoryError> {
     Grams::new(v).map_err(|e| RepositoryError::Backend(e.to_string()))
 }
@@ -189,6 +199,13 @@ impl SpoolRepository for SqlxSpoolRepository {
     ) -> Result<Vec<SpoolListItem>, RepositoryError> {
         let material_id = filter.material_id.as_ref().map(|m| m.as_str());
         let status = filter.status.map(|s| s.as_str());
+        let manufacturer_id = filter.manufacturer_id.as_ref().map(|m| m.as_str());
+        let location_id = filter.location_id.as_ref().map(|l| l.as_str());
+        let search = filter
+            .search
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(escape_like);
 
         let items = match sort {
             SpoolSort::CreatedDesc => {
@@ -205,9 +222,17 @@ impl SpoolRepository for SqlxSpoolRepository {
                        WHERE ($1::text IS NULL OR s.material_id = $1)
                          AND ($2::text IS NULL OR s.status = $2)
                          AND (s.status <> 'Archived' OR $2 = 'Archived')
+                         AND ($3::text IS NULL OR s.manufacturer_id = $3)
+                         AND ($4::text IS NULL OR s.location_id = $4)
+                         AND ($5::text IS NULL
+                              OR mf.name ILIKE '%' || $5 || '%'
+                              OR s.colour_name ILIKE '%' || $5 || '%')
                        ORDER BY s.created_at DESC"#,
                     material_id,
-                    status
+                    status,
+                    manufacturer_id,
+                    location_id,
+                    search
                 )
                 .fetch_all(&self.pool)
                 .await
@@ -244,9 +269,17 @@ impl SpoolRepository for SqlxSpoolRepository {
                        WHERE ($1::text IS NULL OR s.material_id = $1)
                          AND ($2::text IS NULL OR s.status = $2)
                          AND (s.status <> 'Archived' OR $2 = 'Archived')
+                         AND ($3::text IS NULL OR s.manufacturer_id = $3)
+                         AND ($4::text IS NULL OR s.location_id = $4)
+                         AND ($5::text IS NULL
+                              OR mf.name ILIKE '%' || $5 || '%'
+                              OR s.colour_name ILIKE '%' || $5 || '%')
                        ORDER BY (s.remaining_weight / s.net_weight) ASC"#,
                     material_id,
-                    status
+                    status,
+                    manufacturer_id,
+                    location_id,
+                    search
                 )
                 .fetch_all(&self.pool)
                 .await
@@ -283,9 +316,17 @@ impl SpoolRepository for SqlxSpoolRepository {
                        WHERE ($1::text IS NULL OR s.material_id = $1)
                          AND ($2::text IS NULL OR s.status = $2)
                          AND (s.status <> 'Archived' OR $2 = 'Archived')
+                         AND ($3::text IS NULL OR s.manufacturer_id = $3)
+                         AND ($4::text IS NULL OR s.location_id = $4)
+                         AND ($5::text IS NULL
+                              OR mf.name ILIKE '%' || $5 || '%'
+                              OR s.colour_name ILIKE '%' || $5 || '%')
                        ORDER BY (s.remaining_weight / s.net_weight) DESC"#,
                     material_id,
-                    status
+                    status,
+                    manufacturer_id,
+                    location_id,
+                    search
                 )
                 .fetch_all(&self.pool)
                 .await
@@ -389,15 +430,34 @@ impl SpoolRepository for SqlxSpoolRepository {
     async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError> {
         let material_id = filter.material_id.as_ref().map(|m| m.as_str());
         let status = filter.status.map(|s| s.as_str());
+        let manufacturer_id = filter.manufacturer_id.as_ref().map(|m| m.as_str());
+        let location_id = filter.location_id.as_ref().map(|l| l.as_str());
+        let search = filter
+            .search
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(escape_like);
 
+        // Same filter predicates as `list` so the Stock Value stat always
+        // reflects the currently-visible, filtered set. The manufacturer join
+        // exists only so `search` can match the manufacturer name.
         let row = sqlx::query!(
-            r#"SELECT COALESCE(SUM((CAST(remaining_weight AS NUMERIC)/CAST(net_weight AS NUMERIC)) * price_paid), 0)::numeric AS value
-               FROM spools
-               WHERE status <> 'Archived'
-                 AND ($1::text IS NULL OR material_id = $1)
-                 AND ($2::text IS NULL OR status = $2)"#,
+            r#"SELECT COALESCE(SUM((CAST(s.remaining_weight AS NUMERIC)/CAST(s.net_weight AS NUMERIC)) * s.price_paid), 0)::numeric AS value
+               FROM spools s
+               LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id
+               WHERE s.status <> 'Archived'
+                 AND ($1::text IS NULL OR s.material_id = $1)
+                 AND ($2::text IS NULL OR s.status = $2)
+                 AND ($3::text IS NULL OR s.manufacturer_id = $3)
+                 AND ($4::text IS NULL OR s.location_id = $4)
+                 AND ($5::text IS NULL
+                      OR mf.name ILIKE '%' || $5 || '%'
+                      OR s.colour_name ILIKE '%' || $5 || '%')"#,
             material_id,
-            status
+            status,
+            manufacturer_id,
+            location_id,
+            search
         )
         .fetch_one(&self.pool)
         .await
@@ -408,5 +468,18 @@ impl SpoolRepository for SqlxSpoolRepository {
         })?;
 
         Money::from_decimal(value).map_err(|e| RepositoryError::Backend(e.to_string()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::escape_like;
+
+    #[test]
+    fn escape_like_neutralises_wildcards() {
+        assert_eq!(escape_like("50%"), "50\\%");
+        assert_eq!(escape_like("a_b"), "a\\_b");
+        assert_eq!(escape_like("c\\d"), "c\\\\d");
+        assert_eq!(escape_like("plain"), "plain"); // untouched
     }
 }

@@ -165,6 +165,7 @@ async fn add_then_list_then_view_spool() {
             SpoolFilter {
                 material_id: Some(MaterialId::new(material_id.clone())),
                 status: None,
+                ..Default::default()
             },
             SpoolSort::CreatedDesc,
         )
@@ -245,6 +246,7 @@ async fn consume_archive_restore_journey() {
             SpoolFilter {
                 material_id: Some(MaterialId::new(material_id.clone())),
                 status: None,
+                ..Default::default()
             },
             SpoolSort::CreatedDesc,
         )
@@ -476,6 +478,7 @@ async fn stock_value_stat_respects_material_filter() {
             SpoolFilter {
                 material_id: Some(MaterialId::new(mat_a_id.clone())),
                 status: None,
+                ..Default::default()
             },
             SpoolSort::CreatedDesc,
         )
@@ -595,6 +598,7 @@ async fn spool_location_assignment_journey() {
             SpoolFilter {
                 material_id: Some(MaterialId::new(material_id.clone())),
                 status: None,
+                ..Default::default()
             },
             SpoolSort::CreatedDesc,
         )

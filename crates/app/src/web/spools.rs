@@ -178,6 +178,12 @@ pub struct SpoolQuery {
     #[serde(default)]
     pub status: Option<String>,
     #[serde(default)]
+    pub manufacturer_id: Option<String>,
+    #[serde(default)]
+    pub location_id: Option<String>,
+    #[serde(default)]
+    pub search: Option<String>,
+    #[serde(default)]
     pub sort: Option<String>,
 }
 
@@ -194,6 +200,22 @@ impl SpoolQuery {
                 .as_deref()
                 .filter(|s| !s.is_empty())
                 .and_then(|s| SpoolStatus::parse(s).ok()),
+            manufacturer_id: self
+                .manufacturer_id
+                .as_deref()
+                .filter(|s| !s.is_empty())
+                .map(|s| ManufacturerId::new(s.to_string())),
+            location_id: self
+                .location_id
+                .as_deref()
+                .filter(|s| !s.is_empty())
+                .map(|s| LocationId::new(s.to_string())),
+            search: self
+                .search
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string),
         }
     }
 
@@ -264,15 +286,37 @@ fn render_rows(
     locale: &str,
     items: Vec<SpoolListItem>,
     stock_value: &str,
+    total_count: usize,
 ) -> Response {
+    let filtered_count = items.len();
     let views: Vec<SpoolView> = items.into_iter().map(Into::into).collect();
     let mut ctx = Context::new();
     ctx.insert("spools", &views);
     ctx.insert("stock_value", stock_value);
+    ctx.insert("filtered_count", &filtered_count);
+    ctx.insert("total_count", &total_count);
     match st.renderer.render("_spool_rows.html", locale, "", ctx) {
         Ok(html) => Html(html).into_response(),
         Err(e) => internal_error(e),
     }
+}
+
+/// Denominator of the list's "X sur Y affichées" counter: the number of
+/// spools in the current *status* scope, ignoring the refining facets
+/// (search / material / manufacturer / location). Scoping by status keeps
+/// the filtered count a subset of the total (so it never reads "3 sur 2"
+/// when the Archived filter is active). Reuses `list` length rather than a
+/// dedicated count query (brief-sanctioned).
+async fn status_scoped_total(st: &AppState, q: &SpoolQuery) -> Result<usize, Response> {
+    let scope = SpoolFilter {
+        status: q.to_filter().status,
+        ..Default::default()
+    };
+    st.spools
+        .list(scope, SpoolSort::CreatedDesc)
+        .await
+        .map(|items| items.len())
+        .map_err(internal_error)
 }
 
 async fn list_page(
@@ -287,6 +331,18 @@ async fn list_page(
         Ok(ms) => ms,
         Err(resp) => return resp,
     };
+    let manufacturers = match manufacturer_options(&st).await {
+        Ok(ms) => ms,
+        Err(resp) => return resp,
+    };
+    let locations = match location_options(&st).await {
+        Ok(ls) => ls,
+        Err(resp) => return resp,
+    };
+    let total_count = match status_scoped_total(&st, &q).await {
+        Ok(n) => n,
+        Err(resp) => return resp,
+    };
 
     let filter = q.to_filter();
     let stock_value = match st.spools.stock_value(filter.clone()).await {
@@ -296,14 +352,25 @@ async fn list_page(
 
     match st.spools.list(filter, q.to_sort()).await {
         Ok(items) => {
+            let filtered_count = items.len();
             let views: Vec<SpoolView> = items.into_iter().map(Into::into).collect();
             let mut ctx = Context::new();
             ctx.insert("spools", &views);
             ctx.insert("materials", &materials);
+            ctx.insert("manufacturers", &manufacturers);
+            ctx.insert("locations", &locations);
             ctx.insert("selected_material", q.material_id.as_deref().unwrap_or(""));
             ctx.insert("selected_status", q.status.as_deref().unwrap_or(""));
+            ctx.insert(
+                "selected_manufacturer",
+                q.manufacturer_id.as_deref().unwrap_or(""),
+            );
+            ctx.insert("selected_location", q.location_id.as_deref().unwrap_or(""));
+            ctx.insert("search", q.search.as_deref().unwrap_or(""));
             ctx.insert("selected_sort", q.selected_sort());
             ctx.insert("stock_value", &stock_value);
+            ctx.insert("filtered_count", &filtered_count);
+            ctx.insert("total_count", &total_count);
             ctx.insert("page", "spools");
             match st
                 .renderer
@@ -328,8 +395,12 @@ async fn rows(
         Ok(v) => v.to_string(),
         Err(e) => return internal_error(e),
     };
+    let total_count = match status_scoped_total(&st, &q).await {
+        Ok(n) => n,
+        Err(resp) => return resp,
+    };
     match st.spools.list(filter, q.to_sort()).await {
-        Ok(items) => render_rows(&st, &locale, items, &stock_value),
+        Ok(items) => render_rows(&st, &locale, items, &stock_value, total_count),
         Err(e) => internal_error(e),
     }
 }
@@ -1098,15 +1169,35 @@ mod tests {
         }
     }
 
+    fn manufacturer_option() -> ManufacturerOption {
+        ManufacturerOption {
+            id: "01HMFR".into(),
+            name: "Prusament".into(),
+        }
+    }
+
+    /// Inserts the count context every list/rows render needs, so individual
+    /// tests only add what they assert on.
+    fn insert_counts(ctx: &mut Context) {
+        ctx.insert("filtered_count", &1usize);
+        ctx.insert("total_count", &1usize);
+    }
+
     fn render_list(locale: &str) -> String {
         let r = Renderer::new(Catalog::load("en"));
         let mut ctx = Context::new();
         ctx.insert("spools", &vec![view("01HSP", "Sealed")]);
         ctx.insert("materials", &vec![material_option()]);
+        ctx.insert("manufacturers", &vec![manufacturer_option()]);
+        ctx.insert("locations", &vec![location_option()]);
         ctx.insert("selected_material", "");
         ctx.insert("selected_status", "");
+        ctx.insert("selected_manufacturer", "");
+        ctx.insert("selected_location", "");
+        ctx.insert("search", "");
         ctx.insert("selected_sort", "created_desc");
         ctx.insert("stock_value", "37.50");
+        insert_counts(&mut ctx);
         r.render("spools.html", locale, "", ctx).unwrap()
     }
 
@@ -1119,6 +1210,43 @@ mod tests {
         assert!(html.contains("/spools/01HSP"));
         assert!(!html.contains("spools.col.")); // no raw i18n key leaks
         assert!(!html.contains("spools.status.")); // status label resolved
+    }
+
+    #[test]
+    fn query_maps_search_manufacturer_and_location_facets() {
+        let q = SpoolQuery {
+            manufacturer_id: Some("01HMFR".into()),
+            location_id: Some("01HLOC".into()),
+            search: Some("  magenta  ".into()),
+            ..Default::default()
+        };
+        let filter = q.to_filter();
+        assert_eq!(filter.manufacturer_id, Some(ManufacturerId::new("01HMFR")));
+        assert_eq!(filter.location_id, Some(LocationId::new("01HLOC")));
+        assert_eq!(filter.search.as_deref(), Some("magenta")); // trimmed
+    }
+
+    #[test]
+    fn query_blank_search_maps_to_none() {
+        let q = SpoolQuery {
+            search: Some("   ".into()),
+            ..Default::default()
+        };
+        assert_eq!(q.to_filter().search, None);
+    }
+
+    #[test]
+    fn list_page_renders_new_filters_and_counter() {
+        let html = render_list("fr");
+        assert!(html.contains(r#"name="search""#));
+        assert!(html.contains(r#"name="manufacturer_id""#));
+        assert!(html.contains(r#"name="location_id""#));
+        assert!(html.contains("Prusament")); // manufacturer option
+        assert!(html.contains("Shelf A")); // location option
+        assert!(html.contains(r#"id="spools-filtered-count""#));
+        assert!(html.contains("affichées")); // counter suffix (fr)
+        assert!(!html.contains("spools.count.")); // no raw key leak
+        assert!(!html.contains("spools.filter.")); // no raw key leak
     }
 
     #[test]
@@ -1137,6 +1265,7 @@ mod tests {
         let mut ctx = Context::new();
         ctx.insert("spools", &vec![view("01HSP", "Open")]);
         ctx.insert("stock_value", "37.50");
+        insert_counts(&mut ctx);
         let html = r.render("_spool_rows.html", "en", "", ctx).unwrap();
         // The card grid is re-rendered out-of-band so filtering keeps it in sync.
         assert!(html.contains(r#"id="spool-cards" hx-swap-oob="innerHTML""#));
@@ -1172,6 +1301,7 @@ mod tests {
         let mut ctx = Context::new();
         ctx.insert("spools", &vec![view("01HSP", "Open")]);
         ctx.insert("stock_value", "37.50");
+        insert_counts(&mut ctx);
         let html = r.render("_spool_rows.html", "en", "", ctx).unwrap();
         assert!(html.contains("01HSP"));
         assert!(!html.contains("<html")); // fragment only, no full page shell
@@ -1184,6 +1314,7 @@ mod tests {
         let mut ctx = Context::new();
         ctx.insert("spools", &vec![view("01HSP", "Open")]);
         ctx.insert("stock_value", "37.50");
+        insert_counts(&mut ctx);
         let html = r.render("_spool_rows.html", "en", "", ctx).unwrap();
         assert!(html.contains(r#"id="stock-value" hx-swap-oob="true""#));
         assert!(html.contains("37.50"));
@@ -1251,6 +1382,7 @@ mod tests {
             material_id: Some("01HMAT".into()),
             status: Some("Open".into()),
             sort: Some("remaining_asc".into()),
+            ..Default::default()
         };
         let filter = q.to_filter();
         assert_eq!(filter.material_id, Some(MaterialId::new("01HMAT")));

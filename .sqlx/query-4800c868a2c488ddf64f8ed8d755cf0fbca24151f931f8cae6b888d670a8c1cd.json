@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id, s.colour_hex, s.colour_name, s.diameter,\n                              s.net_weight, s.remaining_weight, s.status,\n                              m.name AS material_name, m.density,\n                              l.name AS \"location_name?\",\n                              mf.name AS \"manufacturer_name?\"\n                       FROM spools s\n                       JOIN materials m ON m.id = s.material_id\n                       LEFT JOIN locations l ON l.id = s.location_id\n                       LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id\n                       WHERE ($1::text IS NULL OR s.material_id = $1)\n                         AND ($2::text IS NULL OR s.status = $2)\n                         AND (s.status <> 'Archived' OR $2 = 'Archived')\n                       ORDER BY (s.remaining_weight / s.net_weight) ASC",
+  "query": "SELECT s.id, s.colour_hex, s.colour_name, s.diameter,\n                              s.net_weight, s.remaining_weight, s.status,\n                              m.name AS material_name, m.density,\n                              l.name AS \"location_name?\",\n                              mf.name AS \"manufacturer_name?\"\n                       FROM spools s\n                       JOIN materials m ON m.id = s.material_id\n                       LEFT JOIN locations l ON l.id = s.location_id\n                       LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id\n                       WHERE ($1::text IS NULL OR s.material_id = $1)\n                         AND ($2::text IS NULL OR s.status = $2)\n                         AND (s.status <> 'Archived' OR $2 = 'Archived')\n                         AND ($3::text IS NULL OR s.manufacturer_id = $3)\n                         AND ($4::text IS NULL OR s.location_id = $4)\n                         AND ($5::text IS NULL\n                              OR mf.name ILIKE '%' || $5 || '%'\n                              OR s.colour_name ILIKE '%' || $5 || '%')\n                       ORDER BY (s.remaining_weight / s.net_weight) ASC",
   "describe": {
     "columns": [
       {
@@ -128,6 +128,9 @@
     "parameters": {
       "Left": [
         "Text",
+        "Text",
+        "Text",
+        "Text",
         "Text"
       ]
     },
@@ -145,5 +148,5 @@
       false
     ]
   },
-  "hash": "91369420578c4c4ecc72729183604d48a95799233b591115c6af76d3514b133c"
+  "hash": "4800c868a2c488ddf64f8ed8d755cf0fbca24151f931f8cae6b888d670a8c1cd"
 }

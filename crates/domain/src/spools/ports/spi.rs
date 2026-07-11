@@ -23,10 +23,17 @@ pub enum RepositoryError {
 }
 
 /// Filter applied when listing spools.
+///
+/// `search` is a free-text term matched (case-insensitively, as a substring)
+/// against the manufacturer name and the colour name — the two fields the
+/// list's search box advertises.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SpoolFilter {
     pub material_id: Option<MaterialId>,
     pub status: Option<SpoolStatus>,
+    pub manufacturer_id: Option<ManufacturerId>,
+    pub location_id: Option<LocationId>,
+    pub search: Option<String>,
 }
 
 /// Sort order applied when listing spools.

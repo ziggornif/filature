@@ -173,6 +173,7 @@ mod tests {
                 SpoolFilter {
                     material_id: Some(MaterialId::new("material-2")),
                     status: None,
+                    ..Default::default()
                 },
                 SpoolSort::CreatedDesc,
             )
@@ -196,6 +197,7 @@ mod tests {
                 SpoolFilter {
                     material_id: None,
                     status: Some(SpoolStatus::Sealed),
+                    ..Default::default()
                 },
                 SpoolSort::CreatedDesc,
             )
@@ -314,6 +316,7 @@ mod tests {
                 SpoolFilter {
                     material_id: None,
                     status: Some(SpoolStatus::Archived),
+                    ..Default::default()
                 },
                 SpoolSort::CreatedDesc,
             )

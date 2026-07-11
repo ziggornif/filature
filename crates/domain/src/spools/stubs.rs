@@ -36,6 +36,30 @@ impl Default for StubSpoolRepository {
     }
 }
 
+/// Whether a spool matches the material/status/manufacturer/location/search
+/// facets of a filter (the archived-visibility rule is applied separately by
+/// each caller). The stub has no manufacturer *name* to join, so `search`
+/// only matches the colour name here; the real substring-match against the
+/// manufacturer name lives in the SQL adapter.
+fn matches_filter(s: &Spool, f: &SpoolFilter) -> bool {
+    f.material_id.as_ref().is_none_or(|m| m == &s.material_id)
+        && f.status.is_none_or(|st| st == s.status)
+        && f
+            .manufacturer_id
+            .as_ref()
+            .is_none_or(|m| s.manufacturer_id.as_ref() == Some(m))
+        && f
+            .location_id
+            .as_ref()
+            .is_none_or(|l| s.location_id.as_ref() == Some(l))
+        && f.search.as_ref().is_none_or(|term| {
+            let needle = term.to_lowercase();
+            s.colour
+                .name()
+                .is_some_and(|n| n.to_lowercase().contains(&needle))
+        })
+}
+
 fn to_list_item(s: &Spool) -> SpoolListItem {
     SpoolListItem {
         id: s.id.clone(),
@@ -115,13 +139,7 @@ impl SpoolRepository for StubSpoolRepository {
         let rows = self.rows.lock().unwrap();
         let mut items: Vec<SpoolListItem> = rows
             .iter()
-            .filter(|r| {
-                filter
-                    .material_id
-                    .as_ref()
-                    .is_none_or(|mid| mid == &r.material_id)
-            })
-            .filter(|r| filter.status.is_none_or(|st| st == r.status))
+            .filter(|r| matches_filter(r, &filter))
             .filter(|r| {
                 filter.status == Some(SpoolStatus::Archived) || r.status != SpoolStatus::Archived
             })
@@ -167,13 +185,7 @@ impl SpoolRepository for StubSpoolRepository {
         let rows = self.rows.lock().unwrap();
         let sum: Decimal = rows
             .iter()
-            .filter(|r| {
-                filter
-                    .material_id
-                    .as_ref()
-                    .is_none_or(|mid| mid == &r.material_id)
-            })
-            .filter(|r| filter.status.is_none_or(|st| st == r.status))
+            .filter(|r| matches_filter(r, &filter))
             .filter(|r| r.status != SpoolStatus::Archived)
             .map(|r| {
                 let net = r.net_weight.value();
