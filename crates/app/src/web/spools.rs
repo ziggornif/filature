@@ -44,6 +44,9 @@ pub struct SpoolView {
     pub remaining_pct: u8,
     pub remaining_length_m: f64,
     pub status: String, // "Sealed" | "Open" | "Empty" | "Archived"
+    /// The assigned location's display name, or `None` when unassigned —
+    /// the card view shows this as the spool's storage.
+    pub location_name: Option<String>,
     /// The manufacturer's display name, or `None` when unattributed.
     pub manufacturer_name: Option<String>,
 }
@@ -53,6 +56,7 @@ impl From<SpoolListItem> for SpoolView {
         let remaining_pct = (item.remaining_ratio() * 100.0).round();
         let remaining_length_m = round1(item.remaining_length_m());
         Self {
+            location_name: item.location_name.clone(),
             manufacturer_name: item.manufacturer_name.clone(),
             id: item.id.as_str().to_string(),
             material_name: item.material_name.clone(),
@@ -1075,6 +1079,7 @@ mod tests {
             remaining_pct: 80,
             remaining_length_m: 268.2,
             status: status.into(),
+            location_name: Some("Drybox 1".into()),
             manufacturer_name: Some("Prusament".into()),
         }
     }
@@ -1114,6 +1119,28 @@ mod tests {
         assert!(html.contains("/spools/01HSP"));
         assert!(!html.contains("spools.col.")); // no raw i18n key leaks
         assert!(!html.contains("spools.status.")); // status label resolved
+    }
+
+    #[test]
+    fn list_page_renders_card_view_alongside_table() {
+        let html = render_list("en");
+        // Both views are rendered; a CSS radio toggle picks which is visible.
+        assert!(html.contains(r#"id="spool-cards""#));
+        assert!(html.contains("spool-card--sealed"));
+        assert!(html.contains("Drybox 1")); // location shown as card storage
+        assert!(html.contains(r#"id="spools-view-cards""#)); // view toggle radio
+    }
+
+    #[test]
+    fn rows_fragment_updates_cards_out_of_band() {
+        let r = Renderer::new(Catalog::load("en"));
+        let mut ctx = Context::new();
+        ctx.insert("spools", &vec![view("01HSP", "Open")]);
+        ctx.insert("stock_value", "37.50");
+        let html = r.render("_spool_rows.html", "en", "", ctx).unwrap();
+        // The card grid is re-rendered out-of-band so filtering keeps it in sync.
+        assert!(html.contains(r#"id="spool-cards" hx-swap-oob="innerHTML""#));
+        assert!(html.contains("spool-card--open"));
     }
 
     #[test]

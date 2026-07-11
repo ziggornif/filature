@@ -1,0 +1,37 @@
+<a id="spool-card-{{ s.id }}"
+   class="spool-card spool-card--{{ s.status | lower }}"
+   href="/spools/{{ s.id }}"
+   style="--card-colour:{{ s.colour_hex }}">
+  <div class="spool-card-head">
+    <span class="colour-swatch spool-card-swatch"
+          style="background:{{ s.colour_hex }}"
+          title="{{ s.colour_label }}"></span>
+    <div class="spool-card-id">
+      <div class="spool-card-brand">{{ s.manufacturer_name | default(value="—") }}</div>
+      <div class="spool-card-colour">{{ s.colour_label }}</div>
+    </div>
+    <span class="spool-card-mat">{{ s.material_name }}</span>
+  </div>
+
+  <div class="spool-card-gauge">
+    <div class="spool-card-gauge-labels">
+      <span class="spool-card-remaining">{{ s.remaining_weight }} g</span>
+      <span class="spool-card-sub">{{ s.remaining_pct }}% · {{ s.net_weight }} g</span>
+    </div>
+    <span class="gauge{% if s.remaining_pct == 0 %} gauge--empty{% elif s.remaining_pct < 10 %} gauge--crit{% elif s.remaining_pct <= 15 %} gauge--low{% endif %}">
+      <span class="gauge-fill" style="width:{{ s.remaining_pct }}%"></span>
+    </span>
+  </div>
+
+  <div class="spool-card-foot">
+    <span class="spool-card-storage">{{ s.location_name | default(value="—") }}</span>
+    <span class="spool-card-status spool-status--{{ s.status | lower }}">
+      <span class="spool-status-dot"></span>
+      {% if s.status == "Sealed" %}{{ t(key="spools.status.sealed") }}
+      {% elif s.status == "Open" %}{{ t(key="spools.status.open") }}
+      {% elif s.status == "Empty" %}{{ t(key="spools.status.empty") }}
+      {% elif s.status == "Archived" %}{{ t(key="spools.status.archived") }}
+      {% endif %}
+    </span>
+  </div>
+</a>

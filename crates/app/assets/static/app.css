@@ -613,6 +613,196 @@ a {
   min-width: 38px;
 }
 
+/* Header row: title left, view toggle + add button right */
+.spools-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.spools-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.spools-head .spools-add {
+  margin-bottom: 0;
+}
+
+/* Table ↔ cards switch: pure-CSS radios (no JS), hidden but focusable. The
+   :checked state below drives both the toggle button styling and which view
+   is visible. Cards is the default (the radio is `checked` in the template). */
+.spools-view-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.view-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.view-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  user-select: none;
+}
+.view-toggle-btn svg {
+  display: block;
+}
+#spools-view-table:focus-visible ~ .spools-head .view-toggle-btn[for="spools-view-table"],
+#spools-view-cards:focus-visible ~ .spools-head .view-toggle-btn[for="spools-view-cards"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+#spools-view-table:checked ~ .spools-head .view-toggle-btn[for="spools-view-table"],
+#spools-view-cards:checked ~ .spools-head .view-toggle-btn[for="spools-view-cards"] {
+  background: var(--raised);
+  color: var(--text);
+}
+
+/* Card view: hidden by default, shown when the cards radio is checked (which
+   it is on load); the table hides in that same state. */
+.spool-cards {
+  display: none;
+  grid-template-columns: repeat(auto-fill, minmax(min(248px, 100%), 1fr));
+  gap: 14px;
+}
+#spools-view-cards:checked ~ #spools-list .spool-cards {
+  display: grid;
+}
+#spools-view-cards:checked ~ #spools-list .spools-table {
+  display: none;
+}
+
+.spool-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px 16px;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--card-colour, var(--border-strong));
+  border-radius: 11px;
+  box-shadow: var(--shadow);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.spool-card:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+}
+.spool-card--empty,
+.spool-card--archived {
+  opacity: 0.85;
+}
+.spool-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+.spool-card-swatch {
+  width: 19px;
+  height: 19px;
+  margin-top: 1px;
+}
+.spool-card-id {
+  min-width: 0;
+  flex: 1;
+}
+.spool-card-brand {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.spool-card-colour {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.spool-card-mat {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 3px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.spool-card-gauge-labels {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.spool-card-remaining {
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 600;
+}
+.spool-card-sub {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--faint);
+}
+.spool-card .gauge {
+  height: 9px;
+}
+.spool-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.spool-card-storage {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.spool-card-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+}
+.spool-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.spool-status--sealed {
+  color: var(--ok);
+}
+.spool-status--open {
+  color: var(--muted);
+}
+.spool-status--empty {
+  color: var(--danger);
+}
+.spool-status--archived {
+  color: var(--faint);
+}
+
 /* ============================================================
    Materials referential
    ============================================================ */

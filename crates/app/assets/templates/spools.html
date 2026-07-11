@@ -1,6 +1,27 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>{{ t(key="spools.title") }}</h1>
+  {# CSS-only view switch (no JS): these radios drive `.spools-table` vs
+     `.spool-cards` visibility via sibling selectors. Must precede the header
+     and list they toggle. Cards is the default view (matches the handoff). #}
+  <input class="spools-view-input" type="radio" name="spools-view" id="spools-view-cards" checked>
+  <input class="spools-view-input" type="radio" name="spools-view" id="spools-view-table">
+
+  <div class="spools-head">
+    <h1>{{ t(key="spools.title") }}</h1>
+    <div class="spools-head-actions">
+      <div class="view-toggle" role="group">
+        <label class="view-toggle-btn" for="spools-view-table" title="{{ t(key='spools.view.table') }}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="3" y1="8" x2="21" y2="8"/><line x1="3" y1="13" x2="21" y2="13"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          {{ t(key="spools.view.table") }}
+        </label>
+        <label class="view-toggle-btn" for="spools-view-cards" title="{{ t(key='spools.view.cards') }}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>
+          {{ t(key="spools.view.cards") }}
+        </label>
+      </div>
+      <a class="spools-add" href="/spools/new">{{ t(key="spools.add") }}</a>
+    </div>
+  </div>
 
   <p class="spools-stock-value">
     {{ t(key="spools.stock_value") }}
@@ -43,26 +64,32 @@
     </label>
   </form>
 
-  <a class="spools-add" href="/spools/new">{{ t(key="spools.add") }}</a>
+  <div id="spools-list">
+    <table class="spools-table">
+      <thead>
+        <tr>
+          <th>{{ t(key="spools.col.colour") }}</th>
+          <th>{{ t(key="spools.col.material") }}</th>
+          <th>{{ t(key="spools.col.diameter") }}</th>
+          <th>{{ t(key="spools.col.remaining_weight") }}</th>
+          <th>{{ t(key="spools.col.net_weight") }}</th>
+          <th>{{ t(key="spools.col.remaining_pct") }}</th>
+          <th>{{ t(key="spools.col.manufacturer") }}</th>
+          <th>{{ t(key="spools.col.status") }}</th>
+          <th>{{ t(key="spools.col.actions") }}</th>
+        </tr>
+      </thead>
+      <tbody id="spools-table-body">
+        {% for s in spools %}
+          {% include "_spool_row.html" %}
+        {% endfor %}
+      </tbody>
+    </table>
 
-  <table class="spools-table">
-    <thead>
-      <tr>
-        <th>{{ t(key="spools.col.colour") }}</th>
-        <th>{{ t(key="spools.col.material") }}</th>
-        <th>{{ t(key="spools.col.diameter") }}</th>
-        <th>{{ t(key="spools.col.remaining_weight") }}</th>
-        <th>{{ t(key="spools.col.net_weight") }}</th>
-        <th>{{ t(key="spools.col.remaining_pct") }}</th>
-        <th>{{ t(key="spools.col.manufacturer") }}</th>
-        <th>{{ t(key="spools.col.status") }}</th>
-        <th>{{ t(key="spools.col.actions") }}</th>
-      </tr>
-    </thead>
-    <tbody id="spools-table-body">
+    <div id="spool-cards" class="spool-cards">
       {% for s in spools %}
-        {% include "_spool_row.html" %}
+        {% include "_spool_card.html" %}
       {% endfor %}
-    </tbody>
-  </table>
+    </div>
+  </div>
 {% endblock content %}

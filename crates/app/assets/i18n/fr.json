@@ -52,6 +52,8 @@
   "spools.status.open": "Ouverte",
   "spools.status.empty": "Vide",
   "spools.status.archived": "Archivée",
+  "spools.view.table": "Table",
+  "spools.view.cards": "Cartes",
   "spools.action.view": "Voir",
   "spools.action.edit": "Modifier",
   "spools.action.set_remaining": "Fixer le reste (g)",

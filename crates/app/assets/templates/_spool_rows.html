@@ -1,4 +1,11 @@
 {% for s in spools %}
   {% include "_spool_row.html" %}
 {% endfor %}
+{# Card view kept in sync out-of-band: the filter form swaps the tbody, this
+   re-renders the parallel card grid so both views reflect the same filter. #}
+<div id="spool-cards" hx-swap-oob="innerHTML">
+  {% for s in spools %}
+    {% include "_spool_card.html" %}
+  {% endfor %}
+</div>
 <span id="stock-value" hx-swap-oob="true">{{ stock_value }}</span>
