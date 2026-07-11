@@ -176,9 +176,7 @@ async fn add_then_list_then_view_spool() {
         .expect("the spool just posted is present in the filtered list");
     let spool_id = created.id.as_str().to_string();
 
-
-    // --- GET /spools/{id}: the detail page shows the spool's fields and a
-    // plausible (non-zero, formula-consistent) Remaining Length.
+    // --- GET /spools/{id}: the detail page shows the spool's fields.
     let res = app
         .clone()
         .oneshot(
