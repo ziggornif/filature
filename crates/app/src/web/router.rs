@@ -63,6 +63,7 @@ pub fn router(state: AppState) -> Router {
         .merge(crate::web::dashboard::routes())
         .merge(crate::web::materials::routes())
         .merge(crate::web::locations::routes())
+        .merge(crate::web::manufacturers::routes())
         .merge(crate::web::spools::routes())
         .route("/static/{*path}", get(static_handler))
         .with_state(state)

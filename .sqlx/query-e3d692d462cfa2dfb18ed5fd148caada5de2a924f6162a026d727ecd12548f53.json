@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, material_id, colour_hex, colour_name, diameter,\n                      net_weight, remaining_weight, price_paid, status, location_id\n               FROM spools WHERE id = $1",
+  "query": "SELECT id, material_id, colour_hex, colour_name, diameter,\n                      net_weight, remaining_weight, price_paid, status, location_id,\n                      manufacturer_id\n               FROM spools WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -112,6 +112,17 @@
             "name": "location_id"
           }
         }
+      },
+      {
+        "ordinal": 10,
+        "name": "manufacturer_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spools",
+            "name": "manufacturer_id"
+          }
+        }
       }
     ],
     "parameters": {
@@ -129,8 +140,9 @@
       false,
       false,
       false,
+      true,
       true
     ]
   },
-  "hash": "ac01c1dfb0af8cc9401e96bb1dbaf654e6a32b5b9a5cdf478e0106a765219123"
+  "hash": "e3d692d462cfa2dfb18ed5fd148caada5de2a924f6162a026d727ecd12548f53"
 }

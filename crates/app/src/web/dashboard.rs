@@ -349,6 +349,10 @@ mod tests {
             let locations: Arc<dyn LocationsUseCases> = Arc::new(LocationsService::new(Arc::new(
                 StubLocationRepository::new(),
             )));
+            let manufacturers: Arc<dyn domain::manufacturers::ManufacturersUseCases> =
+                Arc::new(domain::manufacturers::ManufacturersService::new(Arc::new(
+                    domain::manufacturers::stubs::StubManufacturerRepository::new(),
+                )));
             let db = PgPool::connect_lazy("postgres://user:pass@localhost/db").unwrap();
             let cfg = Config {
                 server: ServerConfig {
@@ -361,7 +365,15 @@ mod tests {
                     default_locale: "en".into(),
                 },
             };
-            AppState::new(db, &cfg, materials, spools, locations, dashboard)
+            AppState::new(
+                db,
+                &cfg,
+                materials,
+                spools,
+                locations,
+                manufacturers,
+                dashboard,
+            )
         }
 
         async fn body_of(res: Response) -> String {

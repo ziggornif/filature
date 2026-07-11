@@ -16,7 +16,7 @@
       <span class="spool-remaining-pct">{{ s.remaining_pct }}%</span>
     </span>
   </td>
-  <td>{{ s.remaining_length_m }}</td>
+  <td>{{ s.manufacturer_name | default(value="—") }}</td>
   <td>
     <span class="pill pill--{{ s.status | lower }}">
       {% if s.status == "Sealed" %}{{ t(key="spools.status.sealed") }}

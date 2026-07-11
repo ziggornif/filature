@@ -53,5 +53,15 @@
     </select>
   </label>
 
+  <label>
+    {{ t(key="spools.new.manufacturer") }}
+    <select name="manufacturer_id">
+      <option value="">{{ t(key="spools.manufacturer.unassigned") }}</option>
+      {% for m in manufacturers | default(value=[]) %}
+        <option value="{{ m.id }}"{% if m.id == manufacturer_id | default(value="") %} selected{% endif %}>{{ m.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+
   <button type="submit">{{ t(key="spools.edit.submit") }}</button>
 </form>

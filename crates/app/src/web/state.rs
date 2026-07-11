@@ -4,6 +4,7 @@ use crate::web::i18n::Catalog;
 use crate::web::templates::Renderer;
 use domain::dashboard::DashboardUseCases;
 use domain::locations::LocationsUseCases;
+use domain::manufacturers::ManufacturersUseCases;
 use domain::materials::MaterialsUseCases;
 use domain::spools::SpoolsUseCases;
 use std::sync::Arc;
@@ -21,16 +22,19 @@ pub struct AppState {
     pub materials: Arc<dyn MaterialsUseCases>,
     pub spools: Arc<dyn SpoolsUseCases>,
     pub locations: Arc<dyn LocationsUseCases>,
+    pub manufacturers: Arc<dyn ManufacturersUseCases>,
     pub dashboard: Arc<dyn DashboardUseCases>,
 }
 
 impl AppState {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: Db,
         cfg: &Config,
         materials: Arc<dyn MaterialsUseCases>,
         spools: Arc<dyn SpoolsUseCases>,
         locations: Arc<dyn LocationsUseCases>,
+        manufacturers: Arc<dyn ManufacturersUseCases>,
         dashboard: Arc<dyn DashboardUseCases>,
     ) -> Self {
         let catalog = Catalog::load(&cfg.i18n.default_locale);
@@ -41,6 +45,7 @@ impl AppState {
             materials,
             spools,
             locations,
+            manufacturers,
             dashboard,
         }
     }

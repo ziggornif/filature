@@ -1,4 +1,4 @@
-use crate::shared::{DomainError, LocationId, MaterialId, Money};
+use crate::shared::{DomainError, LocationId, ManufacturerId, MaterialId, Money};
 use crate::spools::model::{NewSpool, Spool, SpoolId, SpoolStatus};
 use crate::spools::read_models::{SpoolDetail, SpoolListItem};
 use async_trait::async_trait;
@@ -16,6 +16,8 @@ pub enum RepositoryError {
     UnknownMaterial(MaterialId),
     #[error("no location with id '{}'", .0.as_str())]
     UnknownLocation(LocationId),
+    #[error("no manufacturer with id '{}'", .0.as_str())]
+    UnknownManufacturer(ManufacturerId),
     #[error("{0}")]
     Domain(#[from] DomainError),
 }

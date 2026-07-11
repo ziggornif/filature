@@ -27,8 +27,8 @@
     <dt>{{ t(key="spools.col.remaining_pct") }}</dt>
     <dd>{{ spool.remaining_pct }}%</dd>
 
-    <dt>{{ t(key="spools.col.remaining_length") }}</dt>
-    <dd>{{ spool.remaining_length_m }}</dd>
+    <dt>{{ t(key="spools.col.manufacturer") }}</dt>
+    <dd>{% if spool.manufacturer_name %}{{ spool.manufacturer_name }}{% else %}{{ t(key="spools.manufacturer.unassigned") }}{% endif %}</dd>
 
     <dt>{{ t(key="spools.new.price_paid") }}</dt>
     <dd>{{ spool.price_paid }}</dd>

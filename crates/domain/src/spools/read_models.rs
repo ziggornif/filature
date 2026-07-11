@@ -20,6 +20,7 @@ pub struct SpoolListItem {
     pub status: SpoolStatus,
     pub density: f64,
     pub location_name: Option<String>,
+    pub manufacturer_name: Option<String>,
 }
 
 impl SpoolListItem {
@@ -54,6 +55,11 @@ pub struct SpoolDetail {
     /// alongside the display-only `location_name` so a web edit form can
     /// preselect the current location on the rendered `<select>`.
     pub location_id: Option<String>,
+    pub manufacturer_name: Option<String>,
+    /// The attributed manufacturer's id (`None` when unattributed) — carried
+    /// alongside `manufacturer_name` so the edit form can preselect the
+    /// current manufacturer and preserve it on save.
+    pub manufacturer_id: Option<String>,
 }
 
 impl SpoolDetail {

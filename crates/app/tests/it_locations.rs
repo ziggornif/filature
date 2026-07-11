@@ -41,6 +41,7 @@ fn sample_spool(material_id: MaterialId) -> NewSpool {
         net_weight: Grams::new(1000.0).unwrap(),
         price_paid: Money::from_decimal(Decimal::from_str_exact("10.00").unwrap()).unwrap(),
         location_id: None,
+        manufacturer_id: None,
     }
 }
 
