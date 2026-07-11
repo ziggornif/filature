@@ -42,6 +42,22 @@ impl LocationId {
     }
 }
 
+/// Opaque identifier for a `Manufacturer`. Lives in the shared kernel
+/// (rather than the `manufacturers` slice) because the `spools` slice
+/// references a manufacturer by id — a cross-slice import of a sibling
+/// slice's own module would violate slice isolation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManufacturerId(pub String);
+
+impl ManufacturerId {
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub enum DomainError {
     #[error("weight must be non-negative, got {0}")]
@@ -74,6 +90,10 @@ pub enum DomainError {
     BlankLocationName,
     #[error("location has {count} spools and cannot be deleted")]
     LocationInUse { count: u64 },
+    #[error("manufacturer name must not be blank")]
+    BlankManufacturerName,
+    #[error("manufacturer has {count} spools and cannot be deleted")]
+    ManufacturerInUse { count: u64 },
 }
 
 impl Grams {

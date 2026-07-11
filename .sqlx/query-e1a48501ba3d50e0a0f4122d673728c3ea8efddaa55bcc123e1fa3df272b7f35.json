@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id, s.colour_hex, s.colour_name, s.diameter,\n                              s.net_weight, s.remaining_weight, s.status,\n                              m.name AS material_name, m.density,\n                              l.name AS \"location_name?\"\n                       FROM spools s\n                       JOIN materials m ON m.id = s.material_id\n                       LEFT JOIN locations l ON l.id = s.location_id\n                       WHERE ($1::text IS NULL OR s.material_id = $1)\n                         AND ($2::text IS NULL OR s.status = $2)\n                         AND (s.status <> 'Archived' OR $2 = 'Archived')\n                       ORDER BY (s.remaining_weight / s.net_weight) ASC",
+  "query": "SELECT s.id, s.colour_hex, s.colour_name, s.diameter,\n                              s.net_weight, s.remaining_weight, s.status,\n                              m.name AS material_name, m.density,\n                              l.name AS \"location_name?\",\n                              mf.name AS \"manufacturer_name?\"\n                       FROM spools s\n                       JOIN materials m ON m.id = s.material_id\n                       LEFT JOIN locations l ON l.id = s.location_id\n                       LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id\n                       WHERE ($1::text IS NULL OR s.material_id = $1)\n                         AND ($2::text IS NULL OR s.status = $2)\n                         AND (s.status <> 'Archived' OR $2 = 'Archived')\n                       ORDER BY s.created_at DESC",
   "describe": {
     "columns": [
       {
@@ -112,6 +112,17 @@
             "name": "name"
           }
         }
+      },
+      {
+        "ordinal": 10,
+        "name": "manufacturer_name?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "manufacturers",
+            "name": "name"
+          }
+        }
       }
     ],
     "parameters": {
@@ -130,8 +141,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "a3f4a48a7c85845cc0d77f58b3ca8dfb0530bfe76b4ab13c521cf5496d05c134"
+  "hash": "e1a48501ba3d50e0a0f4122d673728c3ea8efddaa55bcc123e1fa3df272b7f35"
 }

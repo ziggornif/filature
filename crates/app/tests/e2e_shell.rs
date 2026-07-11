@@ -43,12 +43,17 @@ async fn app() -> axum::Router {
     let dashboard: Arc<dyn DashboardUseCases> = Arc::new(DashboardService::new(Arc::new(
         StubDashboardRepository::new(),
     )));
+    let manufacturers: Arc<dyn domain::manufacturers::ManufacturersUseCases> =
+        Arc::new(domain::manufacturers::ManufacturersService::new(Arc::new(
+            domain::manufacturers::stubs::StubManufacturerRepository::new(),
+        )));
     web::router(web::AppState::new(
         db,
         &test_config(&url),
         materials,
         spools,
         locations,
+        manufacturers,
         dashboard,
     ))
 }

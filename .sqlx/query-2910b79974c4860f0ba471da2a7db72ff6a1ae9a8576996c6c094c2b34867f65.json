@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO spools\n               (id, material_id, colour_hex, colour_name, diameter, net_weight, remaining_weight, price_paid, status, location_id, manufacturer_id)\n               VALUES ($1, $2, $3, $4, $5, $6, $6, $7, 'Sealed', $8, $9)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Float8",
+        "Numeric",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2910b79974c4860f0ba471da2a7db72ff6a1ae9a8576996c6c094c2b34867f65"
+}

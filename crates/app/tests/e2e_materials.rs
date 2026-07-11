@@ -49,6 +49,11 @@ async fn seeded_app() -> axum::Router {
     let location_repo: Arc<dyn LocationRepository> =
         Arc::new(SqlxLocationRepository::new(db.clone()));
     let locations: Arc<dyn LocationsUseCases> = Arc::new(LocationsService::new(location_repo));
+    let manufacturer_repo: Arc<dyn domain::manufacturers::ManufacturerRepository> =
+        Arc::new(filature::persistence::manufacturers::SqlxManufacturerRepository::new(db.clone()));
+    let manufacturers: Arc<dyn domain::manufacturers::ManufacturersUseCases> = Arc::new(
+        domain::manufacturers::ManufacturersService::new(manufacturer_repo),
+    );
     let dash_repo: Arc<dyn DashboardRepository> =
         Arc::new(SqlxDashboardRepository::new(db.clone()));
     let dashboard: Arc<dyn DashboardUseCases> = Arc::new(DashboardService::new(dash_repo));
@@ -58,6 +63,7 @@ async fn seeded_app() -> axum::Router {
         materials,
         spools,
         locations,
+        manufacturers,
         dashboard,
     ))
 }

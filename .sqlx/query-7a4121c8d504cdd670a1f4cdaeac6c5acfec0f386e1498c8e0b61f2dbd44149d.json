@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id, s.colour_hex, s.colour_name, s.diameter,\n                              s.net_weight, s.remaining_weight, s.status,\n                              m.name AS material_name, m.density,\n                              l.name AS \"location_name?\"\n                       FROM spools s\n                       JOIN materials m ON m.id = s.material_id\n                       LEFT JOIN locations l ON l.id = s.location_id\n                       WHERE ($1::text IS NULL OR s.material_id = $1)\n                         AND ($2::text IS NULL OR s.status = $2)\n                         AND (s.status <> 'Archived' OR $2 = 'Archived')\n                       ORDER BY s.created_at DESC",
+  "query": "SELECT s.id, s.material_id, s.colour_hex, s.colour_name, s.diameter,\n                      s.net_weight, s.remaining_weight, s.price_paid, s.status,\n                      s.location_id, s.manufacturer_id,\n                      m.name AS material_name, m.density,\n                      l.name AS \"location_name?\",\n                      mf.name AS \"manufacturer_name?\"\n               FROM spools s\n               JOIN materials m ON m.id = s.material_id\n               LEFT JOIN locations l ON l.id = s.location_id\n               LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id\n               WHERE s.id = $1",
   "describe": {
     "columns": [
       {
@@ -16,6 +16,17 @@
       },
       {
         "ordinal": 1,
+        "name": "material_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spools",
+            "name": "material_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
         "name": "colour_hex",
         "type_info": "Text",
         "origin": {
@@ -26,7 +37,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
         "name": "colour_name",
         "type_info": "Text",
         "origin": {
@@ -37,7 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "diameter",
         "type_info": "Text",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "net_weight",
         "type_info": "Float8",
         "origin": {
@@ -59,7 +70,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "remaining_weight",
         "type_info": "Float8",
         "origin": {
@@ -70,7 +81,18 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
+        "name": "price_paid",
+        "type_info": "Numeric",
+        "origin": {
+          "Table": {
+            "table": "spools",
+            "name": "price_paid"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "status",
         "type_info": "Text",
         "origin": {
@@ -81,7 +103,29 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 9,
+        "name": "location_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spools",
+            "name": "location_id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "manufacturer_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "spools",
+            "name": "manufacturer_id"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
         "name": "material_name",
         "type_info": "Text",
         "origin": {
@@ -92,7 +136,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 12,
         "name": "density",
         "type_info": "Float8",
         "origin": {
@@ -103,7 +147,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 13,
         "name": "location_name?",
         "type_info": "Text",
         "origin": {
@@ -112,15 +156,26 @@
             "name": "name"
           }
         }
+      },
+      {
+        "ordinal": 14,
+        "name": "manufacturer_name?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "manufacturers",
+            "name": "name"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Text",
         "Text"
       ]
     },
     "nullable": [
+      false,
       false,
       false,
       true,
@@ -129,9 +184,13 @@
       false,
       false,
       false,
+      true,
+      true,
       false,
-      false
+      false,
+      true,
+      true
     ]
   },
-  "hash": "728c6afb0c16ad98ef2c74f40f9b61516130d4e47a61f8c601883a64a31d5c85"
+  "hash": "7a4121c8d504cdd670a1f4cdaeac6c5acfec0f386e1498c8e0b61f2dbd44149d"
 }

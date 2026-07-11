@@ -8,7 +8,7 @@
 
 use crate::persistence::Db;
 use async_trait::async_trait;
-use domain::shared::{Grams, LocationId, MaterialId, Money};
+use domain::shared::{Grams, LocationId, ManufacturerId, MaterialId, Money};
 use domain::spools::{
     Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolDetail, SpoolFilter, SpoolId,
     SpoolListItem, SpoolRepository, SpoolSort, SpoolStatus,
@@ -44,13 +44,23 @@ fn backend(e: sqlx::Error, material_id: &str) -> RepositoryError {
 /// by inspecting the violated constraint name rather than assuming which FK
 /// failed. Unrecognised constraints (or no constraint name at all) fall back
 /// to an opaque `Backend` error.
-fn write_error(e: sqlx::Error, material_id: &str, location_id: Option<&str>) -> RepositoryError {
+fn write_error(
+    e: sqlx::Error,
+    material_id: &str,
+    location_id: Option<&str>,
+    manufacturer_id: Option<&str>,
+) -> RepositoryError {
     if let sqlx::Error::Database(db) = &e
         && let Some(constraint) = db.constraint()
     {
         if constraint.contains("location_id") {
             return RepositoryError::UnknownLocation(LocationId::new(
                 location_id.unwrap_or_default().to_string(),
+            ));
+        }
+        if constraint.contains("manufacturer_id") {
+            return RepositoryError::UnknownManufacturer(ManufacturerId::new(
+                manufacturer_id.unwrap_or_default().to_string(),
             ));
         }
         if constraint.contains("material_id") {
@@ -88,6 +98,7 @@ fn to_list_item(
     status: String,
     density: f64,
     location_name: Option<String>,
+    manufacturer_name: Option<String>,
 ) -> Result<SpoolListItem, RepositoryError> {
     Ok(SpoolListItem {
         id: SpoolId::new(id),
@@ -99,6 +110,7 @@ fn to_list_item(
         status: build_status(&status)?,
         density,
         location_name,
+        manufacturer_name,
     })
 }
 
@@ -107,10 +119,11 @@ impl SpoolRepository for SqlxSpoolRepository {
     async fn insert(&self, s: NewSpool) -> Result<Spool, RepositoryError> {
         let id = Ulid::new().to_string();
         let location_id = s.location_id.as_ref().map(|l| l.as_str());
+        let manufacturer_id = s.manufacturer_id.as_ref().map(|m| m.as_str());
         sqlx::query!(
             r#"INSERT INTO spools
-               (id, material_id, colour_hex, colour_name, diameter, net_weight, remaining_weight, price_paid, status, location_id)
-               VALUES ($1, $2, $3, $4, $5, $6, $6, $7, 'Sealed', $8)"#,
+               (id, material_id, colour_hex, colour_name, diameter, net_weight, remaining_weight, price_paid, status, location_id, manufacturer_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $6, $7, 'Sealed', $8, $9)"#,
             id,
             s.material_id.as_str(),
             s.colour.hex(),
@@ -119,10 +132,11 @@ impl SpoolRepository for SqlxSpoolRepository {
             s.net_weight.value(),
             s.price_paid.value(),
             location_id,
+            manufacturer_id,
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| write_error(e, s.material_id.as_str(), location_id))?;
+        .map_err(|e| write_error(e, s.material_id.as_str(), location_id, manufacturer_id))?;
 
         Ok(Spool {
             id: SpoolId::new(id),
@@ -134,15 +148,18 @@ impl SpoolRepository for SqlxSpoolRepository {
             price_paid: s.price_paid,
             status: SpoolStatus::Sealed,
             location_id: s.location_id,
+            manufacturer_id: s.manufacturer_id,
         })
     }
 
     async fn update(&self, s: Spool) -> Result<Spool, RepositoryError> {
         let location_id = s.location_id.as_ref().map(|l| l.as_str());
+        let manufacturer_id = s.manufacturer_id.as_ref().map(|m| m.as_str());
         let result = sqlx::query!(
             r#"UPDATE spools SET
                  material_id=$2, colour_hex=$3, colour_name=$4, diameter=$5,
-                 net_weight=$6, remaining_weight=$7, price_paid=$8, status=$9, location_id=$10
+                 net_weight=$6, remaining_weight=$7, price_paid=$8, status=$9, location_id=$10,
+                 manufacturer_id=$11
                WHERE id=$1"#,
             s.id.as_str(),
             s.material_id.as_str(),
@@ -154,10 +171,11 @@ impl SpoolRepository for SqlxSpoolRepository {
             s.price_paid.value(),
             s.status.as_str(),
             location_id,
+            manufacturer_id,
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| write_error(e, s.material_id.as_str(), location_id))?;
+        .map_err(|e| write_error(e, s.material_id.as_str(), location_id, manufacturer_id))?;
         if result.rows_affected() == 0 {
             return Err(RepositoryError::NotFound(s.id));
         }
@@ -178,10 +196,12 @@ impl SpoolRepository for SqlxSpoolRepository {
                     r#"SELECT s.id, s.colour_hex, s.colour_name, s.diameter,
                               s.net_weight, s.remaining_weight, s.status,
                               m.name AS material_name, m.density,
-                              l.name AS "location_name?"
+                              l.name AS "location_name?",
+                              mf.name AS "manufacturer_name?"
                        FROM spools s
                        JOIN materials m ON m.id = s.material_id
                        LEFT JOIN locations l ON l.id = s.location_id
+                       LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id
                        WHERE ($1::text IS NULL OR s.material_id = $1)
                          AND ($2::text IS NULL OR s.status = $2)
                          AND (s.status <> 'Archived' OR $2 = 'Archived')
@@ -205,6 +225,7 @@ impl SpoolRepository for SqlxSpoolRepository {
                             r.status,
                             r.density,
                             r.location_name,
+                            r.manufacturer_name,
                         )
                     })
                     .collect::<Result<Vec<_>, _>>()?
@@ -214,10 +235,12 @@ impl SpoolRepository for SqlxSpoolRepository {
                     r#"SELECT s.id, s.colour_hex, s.colour_name, s.diameter,
                               s.net_weight, s.remaining_weight, s.status,
                               m.name AS material_name, m.density,
-                              l.name AS "location_name?"
+                              l.name AS "location_name?",
+                              mf.name AS "manufacturer_name?"
                        FROM spools s
                        JOIN materials m ON m.id = s.material_id
                        LEFT JOIN locations l ON l.id = s.location_id
+                       LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id
                        WHERE ($1::text IS NULL OR s.material_id = $1)
                          AND ($2::text IS NULL OR s.status = $2)
                          AND (s.status <> 'Archived' OR $2 = 'Archived')
@@ -241,6 +264,7 @@ impl SpoolRepository for SqlxSpoolRepository {
                             r.status,
                             r.density,
                             r.location_name,
+                            r.manufacturer_name,
                         )
                     })
                     .collect::<Result<Vec<_>, _>>()?
@@ -250,10 +274,12 @@ impl SpoolRepository for SqlxSpoolRepository {
                     r#"SELECT s.id, s.colour_hex, s.colour_name, s.diameter,
                               s.net_weight, s.remaining_weight, s.status,
                               m.name AS material_name, m.density,
-                              l.name AS "location_name?"
+                              l.name AS "location_name?",
+                              mf.name AS "manufacturer_name?"
                        FROM spools s
                        JOIN materials m ON m.id = s.material_id
                        LEFT JOIN locations l ON l.id = s.location_id
+                       LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id
                        WHERE ($1::text IS NULL OR s.material_id = $1)
                          AND ($2::text IS NULL OR s.status = $2)
                          AND (s.status <> 'Archived' OR $2 = 'Archived')
@@ -277,6 +303,7 @@ impl SpoolRepository for SqlxSpoolRepository {
                             r.status,
                             r.density,
                             r.location_name,
+                            r.manufacturer_name,
                         )
                     })
                     .collect::<Result<Vec<_>, _>>()?
@@ -290,12 +317,14 @@ impl SpoolRepository for SqlxSpoolRepository {
         let row = sqlx::query!(
             r#"SELECT s.id, s.material_id, s.colour_hex, s.colour_name, s.diameter,
                       s.net_weight, s.remaining_weight, s.price_paid, s.status,
-                      s.location_id,
+                      s.location_id, s.manufacturer_id,
                       m.name AS material_name, m.density,
-                      l.name AS "location_name?"
+                      l.name AS "location_name?",
+                      mf.name AS "manufacturer_name?"
                FROM spools s
                JOIN materials m ON m.id = s.material_id
                LEFT JOIN locations l ON l.id = s.location_id
+               LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id
                WHERE s.id = $1"#,
             id.as_str()
         )
@@ -321,13 +350,16 @@ impl SpoolRepository for SqlxSpoolRepository {
             density: r.density,
             location_name: r.location_name,
             location_id: r.location_id,
+            manufacturer_name: r.manufacturer_name,
+            manufacturer_id: r.manufacturer_id,
         }))
     }
 
     async fn find(&self, id: &SpoolId) -> Result<Option<Spool>, RepositoryError> {
         let row = sqlx::query!(
             r#"SELECT id, material_id, colour_hex, colour_name, diameter,
-                      net_weight, remaining_weight, price_paid, status, location_id
+                      net_weight, remaining_weight, price_paid, status, location_id,
+                      manufacturer_id
                FROM spools WHERE id = $1"#,
             id.as_str()
         )
@@ -350,6 +382,7 @@ impl SpoolRepository for SqlxSpoolRepository {
                 .map_err(|e| RepositoryError::Backend(e.to_string()))?,
             status: build_status(&r.status)?,
             location_id: r.location_id.map(LocationId::new),
+            manufacturer_id: r.manufacturer_id.map(ManufacturerId::new),
         }))
     }
 

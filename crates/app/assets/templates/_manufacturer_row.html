@@ -1,0 +1,14 @@
+<tr id="manufacturer-row-{{ m.id }}" class="manufacturer-row">
+  <td>{{ m.name }}</td>
+  <td>{{ m.country }}</td>
+  <td class="manufacturer-spool-count">{{ m.spool_count }}</td>
+  <td class="manufacturer-row-actions">
+    <button type="button"
+            hx-delete="/manufacturers/{{ m.id }}"
+            hx-target="closest tr" hx-swap="outerHTML"
+            hx-target-409="#manufacturers-msg"
+            hx-confirm="{{ t(key="manufacturers.delete.confirm") }}">
+      {{ t(key="manufacturers.delete") }}
+    </button>
+  </td>
+</tr>

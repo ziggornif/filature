@@ -6,6 +6,7 @@
 pub mod dashboard;
 pub mod i18n;
 pub mod locations;
+pub mod manufacturers;
 pub mod materials;
 pub mod router;
 pub mod spools;

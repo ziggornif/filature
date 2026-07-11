@@ -16,6 +16,7 @@ not a second canonical name. See [ADR-0001](adr/0001-language-and-i18n.md).
 | **Spool** | Bobine | A single physical reel of filament held in stock. Made of one Material, has a real colour, a diameter, and a remaining amount of filament. Carries its own lifecycle (see Spool Status). |
 | **Material** | Matériau | An entry in the material referential (PLA, PETG, ASA, PA-CF, …). The single source of truth for a filament type's physical & handling properties: density, drying parameters, and humidity Sensitivity. Seeded at startup, editable. Referenced by Spools. |
 | **Location** | Rangement | A physical place a Spool is stored (drybox, shelf). A plain storage place in v1; a Location may later be sensor-monitored (deferred — see below). |
+| **Manufacturer** | Fabricant | The brand that produced a Spool (Prusament, Polymaker, …). An entry in a referential seeded at startup from a curated subset of the OpenPrintTag brand database, editable (add/delete). A Spool optionally references one; a Manufacturer that any Spool references cannot be deleted. Distinct from Material — the same Material (e.g. PLA) is sold by many Manufacturers. |
 
 ## Spool measurements & derived values
 

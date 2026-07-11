@@ -1,4 +1,4 @@
-use crate::shared::{DomainError, Grams, LocationId, MaterialId, Money};
+use crate::shared::{DomainError, Grams, LocationId, ManufacturerId, MaterialId, Money};
 use std::f64::consts::PI;
 
 /// A spool colour: a validated `#RRGGBB` hex string plus an optional
@@ -119,6 +119,7 @@ pub struct NewSpool {
     pub net_weight: Grams,
     pub price_paid: Money,
     pub location_id: Option<LocationId>,
+    pub manufacturer_id: Option<ManufacturerId>,
 }
 
 /// A physical spool of filament: net weight at purchase, current
@@ -134,6 +135,7 @@ pub struct Spool {
     pub price_paid: Money,
     pub status: SpoolStatus,
     pub location_id: Option<LocationId>,
+    pub manufacturer_id: Option<ManufacturerId>,
 }
 
 impl Spool {
@@ -248,6 +250,7 @@ mod tests {
             price_paid: Money::new(2500, 2).unwrap(),
             status: SpoolStatus::Open,
             location_id: None,
+            manufacturer_id: None,
         }
     }
 

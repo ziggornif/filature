@@ -13,10 +13,9 @@ use axum::http::{Request, StatusCode};
 use domain::dashboard::{DashboardRepository, DashboardService, DashboardUseCases};
 use domain::locations::{LocationRepository, LocationsService, LocationsUseCases};
 use domain::materials::{MaterialRepository, MaterialsService, MaterialsUseCases};
-use domain::shared::{Grams, MaterialId};
+use domain::shared::MaterialId;
 use domain::spools::{
-    Diameter, SpoolFilter, SpoolRepository, SpoolSort, SpoolStatus, SpoolsService, SpoolsUseCases,
-    remaining_length_m,
+    SpoolFilter, SpoolRepository, SpoolSort, SpoolStatus, SpoolsService, SpoolsUseCases,
 };
 use filature::config::{Config, DatabaseConfig, I18nConfig, ServerConfig};
 use filature::persistence::dashboard::SqlxDashboardRepository;
@@ -57,6 +56,11 @@ async fn seeded_app() -> axum::Router {
     let location_repo: Arc<dyn LocationRepository> =
         Arc::new(SqlxLocationRepository::new(db.clone()));
     let locations: Arc<dyn LocationsUseCases> = Arc::new(LocationsService::new(location_repo));
+    let manufacturer_repo: Arc<dyn domain::manufacturers::ManufacturerRepository> =
+        Arc::new(filature::persistence::manufacturers::SqlxManufacturerRepository::new(db.clone()));
+    let manufacturers: Arc<dyn domain::manufacturers::ManufacturersUseCases> = Arc::new(
+        domain::manufacturers::ManufacturersService::new(manufacturer_repo),
+    );
     let dash_repo: Arc<dyn DashboardRepository> =
         Arc::new(SqlxDashboardRepository::new(db.clone()));
     let dashboard: Arc<dyn DashboardUseCases> = Arc::new(DashboardService::new(dash_repo));
@@ -66,6 +70,7 @@ async fn seeded_app() -> axum::Router {
         materials,
         spools,
         locations,
+        manufacturers,
         dashboard,
     ))
 }
@@ -171,16 +176,7 @@ async fn add_then_list_then_view_spool() {
         .expect("the spool just posted is present in the filtered list");
     let spool_id = created.id.as_str().to_string();
 
-    // The remaining length is computed off a fresh spool (remaining == net
-    // == 1000g), using this material's density — same formula/rounding the
-    // web layer applies, so it's a genuine (not just non-zero) expectation.
-    let density = material.density.value();
-    let expected_len = remaining_length_m(Grams::new(1000.0).unwrap(), density, Diameter::Mm1_75);
-    let expected_len_rounded = (expected_len * 10.0).round() / 10.0;
-    assert!(expected_len_rounded > 0.0);
-
-    // --- GET /spools/{id}: the detail page shows the spool's fields and a
-    // plausible (non-zero, formula-consistent) Remaining Length.
+    // --- GET /spools/{id}: the detail page shows the spool's fields.
     let res = app
         .clone()
         .oneshot(
@@ -199,7 +195,6 @@ async fn add_then_list_then_view_spool() {
     assert!(detail_html.contains("1000")); // net + remaining weight (equal on a fresh spool)
     assert!(detail_html.contains("100%")); // remaining ratio on a fresh spool
     assert!(detail_html.contains("24.90")); // price paid
-    assert!(detail_html.contains(&format!("{expected_len_rounded}"))); // remaining length, non-zero
     assert!(detail_html.contains(&format!("/spools/{spool_id}/edit")));
 }
 

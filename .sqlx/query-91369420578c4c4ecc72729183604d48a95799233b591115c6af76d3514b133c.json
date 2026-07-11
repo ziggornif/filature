@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id, s.colour_hex, s.colour_name, s.diameter,\n                              s.net_weight, s.remaining_weight, s.status,\n                              m.name AS material_name, m.density,\n                              l.name AS \"location_name?\"\n                       FROM spools s\n                       JOIN materials m ON m.id = s.material_id\n                       LEFT JOIN locations l ON l.id = s.location_id\n                       WHERE ($1::text IS NULL OR s.material_id = $1)\n                         AND ($2::text IS NULL OR s.status = $2)\n                         AND (s.status <> 'Archived' OR $2 = 'Archived')\n                       ORDER BY (s.remaining_weight / s.net_weight) DESC",
+  "query": "SELECT s.id, s.colour_hex, s.colour_name, s.diameter,\n                              s.net_weight, s.remaining_weight, s.status,\n                              m.name AS material_name, m.density,\n                              l.name AS \"location_name?\",\n                              mf.name AS \"manufacturer_name?\"\n                       FROM spools s\n                       JOIN materials m ON m.id = s.material_id\n                       LEFT JOIN locations l ON l.id = s.location_id\n                       LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id\n                       WHERE ($1::text IS NULL OR s.material_id = $1)\n                         AND ($2::text IS NULL OR s.status = $2)\n                         AND (s.status <> 'Archived' OR $2 = 'Archived')\n                       ORDER BY (s.remaining_weight / s.net_weight) ASC",
   "describe": {
     "columns": [
       {
@@ -112,6 +112,17 @@
             "name": "name"
           }
         }
+      },
+      {
+        "ordinal": 10,
+        "name": "manufacturer_name?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "manufacturers",
+            "name": "name"
+          }
+        }
       }
     ],
     "parameters": {
@@ -130,8 +141,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "2fd28a644962cba833d18d21d8f42c2b3b833038adff1380858aa2a606a95a3f"
+  "hash": "91369420578c4c4ecc72729183604d48a95799233b591115c6af76d3514b133c"
 }

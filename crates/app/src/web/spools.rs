@@ -18,7 +18,7 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
 };
-use domain::shared::{DomainError, Grams, LocationId, MaterialId, Money};
+use domain::shared::{DomainError, Grams, LocationId, ManufacturerId, MaterialId, Money};
 use domain::spools::{
     Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolDetail, SpoolFilter, SpoolId,
     SpoolListItem, SpoolSort, SpoolStatus,
@@ -44,6 +44,8 @@ pub struct SpoolView {
     pub remaining_pct: u8,
     pub remaining_length_m: f64,
     pub status: String, // "Sealed" | "Open" | "Empty" | "Archived"
+    /// The manufacturer's display name, or `None` when unattributed.
+    pub manufacturer_name: Option<String>,
 }
 
 impl From<SpoolListItem> for SpoolView {
@@ -51,6 +53,7 @@ impl From<SpoolListItem> for SpoolView {
         let remaining_pct = (item.remaining_ratio() * 100.0).round();
         let remaining_length_m = round1(item.remaining_length_m());
         Self {
+            manufacturer_name: item.manufacturer_name.clone(),
             id: item.id.as_str().to_string(),
             material_name: item.material_name.clone(),
             colour_hex: item.colour.hex().to_string(),
@@ -103,6 +106,8 @@ pub struct SpoolDetailView {
     /// The assigned location's id, or `None` when unassigned — used to
     /// preselect the current option in the reassign `<select>`.
     pub location_id: Option<String>,
+    /// The manufacturer's display name, or `None` when unattributed.
+    pub manufacturer_name: Option<String>,
 }
 
 impl From<SpoolDetail> for SpoolDetailView {
@@ -128,6 +133,7 @@ impl From<SpoolDetail> for SpoolDetailView {
             status: d.status.as_str().to_string(),
             location_name: d.location_name.clone(),
             location_id: d.location_id.clone(),
+            manufacturer_name: d.manufacturer_name.clone(),
         }
     }
 }
@@ -146,6 +152,14 @@ pub struct MaterialOption {
 /// web-layer composition across two driving-adapter handlers.
 #[derive(Serialize)]
 pub struct LocationOption {
+    pub id: String,
+    pub name: String,
+}
+
+/// A manufacturer option for the add-spool `<select>` — the web layer's own
+/// composition of `AppState::manufacturers`, mirroring `LocationOption`.
+#[derive(Serialize)]
+pub struct ManufacturerOption {
     pub id: String,
     pub name: String,
 }
@@ -220,6 +234,21 @@ async fn location_options(st: &AppState) -> Result<Vec<LocationOption>, Response
                 .map(|l| LocationOption {
                     id: l.id.as_str().to_string(),
                     name: l.name.as_str().to_string(),
+                })
+                .collect()
+        })
+        .map_err(internal_error)
+}
+
+async fn manufacturer_options(st: &AppState) -> Result<Vec<ManufacturerOption>, Response> {
+    st.manufacturers
+        .list()
+        .await
+        .map(|ms| {
+            ms.into_iter()
+                .map(|m| ManufacturerOption {
+                    id: m.id.as_str().to_string(),
+                    name: m.name.as_str().to_string(),
                 })
                 .collect()
         })
@@ -327,6 +356,10 @@ pub struct SpoolForm {
     /// posted without this field at all (defensive) still deserializes.
     #[serde(default)]
     pub location_id: String,
+    /// The `<select name="manufacturer_id">` value — blank means no
+    /// manufacturer, same "blank = unassigned" convention as `location_id`.
+    #[serde(default)]
+    pub manufacturer_id: String,
 }
 
 /// The fields shared by `NewSpool` (create) and an edited `Spool` (update) —
@@ -339,6 +372,7 @@ struct SpoolFormFields {
     net_weight: Grams,
     price_paid: Money,
     location_id: Option<LocationId>,
+    manufacturer_id: Option<ManufacturerId>,
 }
 
 /// Maps a raw `location_id` form value to the domain optional id: blank or
@@ -354,6 +388,19 @@ fn parse_location_id(raw: &str) -> Option<LocationId> {
         None
     } else {
         Some(LocationId::new(trimmed.to_string()))
+    }
+}
+
+/// Maps a raw `manufacturer_id` form value to the domain optional id: blank
+/// ⇒ no manufacturer. Mirrors `parse_location_id`; an unknown-but-non-blank
+/// id is caught defensively by the FK constraint
+/// (`RepositoryError::UnknownManufacturer`).
+fn parse_manufacturer_id(raw: &str) -> Option<ManufacturerId> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(ManufacturerId::new(trimmed.to_string()))
     }
 }
 
@@ -396,6 +443,7 @@ impl SpoolForm {
             net_weight,
             price_paid,
             location_id: parse_location_id(&self.location_id),
+            manufacturer_id: parse_manufacturer_id(&self.manufacturer_id),
         })
     }
 
@@ -410,6 +458,7 @@ impl SpoolForm {
             net_weight: f.net_weight,
             price_paid: f.price_paid,
             location_id: f.location_id,
+            manufacturer_id: f.manufacturer_id,
         })
     }
 
@@ -437,6 +486,7 @@ impl SpoolForm {
             price_paid: f.price_paid,
             status,
             location_id: f.location_id,
+            manufacturer_id: f.manufacturer_id,
         })
     }
 }
@@ -462,11 +512,17 @@ async fn render_form(
         Ok(ls) => ls,
         Err(resp) => return resp,
     };
+    let manufacturers = match manufacturer_options(st).await {
+        Ok(ms) => ms,
+        Err(resp) => return resp,
+    };
     let mut ctx = Context::new();
     ctx.insert("materials", &materials);
     ctx.insert("locations", &locations);
+    ctx.insert("manufacturers", &manufacturers);
     ctx.insert("material_id", &form.material_id);
     ctx.insert("location_id", &form.location_id);
+    ctx.insert("manufacturer_id", &form.manufacturer_id);
     ctx.insert("colour_hex", &form.colour_hex);
     ctx.insert("colour_name", &form.colour_name);
     ctx.insert("diameter", &form.diameter);
@@ -811,12 +867,18 @@ async fn render_edit_form(
         Ok(ls) => ls,
         Err(resp) => return resp,
     };
+    let manufacturers = match manufacturer_options(st).await {
+        Ok(ms) => ms,
+        Err(resp) => return resp,
+    };
     let mut ctx = Context::new();
     ctx.insert("id", opts.id);
     ctx.insert("materials", &materials);
     ctx.insert("locations", &locations);
+    ctx.insert("manufacturers", &manufacturers);
     ctx.insert("material_id", &form.material_id);
     ctx.insert("location_id", &form.location_id);
+    ctx.insert("manufacturer_id", &form.manufacturer_id);
     ctx.insert("colour_hex", &form.colour_hex);
     ctx.insert("colour_name", &form.colour_name);
     ctx.insert("diameter", &form.diameter);
@@ -856,6 +918,7 @@ async fn edit_page(
         net_weight: detail.net_weight.value().to_string(),
         price_paid: detail.price_paid.to_string(),
         location_id: detail.location_id.clone().unwrap_or_default(),
+        manufacturer_id: detail.manufacturer_id.clone().unwrap_or_default(),
     };
     render_edit_form(
         &st,
@@ -1012,6 +1075,7 @@ mod tests {
             remaining_pct: 80,
             remaining_length_m: 268.2,
             status: status.into(),
+            manufacturer_name: Some("Prusament".into()),
         }
     }
 
@@ -1114,6 +1178,7 @@ mod tests {
             status: "Open".into(),
             location_name: Some("Shelf A".into()),
             location_id: Some("01HLOC".into()),
+            manufacturer_name: Some("Prusament".into()),
         }
     }
 
@@ -1135,10 +1200,10 @@ mod tests {
         assert!(html.contains("1000"));
         assert!(html.contains("800"));
         assert!(html.contains("80%"));
-        assert!(html.contains("268.2"));
         assert!(html.contains("24.99"));
         assert!(html.contains("/spools/01HSP/edit"));
         assert!(html.contains("Shelf A")); // assigned location name shown
+        assert!(html.contains("Prusament")); // manufacturer name shown
         assert!(!html.contains("spools.col."));
         assert!(!html.contains("spools.detail."));
         assert!(!html.contains("spools.status."));
@@ -1243,6 +1308,7 @@ mod tests {
             net_weight: "1000".to_string(),
             price_paid: "24.99".to_string(),
             location_id: "".to_string(),
+            manufacturer_id: "".to_string(),
         }
     }
 
@@ -1432,6 +1498,11 @@ mod tests {
                 StubDashboardRepository::new(),
             )));
 
+            let manufacturers: Arc<dyn domain::manufacturers::ManufacturersUseCases> =
+                Arc::new(domain::manufacturers::ManufacturersService::new(Arc::new(
+                    domain::manufacturers::stubs::StubManufacturerRepository::new(),
+                )));
+
             let db = PgPool::connect_lazy("postgres://user:pass@localhost/db").unwrap();
             let cfg = Config {
                 server: ServerConfig {
@@ -1445,7 +1516,15 @@ mod tests {
                 },
             };
             (
-                AppState::new(db, &cfg, materials, spools, locations, dashboard),
+                AppState::new(
+                    db,
+                    &cfg,
+                    materials,
+                    spools,
+                    locations,
+                    manufacturers,
+                    dashboard,
+                ),
                 seeded.id.as_str().to_string(),
             )
         }

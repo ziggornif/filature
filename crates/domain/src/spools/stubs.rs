@@ -50,6 +50,7 @@ fn to_list_item(s: &Spool) -> SpoolListItem {
         // location_name comes from the SQL join in the persistence
         // adapter (Task 8). None is enough to exercise use-case behaviour.
         location_name: None,
+        manufacturer_name: None,
     }
 }
 
@@ -70,6 +71,8 @@ fn to_detail(s: &Spool) -> SpoolDetail {
         // is known straight from the stored `Spool` (no join needed).
         location_name: None,
         location_id: s.location_id.as_ref().map(|l| l.as_str().to_string()),
+        manufacturer_name: None,
+        manufacturer_id: s.manufacturer_id.as_ref().map(|m| m.as_str().to_string()),
     }
 }
 
@@ -87,6 +90,7 @@ impl SpoolRepository for StubSpoolRepository {
             price_paid: s.price_paid,
             status: SpoolStatus::Sealed,
             location_id: s.location_id,
+            manufacturer_id: s.manufacturer_id,
         };
         rows.push(spool.clone());
         Ok(spool)

@@ -121,6 +121,7 @@ mod tests {
             net_weight: Grams::new(1000.0).unwrap(),
             price_paid: Money::new(2500, 2).unwrap(),
             location_id: None,
+            manufacturer_id: None,
         }
     }
 

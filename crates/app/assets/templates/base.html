@@ -26,6 +26,7 @@
       <a href="/"{% if page | default(value="") == "dashboard" %} class="active"{% endif %}>{{ t(key="nav.dashboard") }}</a>
       <a href="/spools"{% if page | default(value="") == "spools" %} class="active"{% endif %}>{{ t(key="nav.spools") }}</a>
       <a href="/materials"{% if page | default(value="") == "materials" %} class="active"{% endif %}>{{ t(key="nav.materials") }}</a>
+      <a href="/manufacturers"{% if page | default(value="") == "manufacturers" %} class="active"{% endif %}>{{ t(key="nav.manufacturers") }}</a>
       <a href="/locations"{% if page | default(value="") == "locations" %} class="active"{% endif %}>{{ t(key="nav.locations") }}</a>
     </nav>
     <div class="sidebar-foot">{{ t(key="shell.tagline") }}</div>
