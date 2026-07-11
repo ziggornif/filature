@@ -1,0 +1,8 @@
+[server]
+bind = "127.0.0.1:8080"
+
+[database]
+url = "postgres://filature:filature@127.0.0.1:5432/filature"
+
+[i18n]
+default_locale = "fr"
