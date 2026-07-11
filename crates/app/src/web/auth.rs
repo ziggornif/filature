@@ -31,6 +31,14 @@ use figment::{
 use serde::Deserialize;
 use std::sync::Arc;
 use tera::Context;
+use tokio::sync::Semaphore;
+
+/// Max concurrent argon2id password verifies on `POST /login`. Each verify
+/// costs ~19 MiB (argon2 default `m=19456`), so an unauthenticated flood of
+/// logins could otherwise pin memory at ~19 MiB × N. A small cap bounds that:
+/// legitimate use is a single operator (concurrency ~1); excess attempts queue
+/// (cheap pending futures) instead of each holding a hashing buffer. See AR-005.
+const LOGIN_VERIFY_CONCURRENCY: usize = 4;
 
 /// The operator credential, loaded from the `[auth]` config table. Kept out of
 /// the main `Config` struct so the feature is purely additive (no churn to the
@@ -70,6 +78,8 @@ struct AuthState {
     token: Arc<str>,
     renderer: Renderer,
     default_locale: Arc<str>,
+    /// Bounds concurrent argon2 verifies on `/login` (see `LOGIN_VERIFY_CONCURRENCY`).
+    login_guard: Arc<Semaphore>,
 }
 
 #[derive(Deserialize)]
@@ -93,6 +103,7 @@ pub fn protect(
         token: new_token().into(),
         renderer,
         default_locale: default_locale.into(),
+        login_guard: Arc::new(Semaphore::new(LOGIN_VERIFY_CONCURRENCY)),
     };
     Router::new()
         .route("/login", get(login_page).post(login_submit))
@@ -105,6 +116,11 @@ pub fn protect(
 /// Default-deny gate: `/login` always passes; every other path requires the
 /// session cookie to constant-time-match the boot token, else 303 → `/login`.
 async fn enforce(State(st): State<AuthState>, req: Request, next: Next) -> Response {
+    // `/login` is the ONLY allowlisted path (exact match — no prefix/suffix, so
+    // `/login/`, `//login`, `/static/…` etc. all fall through to default-deny).
+    // `/logout` is deliberately NOT allowlisted: an unauthenticated hit just
+    // redirects to `/login` (harmless), an authenticated one carries the cookie
+    // and passes. Do not "fix" it into the allowlist.
     if req.uri().path() == "/login" {
         return next.run(req).await;
     }
@@ -127,6 +143,14 @@ async fn login_submit(
     headers: HeaderMap,
     Form(form): Form<LoginForm>,
 ) -> Response {
+    // Cap concurrent argon2 verifies so an unauthenticated login flood can't pin
+    // memory (each verify buffers ~19 MiB). Excess attempts wait here rather than
+    // each allocating a hashing buffer. `acquire` only errs if the semaphore is
+    // closed, which never happens (we hold the only handle) — fail safe anyway.
+    let _permit = match st.login_guard.acquire().await {
+        Ok(permit) => permit,
+        Err(_) => return internal_error("login temporarily unavailable"),
+    };
     // Always run the (constant-time) password verify so a wrong username and a
     // wrong password take the same path — no user-enumeration timing signal.
     let pass_ok = verify_password(&form.password, &st.password_hash);

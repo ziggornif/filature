@@ -223,6 +223,28 @@ async fn logout_clears_cookie_and_redirects_to_login() {
 }
 
 #[tokio::test]
+async fn concurrent_logins_all_succeed() {
+    // The login-verify concurrency cap (bounds argon2 memory under a flood) must
+    // not deadlock or starve legitimate logins: fire more than the permit count
+    // at once and assert every one still authenticates and gets a cookie.
+    let app = app().await;
+    let mut handles = Vec::new();
+    for _ in 0..12 {
+        let app = app.clone();
+        handles.push(tokio::spawn(async move {
+            let body = format!("username={USERNAME}&password={PASSWORD}");
+            let res = app.oneshot(post_form("/login", &body)).await.unwrap();
+            (res.status(), session_cookie(res.headers()).map(|c| c.len()))
+        }));
+    }
+    for h in handles {
+        let (status, cookie_len) = h.await.unwrap();
+        assert_eq!(status, StatusCode::SEE_OTHER);
+        assert_eq!(cookie_len, Some(64));
+    }
+}
+
+#[tokio::test]
 async fn hash_password_roundtrips() {
     let hash = auth::hash_password("hunter2");
     assert!(hash.starts_with("$argon2"));
