@@ -4,10 +4,11 @@ use axum::{
     Router,
     extract::Path,
     http::{HeaderMap, StatusCode, header},
-    response::{IntoResponse, Response},
+    response::{Html, IntoResponse, Response},
     routing::get,
 };
 use rust_embed::RustEmbed;
+use tera::Context;
 
 #[derive(RustEmbed)]
 #[folder = "assets/static"]
@@ -38,6 +39,40 @@ pub(crate) fn resolve_theme(headers: &HeaderMap) -> Theme {
 pub(crate) fn internal_error<E: std::fmt::Display>(e: E) -> Response {
     tracing::error!(error = %e, "internal server error");
     (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error").into_response()
+}
+
+/// Renders a form-validation error into the page's shared message slot
+/// (`#…-msg`) as an escaped fragment (`_form_error.html`), tagged with an
+/// `HX-Reswap: innerHTML` header (TD-009).
+///
+/// The htmx `response-targets` extension retargets the 4xx to `#…-msg` (via
+/// each control's `hx-target-error`) but otherwise reuses the control's own
+/// `hx-swap` — which differs between the inline edit inputs (`outerHTML`) and
+/// the add form (`beforeend`). Forcing `innerHTML` here normalizes both so the
+/// message always fills the slot cleanly instead of nesting or wiping it.
+///
+/// `pub(crate)`: shared by the materials/locations create/edit handlers so the
+/// error-feedback wiring has one implementation.
+pub(crate) fn form_error(
+    st: &AppState,
+    locale: &str,
+    status: StatusCode,
+    message: &str,
+) -> Response {
+    let mut ctx = Context::new();
+    ctx.insert("message", message);
+    match st.renderer.render("_form_error.html", locale, "", ctx) {
+        Ok(html) => (
+            status,
+            [(
+                header::HeaderName::from_static("hx-reswap"),
+                header::HeaderValue::from_static("innerHTML"),
+            )],
+            Html(html),
+        )
+            .into_response(),
+        Err(e) => internal_error(e),
+    }
 }
 
 pub(crate) fn read_cookie(headers: &HeaderMap, name: &str) -> Option<String> {

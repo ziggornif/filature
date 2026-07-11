@@ -10,10 +10,17 @@ use filature::persistence::materials::SqlxMaterialRepository;
 use filature::persistence::spools::SqlxSpoolRepository;
 use filature::{config::Config, persistence, web};
 use std::sync::Arc;
+use tower_http::trace::TraceLayer;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt::init();
+    // Log level is config-driven via the `RUST_LOG` env var (the standard
+    // 12-factor / docker-compose knob); absent that, a sensible default keeps
+    // request/response traces on without drowning in sqlx query logs.
+    let filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,tower_http=debug,sqlx=warn"));
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     let cfg = Config::load("filature.toml")?;
     let db = persistence::connect_and_migrate(&cfg.database.url).await?;
@@ -47,7 +54,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         locations,
         manufacturers,
         dashboard,
-    ));
+    ))
+    // Per-request tracing spans (method, path, status, latency) — the
+    // structured request observability TD-002 called for. Verbosity is
+    // governed by the `tower_http` target in the env filter above.
+    .layer(TraceLayer::new_for_http());
     let listener = tokio::net::TcpListener::bind(&cfg.server.bind).await?;
     tracing::info!(bind = %cfg.server.bind, "filature listening");
     axum::serve(listener, app).await?;

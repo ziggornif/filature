@@ -83,6 +83,77 @@ async fn get_materials_lists_seeded_rows() {
 }
 
 #[tokio::test]
+async fn put_materials_unknown_id_is_404() {
+    let app = seeded_app().await;
+    let form = "name=FOO&density=1.10&drying_temp_c=50&drying_time_h=5&sensitivity=Low&nozzle_c=215&bed_c=60";
+    let res = app
+        .oneshot(
+            Request::put("/materials/01ZZZZZZZZZZZZZZZZZZZZZZZZZ")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(form))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+async fn body_of(res: axum::response::Response) -> String {
+    let bytes = to_bytes(res.into_body(), usize::MAX).await.unwrap();
+    String::from_utf8(bytes.to_vec()).unwrap()
+}
+
+#[tokio::test]
+async fn post_materials_blank_name_is_422_with_surfaced_message() {
+    let app = seeded_app().await;
+    let form =
+        "name=&density=1.10&drying_temp_c=50&drying_time_h=5&sensitivity=Low&nozzle_c=215&bed_c=60";
+    let res = app
+        .oneshot(
+            Request::post("/materials")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(form))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    // TD-009: routed to the message slot with a readable body, not silent.
+    assert_eq!(
+        res.headers().get("HX-Reswap").and_then(|v| v.to_str().ok()),
+        Some("innerHTML")
+    );
+    let body = body_of(res).await;
+    assert!(body.contains("Invalid material"), "body was: {body}");
+}
+
+#[tokio::test]
+async fn post_materials_duplicate_name_is_409_with_surfaced_message() {
+    let app = seeded_app().await; // seeds PLA
+    let form = "name=PLA&density=1.24&drying_temp_c=45&drying_time_h=6&sensitivity=Low&nozzle_c=210&bed_c=60";
+    let res = app
+        .oneshot(
+            Request::post("/materials")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(form))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(res.status(), StatusCode::CONFLICT);
+    assert_eq!(
+        res.headers().get("HX-Reswap").and_then(|v| v.to_str().ok()),
+        Some("innerHTML")
+    );
+    let body = body_of(res).await;
+    assert!(body.contains("already exists"), "body was: {body}");
+    assert!(
+        body.contains("PLA"),
+        "duplicate name interpolated; body: {body}"
+    );
+}
+
+#[tokio::test]
 async fn post_materials_adds_a_row() {
     let app = seeded_app().await;
     let form = "name=FOO&density=1.10&drying_temp_c=50&drying_time_h=5&sensitivity=Low&nozzle_c=215&bed_c=60";

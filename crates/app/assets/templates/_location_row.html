@@ -2,12 +2,12 @@
   <td>
     <input type="text" name="name" value="{{ l.name }}"
            hx-put="/locations/{{ l.id }}" hx-target="closest tr" hx-swap="outerHTML"
-           hx-trigger="change" hx-include="closest tr">
+           hx-trigger="change" hx-include="closest tr" hx-target-error="#locations-msg">
   </td>
   <td>
     <input type="text" name="note" value="{{ l.note }}"
            hx-put="/locations/{{ l.id }}" hx-target="closest tr" hx-swap="outerHTML"
-           hx-trigger="change" hx-include="closest tr">
+           hx-trigger="change" hx-include="closest tr" hx-target-error="#locations-msg">
   </td>
   <td class="location-spool-count">{{ l.spool_count }}</td>
   <td class="location-row-actions">

@@ -2,7 +2,7 @@
 //! table (`GET /materials`) whose rows are edited/created in place via
 //! row-fragment responses (`POST /materials`, `PUT /materials/{id}`).
 
-use crate::web::router::{internal_error, resolve_locale, resolve_theme};
+use crate::web::router::{form_error, internal_error, resolve_locale, resolve_theme};
 use crate::web::state::AppState;
 use axum::{
     Router,
@@ -87,7 +87,13 @@ fn render_row(st: &AppState, locale: &str, m: Material) -> Response {
     let mut ctx = Context::new();
     ctx.insert("m", &view);
     match st.renderer.render("_material_row.html", locale, "", ctx) {
-        Ok(html) => Html(html).into_response(),
+        // A trailing OOB clear empties any stale error left in `#materials-msg`
+        // by a prior failed submit, so a successful add/edit dismisses it
+        // (TD-009).
+        Ok(html) => Html(format!(
+            "{html}<div id=\"materials-msg\" hx-swap-oob=\"innerHTML\"></div>"
+        ))
+        .into_response(),
         Err(e) => internal_error(e),
     }
 }
@@ -121,15 +127,20 @@ async fn create(
     let locale = resolve_locale(&headers, &st);
     let new = match f.to_new() {
         Ok(n) => n,
-        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, e).into_response(),
+        Err(_) => {
+            let msg = st.renderer.t(&locale, "materials.error.invalid");
+            return form_error(&st, &locale, StatusCode::UNPROCESSABLE_ENTITY, &msg);
+        }
     };
     match st.materials.add(new).await {
         Ok(m) => render_row(&st, &locale, m),
-        Err(RepositoryError::Duplicate(name)) => (
-            StatusCode::CONFLICT,
-            format!("a material named '{name}' already exists"),
-        )
-            .into_response(),
+        Err(RepositoryError::Duplicate(name)) => {
+            let msg = st
+                .renderer
+                .t(&locale, "materials.error.duplicate")
+                .replace("{name}", &name);
+            form_error(&st, &locale, StatusCode::CONFLICT, &msg)
+        }
         Err(e) => internal_error(e),
     }
 }
@@ -143,7 +154,10 @@ async fn edit(
     let locale = resolve_locale(&headers, &st);
     let new = match f.to_new() {
         Ok(n) => n,
-        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, e).into_response(),
+        Err(_) => {
+            let msg = st.renderer.t(&locale, "materials.error.invalid");
+            return form_error(&st, &locale, StatusCode::UNPROCESSABLE_ENTITY, &msg);
+        }
     };
     let material = Material {
         id: MaterialId::new(id),
@@ -156,11 +170,17 @@ async fn edit(
     };
     match st.materials.edit(material).await {
         Ok(m) => render_row(&st, &locale, m),
-        Err(RepositoryError::Duplicate(name)) => (
-            StatusCode::CONFLICT,
-            format!("a material named '{name}' already exists"),
-        )
-            .into_response(),
+        Err(RepositoryError::Duplicate(name)) => {
+            let msg = st
+                .renderer
+                .t(&locale, "materials.error.duplicate")
+                .replace("{name}", &name);
+            form_error(&st, &locale, StatusCode::CONFLICT, &msg)
+        }
+        Err(RepositoryError::NotFound(_)) => {
+            let msg = st.renderer.t(&locale, "materials.error.not_found");
+            form_error(&st, &locale, StatusCode::NOT_FOUND, &msg)
+        }
         Err(e) => internal_error(e),
     }
 }
@@ -211,5 +231,16 @@ mod tests {
         let html = render("fr");
         assert!(html.contains("Matériau") || html.contains("Densité"));
         assert!(!html.contains("materials.col."));
+    }
+
+    #[test]
+    fn page_wires_the_error_feedback_slot() {
+        // TD-009 wiring guard: the message slot, the response-targets extension,
+        // and the per-control error routing must all be present so a 422/409
+        // reaches the DOM instead of failing silently.
+        let html = render("en");
+        assert!(html.contains(r#"id="materials-msg""#));
+        assert!(html.contains(r#"hx-ext="response-targets""#));
+        assert!(html.contains(r##"hx-target-error="#materials-msg""##)); // add form + row inputs
     }
 }

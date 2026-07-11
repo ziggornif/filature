@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
   <h1>{{ t(key="materials.title") }}</h1>
-  <table class="materials-table">
+  <div id="materials-msg" class="form-error" role="alert" aria-live="polite"></div>
+  <table class="materials-table" hx-ext="response-targets">
     <thead>
       <tr>
         <th>{{ t(key="materials.col.material") }}</th>
@@ -22,9 +23,11 @@
   </table>
 
   <form class="material-add-form"
+        hx-ext="response-targets"
         hx-post="/materials"
         hx-target="#materials-table-body"
         hx-swap="beforeend"
+        hx-target-error="#materials-msg"
         hx-on::after-request="if(event.detail.successful) this.reset()">
     <input type="text" name="name" placeholder="{{ t(key="materials.col.material") }}" required>
     <input type="number" name="density" step="0.01" placeholder="{{ t(key="materials.col.density") }}" required>

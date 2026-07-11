@@ -80,6 +80,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn edit_unknown_id_is_not_found() {
+        let s = svc();
+        let nm = crate::materials::seed::builtin().remove(0); // PLA fields, never inserted
+        let ghost = Material {
+            id: crate::materials::MaterialId::new("does-not-exist"),
+            name: nm.name,
+            density: nm.density,
+            drying: nm.drying,
+            sensitivity: nm.sensitivity,
+            nozzle: nm.nozzle,
+            bed: nm.bed,
+        };
+        assert!(matches!(
+            s.edit(ghost).await,
+            Err(crate::materials::RepositoryError::NotFound(_))
+        ));
+    }
+
+    #[tokio::test]
     async fn edit_persists_changes() {
         let s = svc();
         let created = s

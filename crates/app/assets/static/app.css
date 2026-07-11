@@ -407,6 +407,13 @@ a {
   margin: 0 0 14px;
 }
 
+/* The persistent message slots (#materials-msg / #locations-msg) carry
+   .form-error permanently; collapse the box while the slot is empty so it
+   only appears once a validation error fills it (TD-009). */
+.form-error:empty {
+  display: none;
+}
+
 /* Colour chip (transverse component): circle, always ringed so white/black
    read on either theme; background = the spool's real hex (set inline). */
 .colour-swatch {

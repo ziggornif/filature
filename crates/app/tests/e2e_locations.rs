@@ -84,7 +84,7 @@ async fn body_of(res: axum::response::Response) -> String {
 }
 
 #[tokio::test]
-async fn post_blank_name_is_422() {
+async fn post_blank_name_is_422_with_surfaced_message() {
     let app = seeded_app().await;
     let res = app
         .oneshot(
@@ -96,6 +96,14 @@ async fn post_blank_name_is_422() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    // TD-009: the error is routed to the message slot (HX-Reswap normalizes
+    // the swap) and carries a human-readable body, not a silent failure.
+    assert_eq!(
+        res.headers().get("HX-Reswap").and_then(|v| v.to_str().ok()),
+        Some("innerHTML")
+    );
+    let body = body_of(res).await;
+    assert!(body.contains("Invalid location"), "body was: {body}");
 }
 
 #[tokio::test]

@@ -28,7 +28,7 @@ rust_decimal.workspace = true
 thiserror.workspace = true
 mime_guess = "2"
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ulid = "1"
 async-trait = "0.1"
 
