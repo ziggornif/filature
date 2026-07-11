@@ -15,6 +15,19 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // `filature hash-password <password>` — print an argon2 PHC string for the
+    // `[auth]` config table and exit, before any server/DB setup. Keeps the
+    // single-binary shape (no separate hashing tool).
+    let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("hash-password") {
+        let Some(password) = args.get(2) else {
+            eprintln!("usage: filature hash-password <password>");
+            std::process::exit(2);
+        };
+        println!("{}", web::auth::hash_password(password));
+        return Ok(());
+    }
+
     // Log level is config-driven via the `RUST_LOG` env var (the standard
     // 12-factor / docker-compose knob); absent that, a sensible default keeps
     // request/response traces on without drowning in sqlx query logs.
@@ -46,15 +59,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(SqlxDashboardRepository::new(db.clone()));
     let dashboard: Arc<dyn DashboardUseCases> = Arc::new(DashboardService::new(dash_repo));
 
-    let app = web::router(web::AppState::new(
-        db,
-        &cfg,
-        materials,
-        spools,
-        locations,
-        manufacturers,
-        dashboard,
-    ))
+    // Demo-auth gate (slice 08): load the `[auth]` credential and wrap the app
+    // in the login/session layer. Required in production — a missing `[auth]`
+    // table fails the boot here rather than silently serving an open instance.
+    let auth = web::auth::AuthConfig::load("filature.toml")?;
+    let renderer =
+        web::templates::Renderer::new(web::i18n::Catalog::load(&cfg.i18n.default_locale));
+
+    let app = web::auth::protect(
+        web::router(web::AppState::new(
+            db,
+            &cfg,
+            materials,
+            spools,
+            locations,
+            manufacturers,
+            dashboard,
+        )),
+        auth,
+        renderer,
+        cfg.i18n.default_locale.clone(),
+    )
     // Per-request tracing spans (method, path, status, latency) — the
     // structured request observability TD-002 called for. Verbosity is
     // governed by the `tower_http` target in the env filter above.

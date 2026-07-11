@@ -31,13 +31,19 @@ services:
       FILATURE_SERVER__BIND: 0.0.0.0:8080
       FILATURE_DATABASE__URL: postgres://${POSTGRES_USER:-filature}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-filature}
       FILATURE_I18N__DEFAULT_LOCALE: ${FILATURE_DEFAULT_LOCALE:-fr}
+      # Demo-auth gate (slice 08): login credential. The gate is always active,
+      # so PASSWORD_HASH is mandatory — see .env.example for how to generate it
+      # (and the $$ escaping note). No filature.toml ships in the image, so these
+      # env vars are the only source of the credential.
+      FILATURE_AUTH__USERNAME: ${AUTH_USERNAME:-demo}
+      FILATURE_AUTH__PASSWORD_HASH: ${AUTH_PASSWORD_HASH:?set AUTH_PASSWORD_HASH in .env (see .env.example)}
       # Log verbosity (tracing EnvFilter). Override in .env, e.g.
       # RUST_LOG=debug or RUST_LOG=info,filature=debug,tower_http=debug.
       RUST_LOG: ${RUST_LOG:-info,tower_http=debug,sqlx=warn}
     ports:
-      # host:container — expose the app to the reverse-proxy host. The app has
-      # NO built-in auth, so restrict reachability at the network/firewall layer
-      # (e.g. bind to a private interface: APP_BIND=10.0.0.5).
+      # host:container — expose the app to the reverse-proxy host. The app is
+      # now behind the login gate, but still keep reachability restricted at the
+      # network/firewall layer (e.g. bind to a private interface: APP_BIND=10.0.0.5).
       - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8080}:8080"
 
 volumes:
