@@ -114,8 +114,16 @@ impl Money {
 }
 
 impl std::fmt::Display for Money {
+    /// Always renders to 2 decimal places (cents), rounded — a monetary
+    /// amount is shown to the cent, never as a raw high-scale `Decimal`.
+    /// This is display-only: the stored value keeps full precision. It also
+    /// makes the two Stock Value paths (the spools NUMERIC aggregate and the
+    /// dashboard fold) read identically, since both collapse to the same
+    /// cents (closes TD-011).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.0, f)
+        // `round_dp(2)` rounds to the cent (the `{:.2}` formatter alone
+        // truncates); the precision then pads whole amounts to `X.00`.
+        write!(f, "{:.2}", self.0.round_dp(2))
     }
 }
 
@@ -170,6 +178,27 @@ mod tests {
         let m = Money::from_decimal(Decimal::from_str_exact("24.99").unwrap()).unwrap();
         assert_eq!(m.to_string(), "24.99");
         assert_eq!(m.value(), Decimal::from_str_exact("24.99").unwrap());
+    }
+
+    #[test]
+    fn money_displays_to_two_decimals_rounded() {
+        // High-scale value (as produced by the dashboard f64->Decimal fold)
+        // renders as cents, not a raw tail — TD-011.
+        let tail = Money::from_decimal(Decimal::from_str_exact("1.76000000000000000000").unwrap())
+            .unwrap();
+        assert_eq!(tail.to_string(), "1.76");
+        // Whole amounts pad to 2 dp.
+        assert_eq!(Money::new(25, 0).unwrap().to_string(), "25.00");
+        // Rounds at the cent (unambiguous, non-midpoint cases).
+        let up = Money::from_decimal(Decimal::from_str_exact("33.336").unwrap()).unwrap();
+        assert_eq!(up.to_string(), "33.34");
+        let down = Money::from_decimal(Decimal::from_str_exact("33.334").unwrap()).unwrap();
+        assert_eq!(down.to_string(), "33.33");
+        // Display is non-destructive: the stored value keeps full precision.
+        assert_eq!(
+            tail.value(),
+            Decimal::from_str_exact("1.76000000000000000000").unwrap()
+        );
     }
 
     #[test]
