@@ -1,0 +1,16 @@
+# Build artifacts (huge; rebuilt inside the image)
+target/
+# VCS + CI
+.git/
+.github/
+.gitignore
+# Docs & design handoff — not needed to compile (assets/migrations live under
+# crates/ and ARE copied)
+docs/
+init_assets/
+*.md
+# Local dev config & secrets
+filature.toml
+.env
+.env.*
+!.env.example
