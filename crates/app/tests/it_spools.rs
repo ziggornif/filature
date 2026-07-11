@@ -161,6 +161,56 @@ async fn update_persists_changes() {
 }
 
 #[tokio::test]
+async fn list_maps_net_and_remaining_to_distinct_fields() {
+    // Swap-guard for `to_list_item`'s 9 positional args (TD-006): net_weight
+    // and remaining_weight are adjacent same-typed args, so a transposition
+    // would compile and go unnoticed if a test only used a full spool where
+    // remaining == net. Draw the spool down so the two differ, then assert
+    // each lands in its own field on the LIST read path (not just `get`).
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+
+    let material = materials
+        .insert(sample_material("PLA-SwapGuard"))
+        .await
+        .unwrap();
+    let mut created = spools
+        .insert(sample_spool(material.id.clone(), 1000.0, "10.00"))
+        .await
+        .unwrap();
+
+    created.status = SpoolStatus::Open;
+    created.remaining_weight = Grams::new(400.0).unwrap();
+    spools.update(created.clone()).await.unwrap();
+
+    let list = spools
+        .list(
+            SpoolFilter {
+                material_id: Some(material.id.clone()),
+                status: None,
+                ..Default::default()
+            },
+            SpoolSort::CreatedDesc,
+        )
+        .await
+        .unwrap();
+    let item = list.iter().find(|i| i.id == created.id).unwrap();
+    assert_eq!(item.net_weight.value(), 1000.0, "net_weight mismatch");
+    assert_eq!(
+        item.remaining_weight.value(),
+        400.0,
+        "remaining_weight mismatch"
+    );
+    assert_ne!(
+        item.net_weight.value(),
+        item.remaining_weight.value(),
+        "net and remaining must be distinct — a positional swap would tie them"
+    );
+}
+
+#[tokio::test]
 async fn list_filters_by_material_and_status() {
     let url = support::postgres_url().await;
     let pool = connect_and_migrate(&url).await.unwrap();

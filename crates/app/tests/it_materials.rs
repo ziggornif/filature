@@ -1,8 +1,8 @@
 mod support;
 
 use domain::materials::{
-    Density, DryingParams, MaterialName, MaterialRepository, NewMaterial, RepositoryError,
-    Sensitivity, Temperature,
+    Density, DryingParams, Material, MaterialId, MaterialName, MaterialRepository, NewMaterial,
+    RepositoryError, Sensitivity, Temperature,
 };
 use filature::persistence::connect_and_migrate;
 use filature::persistence::materials::SqlxMaterialRepository;
@@ -109,6 +109,30 @@ async fn update_persists() {
         .find(|x| x.name.as_str() == "PETG-CF")
         .unwrap();
     assert_fields(petg, expected());
+}
+
+#[tokio::test]
+async fn update_unknown_id_maps_to_not_found() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let repo = SqlxMaterialRepository::new(pool);
+
+    // A well-formed Material whose id was never inserted — the 0-row UPDATE
+    // must surface as NotFound, not a false-success 200 (TD-003).
+    let s = sample("GHOST");
+    let ghost = Material {
+        id: MaterialId::new("01ZZZZZZZZZZZZZZZZZZZZZZZZZ"),
+        name: s.name,
+        density: s.density,
+        drying: s.drying,
+        sensitivity: s.sensitivity,
+        nozzle: s.nozzle,
+        bed: s.bed,
+    };
+    assert!(matches!(
+        repo.update(ghost).await,
+        Err(RepositoryError::NotFound(_))
+    ));
 }
 
 #[tokio::test]

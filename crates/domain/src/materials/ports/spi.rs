@@ -1,4 +1,4 @@
-use crate::materials::model::{Material, NewMaterial};
+use crate::materials::model::{Material, MaterialId, NewMaterial};
 use async_trait::async_trait;
 use thiserror::Error;
 
@@ -6,6 +6,8 @@ use thiserror::Error;
 pub enum RepositoryError {
     #[error("a material named '{0}' already exists")]
     Duplicate(String),
+    #[error("no material with id '{}'", .0.as_str())]
+    NotFound(MaterialId),
     #[error("persistence backend error: {0}")]
     Backend(String),
 }

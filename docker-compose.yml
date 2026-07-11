@@ -31,6 +31,9 @@ services:
       FILATURE_SERVER__BIND: 0.0.0.0:8080
       FILATURE_DATABASE__URL: postgres://${POSTGRES_USER:-filature}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-filature}
       FILATURE_I18N__DEFAULT_LOCALE: ${FILATURE_DEFAULT_LOCALE:-fr}
+      # Log verbosity (tracing EnvFilter). Override in .env, e.g.
+      # RUST_LOG=debug or RUST_LOG=info,filature=debug,tower_http=debug.
+      RUST_LOG: ${RUST_LOG:-info,tower_http=debug,sqlx=warn}
     ports:
       # host:container — expose the app to the reverse-proxy host. The app has
       # NO built-in auth, so restrict reachability at the network/firewall layer

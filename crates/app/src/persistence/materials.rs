@@ -95,7 +95,7 @@ impl MaterialRepository for SqlxMaterialRepository {
     }
 
     async fn update(&self, m: Material) -> Result<Material, RepositoryError> {
-        sqlx::query!(
+        let result = sqlx::query!(
             r#"UPDATE materials SET
                  name=$2, density=$3, drying_temp_c=$4, drying_time_h=$5,
                  sensitivity=$6, nozzle_c=$7, bed_c=$8
@@ -112,6 +112,11 @@ impl MaterialRepository for SqlxMaterialRepository {
         .execute(&self.pool)
         .await
         .map_err(|e| backend(e, m.name.as_str()))?;
+        // A 0-row UPDATE means the id doesn't exist — surface it as NotFound
+        // rather than a false-success 200 (TD-003).
+        if result.rows_affected() == 0 {
+            return Err(RepositoryError::NotFound(m.id));
+        }
         Ok(m)
     }
 

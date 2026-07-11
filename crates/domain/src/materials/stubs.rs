@@ -55,7 +55,7 @@ impl MaterialRepository for StubMaterialRepository {
                 *slot = m.clone();
                 Ok(m)
             }
-            None => Err(RepositoryError::Backend("no such id".into())),
+            None => Err(RepositoryError::NotFound(m.id)),
         }
     }
     async fn exists_by_name(&self, name: &str) -> Result<bool, RepositoryError> {

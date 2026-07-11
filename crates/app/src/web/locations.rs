@@ -3,7 +3,7 @@
 //! via row-fragment responses (`POST /locations`, `PUT /locations/{id}`,
 //! `DELETE /locations/{id}`) — mirrors `web::materials`.
 
-use crate::web::router::{internal_error, resolve_locale, resolve_theme};
+use crate::web::router::{form_error, internal_error, resolve_locale, resolve_theme};
 use crate::web::state::AppState;
 use axum::{
     Router,
@@ -73,7 +73,15 @@ fn render_row(st: &AppState, locale: &str, status: StatusCode, view: LocationVie
     let mut ctx = Context::new();
     ctx.insert("l", &view);
     match st.renderer.render("_location_row.html", locale, "", ctx) {
-        Ok(html) => (status, Html(html)).into_response(),
+        // Trailing OOB clear empties any stale error in `#locations-msg` from a
+        // prior failed submit, so a successful add/edit dismisses it (TD-009).
+        Ok(html) => (
+            status,
+            Html(format!(
+                "{html}<div id=\"locations-msg\" hx-swap-oob=\"innerHTML\"></div>"
+            )),
+        )
+            .into_response(),
         Err(e) => internal_error(e),
     }
 }
@@ -133,7 +141,10 @@ async fn create(
     let locale = resolve_locale(&headers, &st);
     let new = match f.to_new() {
         Ok(n) => n,
-        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, e).into_response(),
+        Err(_) => {
+            let msg = st.renderer.t(&locale, "locations.error.invalid");
+            return form_error(&st, &locale, StatusCode::UNPROCESSABLE_ENTITY, &msg);
+        }
     };
     match st.locations.add(new).await {
         Ok(l) => {
@@ -153,7 +164,10 @@ async fn edit(
     let locale = resolve_locale(&headers, &st);
     let new = match f.to_new() {
         Ok(n) => n,
-        Err(e) => return (StatusCode::UNPROCESSABLE_ENTITY, e).into_response(),
+        Err(_) => {
+            let msg = st.renderer.t(&locale, "locations.error.invalid");
+            return form_error(&st, &locale, StatusCode::UNPROCESSABLE_ENTITY, &msg);
+        }
     };
     let location = Location {
         id: LocationId::new(id),
@@ -166,7 +180,10 @@ async fn edit(
             let view: LocationView = (l, count).into();
             render_row(&st, &locale, StatusCode::OK, view)
         }
-        Err(RepositoryError::NotFound(_)) => not_found(&st, &locale),
+        Err(RepositoryError::NotFound(_)) => {
+            let msg = st.renderer.t(&locale, "locations.error.not_found");
+            form_error(&st, &locale, StatusCode::NOT_FOUND, &msg)
+        }
         Err(e) => internal_error(e),
     }
 }
@@ -244,6 +261,16 @@ mod tests {
         let html = render("fr");
         assert!(html.contains("Emplacement") || html.contains("Remarque"));
         assert!(!html.contains("locations."));
+    }
+
+    #[test]
+    fn page_wires_the_error_feedback_slot() {
+        // TD-009 wiring guard (mirrors the materials test): slot + extension +
+        // per-control error routing all present.
+        let html = render("en");
+        assert!(html.contains(r#"id="locations-msg""#));
+        assert!(html.contains(r#"hx-ext="response-targets""#));
+        assert!(html.contains(r##"hx-target-error="#locations-msg""##));
     }
 
     #[test]
