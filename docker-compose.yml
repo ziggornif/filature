@@ -1,0 +1,41 @@
+# Filature — self-hosted deploy: the app + its PostgreSQL, nothing else.
+# TLS/HTTPS is terminated by an external reverse proxy (on another host) that
+# forwards to this VM's published app port. Copy .env.example to .env first.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-filature}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-filature}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # App waits on this before starting (it runs migrations on boot).
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-filature} -d ${POSTGRES_DB:-filature}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Bind to all interfaces inside the container; the published port below
+      # is what the external reverse proxy targets.
+      FILATURE_SERVER__BIND: 0.0.0.0:8080
+      FILATURE_DATABASE__URL: postgres://${POSTGRES_USER:-filature}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-filature}
+      FILATURE_I18N__DEFAULT_LOCALE: ${FILATURE_DEFAULT_LOCALE:-fr}
+    ports:
+      # host:container — expose the app to the reverse-proxy host. The app has
+      # NO built-in auth, so restrict reachability at the network/firewall layer
+      # (e.g. bind to a private interface: APP_BIND=10.0.0.5).
+      - "${APP_BIND:-0.0.0.0}:${APP_PORT:-8080}:8080"
+
+volumes:
+  pgdata:
