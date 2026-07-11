@@ -52,6 +52,8 @@
   "spools.status.open": "Open",
   "spools.status.empty": "Empty",
   "spools.status.archived": "Archived",
+  "spools.view.table": "Table",
+  "spools.view.cards": "Cards",
   "spools.action.view": "View",
   "spools.action.edit": "Edit",
   "spools.action.set_remaining": "Set remaining (g)",
