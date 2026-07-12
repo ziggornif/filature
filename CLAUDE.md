@@ -8,6 +8,11 @@ This repo uses the **craft harness** — a set of skills and a documented projec
 
 **Start every session by reading the `orchestrator` skill.** It is the control system: phase order, exit gates, who owns the human at each moment, model routing, and the full guide/sensor map. If you don't know what to do next, the orchestrator is the answer.
 
+## Working conventions
+
+- **Langue** : échanger avec l'utilisateur en **français**.
+- **Délégation dev** : déléguer les tâches d'implémentation/dev à **Codex via la CLI Codex**, pas en inline. Claude Code orchestre (discovery, design, briefs, review) ; Codex écrit le code. C'est ainsi que les slices sont construites dans ce repo (cf. le dernier ticket livré).
+
 ## Skills installed
 
 The skills live in the **`craftmanship-harness` git submodule** at `.claude/harness`
