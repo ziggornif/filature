@@ -103,7 +103,8 @@
   </form>
 
   <div id="spools-list">
-    <table class="spools-table">
+    <div class="table-scroll">
+      <table class="spools-table">
       <thead>
         <tr>
           <th>{{ t(key="spools.col.colour") }}</th>
@@ -122,7 +123,8 @@
           {% include "_spool_row.html" %}
         {% endfor %}
       </tbody>
-    </table>
+      </table>
+    </div>
 
     <div id="spool-cards" class="spool-cards">
       {% for s in spools %}
