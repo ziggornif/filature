@@ -147,6 +147,10 @@ body {
   display: none;
 }
 
+.sidebar-menu::details-content {
+  content-visibility: visible;
+}
+
 .sidebar nav {
   display: flex;
   flex-direction: column;
