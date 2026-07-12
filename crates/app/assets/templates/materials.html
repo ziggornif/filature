@@ -2,7 +2,8 @@
 {% block content %}
   <h1>{{ t(key="materials.title") }}</h1>
   <div id="materials-msg" class="form-error" role="alert" aria-live="polite"></div>
-  <table class="materials-table" hx-ext="response-targets">
+  <div class="table-scroll">
+    <table class="materials-table" hx-ext="response-targets">
     <thead>
       <tr>
         <th>{{ t(key="materials.col.material") }}</th>
@@ -20,7 +21,8 @@
         {% include "_material_row.html" %}
       {% endfor %}
     </tbody>
-  </table>
+    </table>
+  </div>
 
   <form class="material-add-form"
         hx-ext="response-targets"

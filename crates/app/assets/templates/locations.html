@@ -2,7 +2,8 @@
 {% block content %}
   <h1>{{ t(key="locations.title") }}</h1>
   <div id="locations-msg" class="form-error" role="alert" aria-live="polite"></div>
-  <table class="locations-table" hx-ext="response-targets">
+  <div class="table-scroll">
+    <table class="locations-table" hx-ext="response-targets">
     <thead>
       <tr>
         <th>{{ t(key="locations.col.name") }}</th>
@@ -16,7 +17,8 @@
         {% include "_location_row.html" %}
       {% endfor %}
     </tbody>
-  </table>
+    </table>
+  </div>
 
   <form class="location-add-form"
         hx-ext="response-targets"

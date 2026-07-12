@@ -2,7 +2,8 @@
 {% block content %}
   <h1>{{ t(key="manufacturers.title") }}</h1>
   <div id="manufacturers-msg"></div>
-  <table class="manufacturers-table" hx-ext="response-targets">
+  <div class="table-scroll">
+    <table class="manufacturers-table" hx-ext="response-targets">
     <thead>
       <tr>
         <th>{{ t(key="manufacturers.col.name") }}</th>
@@ -16,7 +17,8 @@
         {% include "_manufacturer_row.html" %}
       {% endfor %}
     </tbody>
-  </table>
+    </table>
+  </div>
 
   <form class="manufacturer-add-form"
         hx-post="/manufacturers"
