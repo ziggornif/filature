@@ -1,89 +1,127 @@
-<div id="spool-card" hx-target="this" hx-swap="outerHTML">
-  {% if error_key %}
-    <p class="form-error">{{ t(key=error_key) }}</p>
+<div id="spool-card" class="spool-detail-stack" hx-ext="response-targets"
+     hx-target="this" hx-target-422="this" hx-swap="outerHTML">
+  {% if is_fragment | default(value=false) %}
+    <form id="spool-lifecycle-action" class="detail-lifecycle-form" hx-swap-oob="outerHTML"
+          hx-post="/spools/{{ spool.id }}/{% if spool.status == 'Archived' %}restore{% else %}archive{% endif %}"
+          hx-target="#spool-card" hx-swap="outerHTML"{% if spool.status != "Archived" %}
+          hx-confirm="{{ t(key='spools.action.archive_confirm') }}"{% endif %}>
+      <button class="detail-button detail-button--quiet" type="submit">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>
+        {% if spool.status == "Archived" %}{{ t(key="spools.action.restore") }}{% else %}{{ t(key="spools.action.archive") }}{% endif %}
+      </button>
+    </form>
   {% endif %}
 
-  <dl class="spool-detail">
-    <dt>{{ t(key="spools.col.colour") }}</dt>
-    <dd>
-      <span class="colour-swatch{% if not spool.colour_hex %} colour-swatch--unset{% endif %}"
-            style="background:{{ spool.colour_hex }}"
-            title="{{ spool.colour_label }}"></span>
-      {% if spool.has_colour_name %}{{ spool.colour_label }}{% else %}{{ t(key="spools.colour.unset") }}{% endif %}
-    </dd>
+  {% if error_key %}<p class="form-error detail-error">{{ t(key=error_key) }}</p>{% endif %}
 
-    <dt>{{ t(key="spools.col.material") }}</dt>
-    <dd>{{ spool.material_name }}</dd>
+  <section class="spool-detail-hero{% if not spool.colour_hex %} spool-detail-hero--no-colour{% endif %}"
+           style="--spool-colour:{{ spool.colour_hex }}">
+    <div class="spool-detail-identity">
+      <span class="colour-swatch spool-detail-swatch{% if not spool.colour_hex %} colour-swatch--unset{% elif spool.colour_hex == 'transparent' %} colour-swatch--transparent{% endif %}"
+            style="background:{{ spool.colour_hex }}" title="{{ spool.colour_label }}"></span>
+      <div class="spool-detail-name">
+        <strong>{{ spool.manufacturer_name | default(value=t(key="spools.manufacturer.unassigned")) }}</strong>
+        <span>{% if spool.has_colour_name %}{{ spool.colour_label }}{% else %}{{ t(key="spools.colour.unset") }}{% endif %}</span>
+      </div>
+      <div class="spool-detail-badges">
+        <span class="spool-detail-material">{{ spool.material_name }}</span>
+        <span class="pill detail-status-pill pill--{{ spool.status | lower }}">
+          <span class="spool-status-dot"></span>
+          {% if spool.status == "Sealed" %}{{ t(key="spools.status.sealed") }}
+          {% elif spool.status == "Open" %}{{ t(key="spools.status.open") }}
+          {% elif spool.status == "Empty" %}{{ t(key="spools.status.empty") }}
+          {% elif spool.status == "Archived" %}{{ t(key="spools.status.archived") }}{% endif %}
+        </span>
+      </div>
+    </div>
 
-    <dt>{{ t(key="spools.col.diameter") }}</dt>
-    <dd>{{ spool.diameter }}</dd>
+    <div class="spool-detail-weight-row">
+      <div class="spool-detail-weight">
+        <div class="spool-detail-weight-values{% if spool.remaining_pct == 0 %} detail-weight--empty{% elif spool.remaining_pct < 10 %} detail-weight--crit{% elif spool.remaining_pct <= low_stock_threshold_pct | default(value=15) %} detail-weight--low{% endif %}">
+          <strong>{{ spool.remaining_weight }} <small>g</small></strong>
+          <span>{{ spool.remaining_length_m }} m</span>
+          <span>{{ spool.remaining_pct }}%</span>
+        </div>
+        <span class="gauge spool-detail-gauge{% if spool.remaining_pct == 0 %} gauge--empty{% elif spool.remaining_pct < 10 %} gauge--crit{% elif spool.remaining_pct <= low_stock_threshold_pct | default(value=15) %} gauge--low{% endif %}">
+          <span class="gauge-fill" style="width:{{ spool.remaining_pct }}%"></span>
+        </span>
+        <div class="spool-detail-total">{{ t(key="spools.detail.out_of") }} {{ spool.net_weight }} g · {{ spool.total_length_m }} m {{ t(key="spools.detail.total_suffix") }}</div>
+      </div>
 
-    <dt>{{ t(key="spools.col.net_weight") }}</dt>
-    <dd>{{ spool.net_weight }}</dd>
-
-    <dt>{{ t(key="spools.col.remaining_weight") }}</dt>
-    <dd>{{ spool.remaining_weight }}</dd>
-
-    <dt>{{ t(key="spools.col.remaining_pct") }}</dt>
-    <dd>{{ spool.remaining_pct }}%</dd>
-
-    <dt>{{ t(key="spools.col.manufacturer") }}</dt>
-    <dd>{% if spool.manufacturer_name %}{{ spool.manufacturer_name }}{% else %}{{ t(key="spools.manufacturer.unassigned") }}{% endif %}</dd>
-
-    <dt>{{ t(key="spools.new.price_paid") }}</dt>
-    <dd>{{ spool.price_paid }}</dd>
-
-    <dt>{{ t(key="spools.col.status") }}</dt>
-    <dd>
-      <span class="pill pill--{{ spool.status | lower }}">
-        {% if spool.status == "Sealed" %}{{ t(key="spools.status.sealed") }}
-        {% elif spool.status == "Open" %}{{ t(key="spools.status.open") }}
-        {% elif spool.status == "Empty" %}{{ t(key="spools.status.empty") }}
-        {% elif spool.status == "Archived" %}{{ t(key="spools.status.archived") }}
+      {% if spool.status != "Archived" %}
+        {% if editing_remaining | default(value=false) %}
+          <form class="detail-inline-weight" hx-put="/spools/{{ spool.id }}/remaining">
+            <label class="sr-only" for="detail-remaining-{{ spool.id }}">{{ t(key="spools.action.set_remaining") }}</label>
+            <input id="detail-remaining-{{ spool.id }}" type="number" name="remaining" value="{{ spool.remaining_weight }}" step="0.1" min="0" max="{{ spool.net_weight }}" required autofocus>
+            <span>g</span>
+            <button type="submit">{{ t(key="spools.action.set_remaining_submit") }}</button>
+            <button class="detail-inline-cancel" type="button" hx-get="/spools/{{ spool.id }}/card" aria-label="{{ t(key='common.cancel') }}">×</button>
+          </form>
+        {% else %}
+          <button class="detail-button detail-adjust-button" type="button" hx-get="/spools/{{ spool.id }}/remaining/edit">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            {{ t(key="spools.action.adjust_weight") }}
+          </button>
         {% endif %}
-      </span>
-    </dd>
+      {% endif %}
+    </div>
+  </section>
 
-    <dt>{{ t(key="spools.col.location") }}</dt>
-    <dd>{% if spool.location_name %}{{ spool.location_name }}{% else %}{{ t(key="spools.location.unassigned") }}{% endif %}</dd>
-  </dl>
+  <section class="spool-detail-info-grid" aria-label="{{ t(key='spools.detail.information') }}">
+    <div><span>{{ t(key="spools.detail.diameter") }}</span><strong>{{ spool.diameter }} mm</strong></div>
+    <div><span>{{ t(key="spools.detail.initial_net_weight") }}</span><strong>{{ spool.net_weight }} g</strong></div>
+    <div><span>{{ t(key="spools.detail.current_value") }}</span><strong>{{ spool.current_value }} €</strong></div>
+    <div><span>{{ t(key="spools.new.price_paid") }}</span><strong>{{ spool.price_paid }} €</strong></div>
+    <div><span>{{ t(key="spools.detail.storage") }}</span><strong>{{ spool.location_name | default(value=t(key="spools.location.unassigned")) }}</strong></div>
+    <div><span>{{ t(key="spools.detail.supplier_manufacturer") }}</span><strong>{{ spool.manufacturer_name | default(value=t(key="spools.manufacturer.unassigned")) }}</strong></div>
+    <div><span>{{ t(key="spools.detail.purchased_on") }}</span><strong>{{ t(key="spools.detail.not_provided") }}</strong></div>
+    <div><span>{{ t(key="spools.detail.opened_on") }}</span><strong>{{ t(key="spools.detail.not_provided") }}</strong></div>
+    <div><span>{{ t(key="spools.col.status") }}</span><strong class="spool-status--{{ spool.status | lower }}">
+      {% if spool.status == "Sealed" %}{{ t(key="spools.status.sealed") }}
+      {% elif spool.status == "Open" %}{{ t(key="spools.status.open") }}
+      {% elif spool.status == "Empty" %}{{ t(key="spools.status.empty") }}
+      {% elif spool.status == "Archived" %}{{ t(key="spools.status.archived") }}{% endif %}
+    </strong></div>
+  </section>
 
-  <form class="spool-op-form spool-op-form--location" hx-post="/spools/{{ spool.id }}/location">
-    <label>
-      {{ t(key="spools.new.location") }}
-      <select name="location_id">
-        <option value="">{{ t(key="spools.location.unassigned") }}</option>
-        {% for l in locations | default(value=[]) %}
-          <option value="{{ l.id }}"{% if l.id == spool.location_id | default(value="") %} selected{% endif %}>{{ l.name }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <button type="submit">{{ t(key="spools.action.reassign_location_submit") }}</button>
-  </form>
+  <section class="spool-detail-notice">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+    <span>{{ t(key="spools.detail.storage_unmonitored") }} ({{ spool.location_name | default(value=t(key="spools.location.unassigned")) }}) — {{ t(key="spools.detail.storage_unmonitored_suffix") }}</span>
+  </section>
 
-  {% if spool.status != "Archived" %}
-    <form class="spool-op-form spool-op-form--remaining" hx-post="/spools/{{ spool.id }}/remaining">
-      <label>
-        {{ t(key="spools.action.set_remaining") }}
-        <input type="number" name="remaining" step="0.1" min="0" required>
-      </label>
-      <button type="submit">{{ t(key="spools.action.set_remaining_submit") }}</button>
-    </form>
+  <details class="spool-detail-operations">
+    <summary>{{ t(key="spools.detail.operations") }}</summary>
+    <div class="spool-detail-operation-grid">
+      <form class="spool-op-form spool-op-form--location" hx-post="/spools/{{ spool.id }}/location">
+        <label>{{ t(key="spools.new.location") }}
+          <select name="location_id">
+            <option value="">{{ t(key="spools.location.unassigned") }}</option>
+            {% for l in locations | default(value=[]) %}<option value="{{ l.id }}"{% if l.id == spool.location_id | default(value="") %} selected{% endif %}>{{ l.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <button type="submit">{{ t(key="spools.action.reassign_location_submit") }}</button>
+      </form>
+      {% if spool.status != "Archived" %}
+        <form class="spool-op-form spool-op-form--consume" hx-post="/spools/{{ spool.id }}/consume">
+          <label>{{ t(key="spools.action.consume") }}
+            <input type="number" name="amount" step="0.1" min="0" required>
+          </label>
+          <button type="submit">{{ t(key="spools.action.consume_submit") }}</button>
+        </form>
+      {% endif %}
+    </div>
+  </details>
 
-    <form class="spool-op-form spool-op-form--consume" hx-post="/spools/{{ spool.id }}/consume">
-      <label>
-        {{ t(key="spools.action.consume") }}
-        <input type="number" name="amount" step="0.1" min="0" required>
-      </label>
-      <button type="submit">{{ t(key="spools.action.consume_submit") }}</button>
-    </form>
+  <section class="spool-detail-panel">
+    <h2>{{ t(key="spools.detail.notes") }}</h2>
+    <p class="spool-detail-empty-copy">{{ t(key="spools.detail.notes_empty") }}</p>
+  </section>
 
-    <form class="spool-op-form spool-op-form--archive" hx-post="/spools/{{ spool.id }}/archive">
-      <button type="submit">{{ t(key="spools.action.archive") }}</button>
-    </form>
-  {% else %}
-    <form class="spool-op-form spool-op-form--restore" hx-post="/spools/{{ spool.id }}/restore">
-      <button type="submit">{{ t(key="spools.action.restore") }}</button>
-    </form>
-  {% endif %}
+  <section class="spool-detail-panel">
+    <h2>{{ t(key="spools.detail.consumption_history") }}</h2>
+    <div class="spool-detail-history-placeholder">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 2 4-5"/></svg>
+      <span>{{ t(key="spools.detail.consumption_history_placeholder") }}</span>
+    </div>
+  </section>
 </div>

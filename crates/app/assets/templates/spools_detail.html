@@ -1,9 +1,28 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>{{ t(key="spools.detail.title") }} — {{ spool.material_name }}</h1>
+  <div class="spool-detail-page">
+    <header class="spool-detail-header">
+      <a class="spool-detail-back" href="/spools">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+        {{ t(key="spools.detail.back_short") }}
+      </a>
+      <div class="spool-detail-actions">
+        <a class="detail-button" href="/spools/{{ spool.id }}/edit">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          {{ t(key="spools.action.edit") }}
+        </a>
+        <form id="spool-lifecycle-action" class="detail-lifecycle-form"
+              hx-post="/spools/{{ spool.id }}/{% if spool.status == 'Archived' %}restore{% else %}archive{% endif %}"
+              hx-target="#spool-card" hx-swap="outerHTML"{% if spool.status != "Archived" %}
+              hx-confirm="{{ t(key='spools.action.archive_confirm') }}"{% endif %}>
+          <button class="detail-button detail-button--quiet" type="submit">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg>
+            {% if spool.status == "Archived" %}{{ t(key="spools.action.restore") }}{% else %}{{ t(key="spools.action.archive") }}{% endif %}
+          </button>
+        </form>
+      </div>
+    </header>
 
-  {% include "_spool_detail_card.html" %}
-
-  <a class="spool-detail-edit" href="/spools/{{ spool.id }}/edit">{{ t(key="spools.action.edit") }}</a>
-  <a class="spool-detail-back" href="/spools">{{ t(key="spools.detail.back") }}</a>
+    {% include "_spool_detail_card.html" %}
+  </div>
 {% endblock content %}
