@@ -40,13 +40,15 @@ fn sample_material(name: &str) -> NewMaterial {
 
 fn sample_spool(material_id: MaterialId, net: f64, price: &str) -> NewSpool {
     NewSpool {
+        condition: domain::spools::SpoolCondition::New,
         material_id,
-        colour: Colour::new("#1A9E4B".into(), Some("vert sapin".into())).unwrap(),
+        colour: Some(Colour::new("#1A9E4B".into(), Some("vert sapin".into())).unwrap()),
         diameter: Diameter::Mm1_75,
         net_weight: Grams::new(net).unwrap(),
         price_paid: Money::from_decimal(Decimal::from_str_exact(price).unwrap()).unwrap(),
         location_id: None,
         manufacturer_id: None,
+        remaining_weight: None,
     }
 }
 
@@ -73,8 +75,8 @@ async fn insert_get_full_roundtrip() {
         created.price_paid,
         Money::from_decimal(Decimal::from_str_exact("24.99").unwrap()).unwrap()
     );
-    assert_eq!(created.colour.hex(), "#1A9E4B");
-    assert_eq!(created.colour.name(), Some("vert sapin"));
+    assert_eq!(created.colour.as_ref().unwrap().hex(), "#1A9E4B");
+    assert_eq!(created.colour.as_ref().unwrap().name(), Some("#1A9E4B"));
     assert_eq!(created.diameter, Diameter::Mm1_75);
 
     let detail = spools.get(&created.id).await.unwrap().unwrap();
@@ -82,8 +84,8 @@ async fn insert_get_full_roundtrip() {
     assert_eq!(detail.material_id, material.id);
     assert_eq!(detail.material_name, "PLA-A");
     assert_eq!(detail.density, 1.24);
-    assert_eq!(detail.colour.hex(), "#1A9E4B");
-    assert_eq!(detail.colour.name(), Some("vert sapin"));
+    assert_eq!(detail.colour.as_ref().unwrap().hex(), "#1A9E4B");
+    assert_eq!(detail.colour.as_ref().unwrap().name(), Some("#1A9E4B"));
     assert_eq!(detail.diameter, Diameter::Mm1_75);
     assert_eq!(detail.net_weight.value(), 1000.0);
     assert_eq!(detail.remaining_weight.value(), 1000.0);
@@ -135,14 +137,14 @@ async fn update_persists_changes() {
         .await
         .unwrap();
 
-    created.colour = Colour::new("#FF0000".into(), None).unwrap();
+    created.colour = Some(Colour::new("#FF0000".into(), None).unwrap());
     created.status = SpoolStatus::Open;
     created.remaining_weight = Grams::new(400.0).unwrap();
     created.price_paid = Money::from_decimal(Decimal::from_str_exact("21.50").unwrap()).unwrap();
 
     let updated = spools.update(created.clone()).await.unwrap();
-    assert_eq!(updated.colour.hex(), "#FF0000");
-    assert_eq!(updated.colour.name(), None);
+    assert_eq!(updated.colour.as_ref().unwrap().hex(), "#FF0000");
+    assert_eq!(updated.colour.as_ref().unwrap().name(), Some("#FF0000"));
     assert_eq!(updated.status, SpoolStatus::Open);
     assert_eq!(updated.remaining_weight.value(), 400.0);
     assert_eq!(
@@ -151,7 +153,7 @@ async fn update_persists_changes() {
     );
 
     let detail = spools.get(&created.id).await.unwrap().unwrap();
-    assert_eq!(detail.colour.hex(), "#FF0000");
+    assert_eq!(detail.colour.as_ref().unwrap().hex(), "#FF0000");
     assert_eq!(detail.status, SpoolStatus::Open);
     assert_eq!(detail.remaining_weight.value(), 400.0);
     assert_eq!(
@@ -303,26 +305,28 @@ async fn list_filters_by_manufacturer_location_and_search() {
         .await
         .unwrap();
 
-    let spool_with = |mfr: &ManufacturerId, loc: &LocationId, colour_name: &str| NewSpool {
+    let spool_with = |mfr: &ManufacturerId, loc: &LocationId, colour_hex: &str| NewSpool {
+        condition: domain::spools::SpoolCondition::New,
         material_id: mat.id.clone(),
-        colour: Colour::new("#123456".into(), Some(colour_name.into())).unwrap(),
+        colour: Some(Colour::from_hex(colour_hex.into()).unwrap()),
         diameter: Diameter::Mm1_75,
         net_weight: Grams::new(1000.0).unwrap(),
         price_paid: Money::from_decimal(Decimal::from_str_exact("10.00").unwrap()).unwrap(),
         location_id: Some(loc.clone()),
         manufacturer_id: Some(mfr.clone()),
+        remaining_weight: None,
     };
 
     let sp_a = spools
-        .insert(spool_with(&brand_x.id, &shelf.id, "ZZMagentaOne"))
+        .insert(spool_with(&brand_x.id, &shelf.id, "#AA11CC"))
         .await
         .unwrap();
     let sp_b = spools
-        .insert(spool_with(&brand_y.id, &dry.id, "ZZCyanTwo"))
+        .insert(spool_with(&brand_y.id, &dry.id, "#00CCDD"))
         .await
         .unwrap();
     let sp_c = spools
-        .insert(spool_with(&brand_x.id, &shelf.id, "plainthree"))
+        .insert(spool_with(&brand_x.id, &shelf.id, "#123456"))
         .await
         .unwrap();
 
@@ -360,7 +364,7 @@ async fn list_filters_by_manufacturer_location_and_search() {
     let by_colour = spools
         .list(
             SpoolFilter {
-                search: Some("zzmagenta".into()),
+                search: Some("aa11cc".into()),
                 ..Default::default()
             },
             SpoolSort::CreatedDesc,
@@ -467,7 +471,8 @@ async fn update_unknown_id_returns_not_found() {
     let fake = domain::spools::Spool {
         id: domain::spools::SpoolId::new("01FAKEIDDOESNOTEXISTXXXXXX"),
         material_id: material.id.clone(),
-        colour: Colour::new("#000000".into(), None).unwrap(),
+        spool_type: domain::spools::SpoolType::Complete,
+        colour: Some(Colour::new("#000000".into(), None).unwrap()),
         diameter: Diameter::Mm1_75,
         net_weight: Grams::new(500.0).unwrap(),
         remaining_weight: Grams::new(500.0).unwrap(),

@@ -53,7 +53,8 @@ fn matches_filter(s: &Spool, f: &SpoolFilter) -> bool {
         && f.search.as_ref().is_none_or(|term| {
             let needle = term.to_lowercase();
             s.colour
-                .name()
+                .as_ref()
+                .and_then(|colour| colour.name())
                 .is_some_and(|n| n.to_lowercase().contains(&needle))
         })
 }
@@ -81,6 +82,7 @@ fn to_detail(s: &Spool) -> SpoolDetail {
         id: s.id.clone(),
         material_id: s.material_id.clone(),
         material_name: STUB_MATERIAL_NAME.to_string(),
+        spool_type: s.spool_type,
         colour: s.colour.clone(),
         diameter: s.diameter,
         net_weight: s.net_weight,
@@ -102,15 +104,19 @@ fn to_detail(s: &Spool) -> SpoolDetail {
 impl SpoolRepository for StubSpoolRepository {
     async fn insert(&self, s: NewSpool) -> Result<Spool, RepositoryError> {
         let mut rows = self.rows.lock().unwrap();
+        let remaining_weight = s.initial_remaining_weight();
+        let status = s.initial_status();
+        let spool_type = s.spool_type();
         let spool = Spool {
             id: SpoolId::new(format!("stub-{}", rows.len())),
             material_id: s.material_id,
+            spool_type,
             colour: s.colour,
             diameter: s.diameter,
             net_weight: s.net_weight,
-            remaining_weight: s.net_weight,
+            remaining_weight,
             price_paid: s.price_paid,
-            status: SpoolStatus::Sealed,
+            status,
             location_id: s.location_id,
             manufacturer_id: s.manufacturer_id,
         };

@@ -18,10 +18,11 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Response},
     routing::{get, post},
 };
+use domain::manufacturers::{ManufacturerName, NewManufacturer};
 use domain::shared::{DomainError, Grams, LocationId, ManufacturerId, MaterialId, Money};
 use domain::spools::{
-    Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolDetail, SpoolFilter, SpoolId,
-    SpoolListItem, SpoolSort, SpoolStatus,
+    Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolCondition, SpoolDetail, SpoolFilter,
+    SpoolId, SpoolListItem, SpoolSort, SpoolStatus, SpoolType,
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -55,17 +56,23 @@ impl From<SpoolListItem> for SpoolView {
     fn from(item: SpoolListItem) -> Self {
         let remaining_pct = (item.remaining_ratio() * 100.0).round();
         let remaining_length_m = round1(item.remaining_length_m());
+        let (colour_hex, colour_label) = item
+            .colour
+            .as_ref()
+            .map(|colour| {
+                (
+                    colour.hex().to_string(),
+                    colour.name().unwrap_or(colour.hex()).to_string(),
+                )
+            })
+            .unwrap_or_default();
         Self {
             location_name: item.location_name.clone(),
             manufacturer_name: item.manufacturer_name.clone(),
             id: item.id.as_str().to_string(),
             material_name: item.material_name.clone(),
-            colour_hex: item.colour.hex().to_string(),
-            colour_label: item
-                .colour
-                .name()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| item.colour.hex().to_string()),
+            colour_hex,
+            colour_label,
             diameter: item.diameter.as_str().to_string(),
             remaining_weight: round1(item.remaining_weight.value()),
             net_weight: round1(item.net_weight.value()),
@@ -118,16 +125,23 @@ impl From<SpoolDetail> for SpoolDetailView {
     fn from(d: SpoolDetail) -> Self {
         let remaining_pct = (d.remaining_ratio() * 100.0).round();
         let remaining_length_m = round1(d.remaining_length_m());
+        let (colour_hex, colour_label, has_colour_name) = d
+            .colour
+            .as_ref()
+            .map(|colour| {
+                (
+                    colour.hex().to_string(),
+                    colour.name().unwrap_or(colour.hex()).to_string(),
+                    true,
+                )
+            })
+            .unwrap_or_default();
         Self {
             id: d.id.as_str().to_string(),
             material_name: d.material_name.clone(),
-            colour_hex: d.colour.hex().to_string(),
-            colour_label: d
-                .colour
-                .name()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| d.colour.hex().to_string()),
-            has_colour_name: d.colour.name().is_some(),
+            colour_hex,
+            colour_label,
+            has_colour_name,
             diameter: d.diameter.as_str().to_string(),
             net_weight: round1(d.net_weight.value()),
             remaining_weight: round1(d.remaining_weight.value()),
@@ -414,6 +428,8 @@ async fn rows(
 #[derive(Debug, Deserialize, Default, Clone)]
 pub struct SpoolForm {
     #[serde(default)]
+    pub condition: String,
+    #[serde(default)]
     pub material_id: String,
     #[serde(default)]
     pub colour_hex: String,
@@ -423,6 +439,8 @@ pub struct SpoolForm {
     pub diameter: String,
     #[serde(default)]
     pub net_weight: String,
+    #[serde(default)]
+    pub remaining_weight: String,
     #[serde(default)]
     pub price_paid: String,
     /// The `<select name="location_id">` value — blank (the leading empty
@@ -435,6 +453,8 @@ pub struct SpoolForm {
     /// manufacturer, same "blank = unassigned" convention as `location_id`.
     #[serde(default)]
     pub manufacturer_id: String,
+    #[serde(default)]
+    pub manufacturer_name: String,
 }
 
 /// The fields shared by `NewSpool` (create) and an edited `Spool` (update) —
@@ -442,7 +462,7 @@ pub struct SpoolForm {
 /// `to_new` and `to_edit` so the two call sites can't drift.
 struct SpoolFormFields {
     material_id: MaterialId,
-    colour: Colour,
+    colour: Option<Colour>,
     diameter: Diameter,
     net_weight: Grams,
     price_paid: Money,
@@ -472,7 +492,7 @@ fn parse_location_id(raw: &str) -> Option<LocationId> {
 /// (`RepositoryError::UnknownManufacturer`).
 fn parse_manufacturer_id(raw: &str) -> Option<ManufacturerId> {
     let trimmed = raw.trim();
-    if trimmed.is_empty() {
+    if trimmed.is_empty() || trimmed == "__other" {
         None
     } else {
         Some(ManufacturerId::new(trimmed.to_string()))
@@ -488,14 +508,14 @@ impl SpoolForm {
         if self.material_id.trim().is_empty() {
             return Err("spools.new.error.material");
         }
-        let name = self.colour_name.trim();
-        let colour_name = if name.is_empty() {
+        let colour = if self.colour_hex.trim().is_empty() {
             None
         } else {
-            Some(name.to_string())
+            Some(
+                Colour::from_hex(self.colour_hex.trim().to_string())
+                    .map_err(|_| "spools.new.error.colour")?,
+            )
         };
-        let colour = Colour::new(self.colour_hex.trim().to_string(), colour_name)
-            .map_err(|_| "spools.new.error.colour")?;
         let diameter =
             Diameter::parse(self.diameter.trim()).map_err(|_| "spools.new.error.diameter")?;
         let net_weight: f64 = self
@@ -526,7 +546,20 @@ impl SpoolForm {
     /// `location_id` ⇒ unassigned.
     fn to_new(&self) -> Result<NewSpool, &'static str> {
         let f = self.parse()?;
+        let condition = SpoolCondition::parse(self.condition.trim())
+            .map_err(|_| "spools.new.error.condition")?;
+        let remaining_weight = if condition == SpoolCondition::Opened {
+            let value = self
+                .remaining_weight
+                .trim()
+                .parse::<f64>()
+                .map_err(|_| "spools.new.error.remaining_weight")?;
+            Some(Grams::new(value).map_err(|_| "spools.new.error.remaining_weight")?)
+        } else {
+            None
+        };
         Ok(NewSpool {
+            condition,
             material_id: f.material_id,
             colour: f.colour,
             diameter: f.diameter,
@@ -534,6 +567,7 @@ impl SpoolForm {
             price_paid: f.price_paid,
             location_id: f.location_id,
             manufacturer_id: f.manufacturer_id,
+            remaining_weight,
         })
     }
 
@@ -549,11 +583,13 @@ impl SpoolForm {
         id: SpoolId,
         remaining_weight: Grams,
         status: SpoolStatus,
+        spool_type: SpoolType,
     ) -> Result<Spool, &'static str> {
         let f = self.parse()?;
         Ok(Spool {
             id,
             material_id: f.material_id,
+            spool_type,
             colour: f.colour,
             diameter: f.diameter,
             net_weight: f.net_weight,
@@ -578,6 +614,7 @@ async fn render_form(
     status: StatusCode,
     form: &SpoolForm,
     error_key: Option<&str>,
+    full_page: bool,
 ) -> Response {
     let materials = match material_options(st).await {
         Ok(ms) => ms,
@@ -595,20 +632,45 @@ async fn render_form(
     ctx.insert("materials", &materials);
     ctx.insert("locations", &locations);
     ctx.insert("manufacturers", &manufacturers);
+    ctx.insert("condition", &form.condition);
     ctx.insert("material_id", &form.material_id);
     ctx.insert("location_id", &form.location_id);
     ctx.insert("manufacturer_id", &form.manufacturer_id);
+    ctx.insert("manufacturer_name", &form.manufacturer_name);
     ctx.insert("colour_hex", &form.colour_hex);
-    ctx.insert("colour_name", &form.colour_name);
+    let derived_colour_name = Colour::from_hex(form.colour_hex.clone())
+        .ok()
+        .and_then(|colour| colour.name().map(str::to_string))
+        .unwrap_or_default();
+    ctx.insert("colour_name", &derived_colour_name);
     ctx.insert("diameter", &form.diameter);
     ctx.insert("net_weight", &form.net_weight);
+    ctx.insert("remaining_weight", &form.remaining_weight);
     ctx.insert("price_paid", &form.price_paid);
     ctx.insert("error_key", &error_key);
-    match st
-        .renderer
-        .render("spools_new.html", locale, theme_attr, ctx)
-    {
+    ctx.insert("wizard_step", "details");
+    let template = if full_page {
+        "spools_new.html"
+    } else {
+        "_spool_wizard_details.html"
+    };
+    match st.renderer.render(template, locale, theme_attr, ctx) {
         Ok(html) => (status, Html(html)).into_response(),
+        Err(e) => internal_error(e),
+    }
+}
+
+fn render_condition(st: &AppState, locale: &str, theme_attr: &str, full_page: bool) -> Response {
+    let mut ctx = Context::new();
+    ctx.insert("page", "spools");
+    ctx.insert("wizard_step", "condition");
+    let template = if full_page {
+        "spools_new.html"
+    } else {
+        "_spool_wizard_condition.html"
+    };
+    match st.renderer.render(template, locale, theme_attr, ctx) {
+        Ok(html) => Html(html).into_response(),
         Err(e) => internal_error(e),
     }
 }
@@ -616,11 +678,35 @@ async fn render_form(
 async fn new_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let locale = resolve_locale(&headers, &st);
     let theme = resolve_theme(&headers);
+    render_condition(&st, &locale, theme.data_attr(), true)
+}
+
+#[derive(Deserialize)]
+struct ConditionQuery {
+    condition: String,
+}
+
+async fn condition_step(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    render_condition(&st, &locale, "", false)
+}
+
+async fn details_step(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<ConditionQuery>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    if SpoolCondition::parse(&query.condition).is_err() {
+        return render_condition(&st, &locale, "", false);
+    }
     let form = SpoolForm {
+        condition: query.condition,
         diameter: "1.75".to_string(),
+        net_weight: "1000".to_string(),
         ..Default::default()
     };
-    render_form(&st, &locale, theme.data_attr(), StatusCode::OK, &form, None).await
+    render_form(&st, &locale, "", StatusCode::OK, &form, None, false).await
 }
 
 async fn create(
@@ -631,7 +717,7 @@ async fn create(
     let locale = resolve_locale(&headers, &st);
     let theme = resolve_theme(&headers);
 
-    let new = match form.to_new() {
+    let mut new = match form.to_new() {
         Ok(n) => n,
         Err(key) => {
             return render_form(
@@ -641,13 +727,54 @@ async fn create(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 &form,
                 Some(key),
+                true,
             )
             .await;
         }
     };
 
+    if form.manufacturer_id == "__other" {
+        let name = match ManufacturerName::new(form.manufacturer_name.clone()) {
+            Ok(name) => name,
+            Err(_) => {
+                return render_form(
+                    &st,
+                    &locale,
+                    theme.data_attr(),
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    &form,
+                    Some("spools.new.error.manufacturer"),
+                    true,
+                )
+                .await;
+            }
+        };
+        let id = match st
+            .manufacturers
+            .add(NewManufacturer {
+                name: name.clone(),
+                country: None,
+            })
+            .await
+        {
+            Ok(created) => created.id,
+            Err(domain::manufacturers::RepositoryError::Duplicate(_)) => match st
+                .manufacturers
+                .list()
+                .await
+                .ok()
+                .and_then(|items| items.into_iter().find(|m| m.name == name))
+            {
+                Some(existing) => existing.id,
+                None => return internal_error("duplicate manufacturer could not be resolved"),
+            },
+            Err(e) => return internal_error(e),
+        };
+        new.manufacturer_id = Some(id);
+    }
+
     match st.spools.add(new).await {
-        Ok(_) => Redirect::to("/spools").into_response(),
+        Ok(created) => Redirect::to(&format!("/spools/{}", created.id.as_str())).into_response(),
         Err(RepositoryError::UnknownMaterial(_)) => {
             render_form(
                 &st,
@@ -656,6 +783,7 @@ async fn create(
                 StatusCode::UNPROCESSABLE_ENTITY,
                 &form,
                 Some("spools.new.error.material"),
+                true,
             )
             .await
         }
@@ -951,13 +1079,16 @@ async fn render_edit_form(
     ctx.insert("materials", &materials);
     ctx.insert("locations", &locations);
     ctx.insert("manufacturers", &manufacturers);
+    ctx.insert("condition", &form.condition);
     ctx.insert("material_id", &form.material_id);
     ctx.insert("location_id", &form.location_id);
     ctx.insert("manufacturer_id", &form.manufacturer_id);
+    ctx.insert("manufacturer_name", &form.manufacturer_name);
     ctx.insert("colour_hex", &form.colour_hex);
     ctx.insert("colour_name", &form.colour_name);
     ctx.insert("diameter", &form.diameter);
     ctx.insert("net_weight", &form.net_weight);
+    ctx.insert("remaining_weight", &form.remaining_weight);
     ctx.insert("price_paid", &form.price_paid);
     ctx.insert("error_key", &opts.error_key);
     let template = if opts.full_page {
@@ -986,14 +1117,32 @@ async fn edit_page(
     };
 
     let form = SpoolForm {
+        condition: if detail.status == SpoolStatus::Open {
+            "opened".to_string()
+        } else if detail.spool_type == SpoolType::Recharge {
+            "refill".to_string()
+        } else {
+            "new".to_string()
+        },
         material_id: detail.material_id.as_str().to_string(),
-        colour_hex: detail.colour.hex().to_string(),
-        colour_name: detail.colour.name().unwrap_or("").to_string(),
+        colour_hex: detail
+            .colour
+            .as_ref()
+            .map(|colour| colour.hex().to_string())
+            .unwrap_or_default(),
+        colour_name: detail
+            .colour
+            .as_ref()
+            .and_then(Colour::name)
+            .unwrap_or("")
+            .to_string(),
         diameter: detail.diameter.as_str().to_string(),
         net_weight: detail.net_weight.value().to_string(),
         price_paid: detail.price_paid.to_string(),
         location_id: detail.location_id.clone().unwrap_or_default(),
         manufacturer_id: detail.manufacturer_id.clone().unwrap_or_default(),
+        manufacturer_name: String::new(),
+        remaining_weight: detail.remaining_weight.value().to_string(),
     };
     render_edit_form(
         &st,
@@ -1031,7 +1180,12 @@ async fn update(
         Err(e) => return internal_error(e),
     };
 
-    let spool = match form.to_edit(spool_id, current.remaining_weight, current.status) {
+    let spool = match form.to_edit(
+        spool_id,
+        current.remaining_weight,
+        current.status,
+        current.spool_type,
+    ) {
         Ok(s) => s,
         Err(key) => {
             return render_edit_form(
@@ -1123,6 +1277,8 @@ pub fn routes() -> Router<AppState> {
         .route("/spools", get(list_page).post(create))
         .route("/spools/rows", get(rows))
         .route("/spools/new", get(new_page))
+        .route("/spools/new/condition", get(condition_step))
+        .route("/spools/new/details", get(details_step))
         .route("/spools/{id}/edit", get(edit_page))
         .route("/spools/{id}", get(detail_page).put(update))
         .route("/spools/{id}/remaining", post(set_remaining))
@@ -1405,12 +1561,18 @@ mod tests {
         let mut ctx = Context::new();
         ctx.insert("materials", &vec![material_option()]);
         ctx.insert("locations", &vec![location_option()]);
+        ctx.insert("manufacturers", &vec![manufacturer_option()]);
+        ctx.insert("wizard_step", "details");
+        ctx.insert("condition", "new");
         ctx.insert("material_id", "");
         ctx.insert("location_id", "");
+        ctx.insert("manufacturer_id", "");
+        ctx.insert("manufacturer_name", "");
         ctx.insert("colour_hex", "");
         ctx.insert("colour_name", "");
         ctx.insert("diameter", "1.75");
         ctx.insert("net_weight", "");
+        ctx.insert("remaining_weight", "");
         ctx.insert("price_paid", "");
         ctx.insert("error_key", &Option::<&str>::None);
         r.render("spools_new.html", locale, "", ctx).unwrap()
@@ -1446,11 +1608,19 @@ mod tests {
         let r = Renderer::new(Catalog::load("en"));
         let mut ctx = Context::new();
         ctx.insert("materials", &vec![material_option()]);
+        ctx.insert("locations", &vec![location_option()]);
+        ctx.insert("manufacturers", &vec![manufacturer_option()]);
+        ctx.insert("wizard_step", "details");
+        ctx.insert("condition", "new");
         ctx.insert("material_id", "");
+        ctx.insert("location_id", "");
+        ctx.insert("manufacturer_id", "");
+        ctx.insert("manufacturer_name", "");
         ctx.insert("colour_hex", "not-a-hex");
         ctx.insert("colour_name", "");
         ctx.insert("diameter", "1.75");
         ctx.insert("net_weight", "1000");
+        ctx.insert("remaining_weight", "");
         ctx.insert("price_paid", "24.99");
         ctx.insert("error_key", &Some("spools.new.error.colour"));
         let html = r.render("spools_new.html", "en", "", ctx).unwrap();
@@ -1460,6 +1630,7 @@ mod tests {
 
     fn valid_form(material_id: &str) -> SpoolForm {
         SpoolForm {
+            condition: "new".to_string(),
             material_id: material_id.to_string(),
             colour_hex: "#1A9E4B".to_string(),
             colour_name: "vert sapin".to_string(),
@@ -1468,6 +1639,8 @@ mod tests {
             price_paid: "24.99".to_string(),
             location_id: "".to_string(),
             manufacturer_id: "".to_string(),
+            manufacturer_name: "".to_string(),
+            remaining_weight: "".to_string(),
         }
     }
 
@@ -1481,14 +1654,38 @@ mod tests {
     fn to_new_maps_valid_form_to_domain_values() {
         let new = valid_form("01HMAT").to_new().unwrap();
         assert_eq!(new.material_id, MaterialId::new("01HMAT"));
-        assert_eq!(new.colour.hex(), "#1A9E4B");
-        assert_eq!(new.colour.name(), Some("vert sapin"));
+        assert_eq!(new.colour.as_ref().unwrap().hex(), "#1A9E4B");
+        assert_eq!(new.colour.as_ref().unwrap().name(), Some("#1A9E4B"));
         assert_eq!(new.diameter, Diameter::Mm1_75);
         assert_eq!(new.net_weight.value(), 1000.0);
         assert_eq!(
             new.price_paid,
             Money::from_decimal(Decimal::from_str_exact("24.99").unwrap()).unwrap()
         );
+    }
+
+    #[test]
+    fn to_new_derives_opened_and_refill_initial_values() {
+        let mut opened = valid_form("01HMAT");
+        opened.condition = "opened".into();
+        opened.remaining_weight = "1200".into();
+        let opened = opened.to_new().unwrap();
+        assert_eq!(opened.initial_status(), SpoolStatus::Open);
+        assert_eq!(opened.initial_remaining_weight().value(), 1000.0);
+        assert_eq!(opened.spool_type(), SpoolType::Complete);
+
+        let mut refill = valid_form("01HMAT");
+        refill.condition = "refill".into();
+        let refill = refill.to_new().unwrap();
+        assert_eq!(refill.initial_status(), SpoolStatus::Sealed);
+        assert_eq!(refill.spool_type(), SpoolType::Recharge);
+    }
+
+    #[test]
+    fn to_new_accepts_an_unset_colour() {
+        let mut form = valid_form("01HMAT");
+        form.colour_hex.clear();
+        assert_eq!(form.to_new().unwrap().colour, None);
     }
 
     #[test]
@@ -1579,6 +1776,7 @@ mod tests {
                 SpoolId::new("01HSP"),
                 Grams::new(1000.0).unwrap(),
                 SpoolStatus::Sealed,
+                SpoolType::Complete,
             )
             .unwrap();
         assert_eq!(spool.location_id, Some(LocationId::new("01HLOC")));
@@ -1593,6 +1791,7 @@ mod tests {
                 SpoolId::new("01HSP"),
                 Grams::new(1000.0).unwrap(),
                 SpoolStatus::Sealed,
+                SpoolType::Complete,
             )
             .unwrap();
         assert_eq!(spool.location_id, None);
@@ -1711,12 +1910,43 @@ mod tests {
 
         #[tokio::test]
         async fn get_new_renders_form_with_material_option() {
-            let (st, material_id) = test_state().await;
+            let (st, _material_id) = test_state().await;
             let res = new_page(State(st), HeaderMap::new()).await;
             assert_eq!(res.status(), StatusCode::OK);
             let html = body_of(res).await;
-            assert!(html.contains("PLA"));
-            assert!(html.contains(&format!(r#"value="{material_id}""#)));
+            assert!(html.contains("/spools/new/details?condition=new"));
+            assert!(html.contains("/spools/new/details?condition=opened"));
+            assert!(html.contains("/spools/new/details?condition=refill"));
+        }
+
+        #[tokio::test]
+        async fn details_fragment_keeps_active_french_locale_and_condition_fields() {
+            let (st, _) = test_state().await;
+            let mut headers = HeaderMap::new();
+            headers.insert("cookie", "lang=fr".parse().unwrap());
+            let opened = details_step(
+                State(st.clone()),
+                headers.clone(),
+                Query(ConditionQuery {
+                    condition: "opened".into(),
+                }),
+            )
+            .await;
+            let html = body_of(opened).await;
+            assert!(html.contains("Entamée"));
+            assert!(html.contains("Poids restant"));
+            assert!(html.contains("Changer"));
+            assert!(!html.contains("spools.condition."));
+
+            let new = details_step(
+                State(st),
+                headers,
+                Query(ConditionQuery {
+                    condition: "new".into(),
+                }),
+            )
+            .await;
+            assert!(!body_of(new).await.contains("Poids restant"));
         }
 
         #[tokio::test]
@@ -1725,9 +1955,13 @@ mod tests {
             let spools = st.spools.clone();
             let res = create(State(st), HeaderMap::new(), Form(valid_form(&material_id))).await;
             assert_eq!(res.status(), StatusCode::SEE_OTHER);
-            assert_eq!(
-                res.headers().get("location").unwrap().to_str().unwrap(),
-                "/spools"
+            assert!(
+                res.headers()
+                    .get("location")
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with("/spools/")
             );
             let created = spools
                 .list(SpoolFilter::default(), SpoolSort::CreatedDesc)
@@ -1877,7 +2111,7 @@ mod tests {
             );
 
             let detail = spools.view(created.id.clone()).await.unwrap();
-            assert_eq!(detail.colour.hex(), "#00FF00");
+            assert_eq!(detail.colour.as_ref().unwrap().hex(), "#00FF00");
             assert_eq!(detail.status, SpoolStatus::Open);
             assert_eq!(detail.remaining_weight.value(), 800.0);
             assert_eq!(detail.net_weight.value(), 1000.0);
@@ -1928,7 +2162,7 @@ mod tests {
             assert!(html.contains(r#"value="not-a-hex""#)); // submitted value echoed
 
             let detail = spools.view(created.id.clone()).await.unwrap();
-            assert_eq!(detail.colour.hex(), "#1A9E4B"); // unchanged
+            assert_eq!(detail.colour.as_ref().unwrap().hex(), "#1A9E4B"); // unchanged
         }
 
         // --- Task 12: GET /spools/{id} (detail view).
@@ -1952,7 +2186,7 @@ mod tests {
             let html = body_of(res).await;
             assert!(html.contains("stub")); // material name (stub repo's fixed join value)
             assert!(html.contains("#1A9E4B")); // colour hex
-            assert!(html.contains("vert sapin")); // colour name
+            assert!(html.contains("#1A9E4B")); // derived colour name
             assert!(html.contains("1.75")); // diameter
             assert!(html.contains("1000")); // net weight
             assert!(html.contains("800")); // remaining weight
@@ -2180,7 +2414,14 @@ mod tests {
         async fn get_new_lists_location_option() {
             let (st, _material_id) = test_state().await;
             let location_id = seed_location(&st, "Shelf A").await;
-            let res = new_page(State(st), HeaderMap::new()).await;
+            let res = details_step(
+                State(st),
+                HeaderMap::new(),
+                Query(ConditionQuery {
+                    condition: "new".to_string(),
+                }),
+            )
+            .await;
             assert_eq!(res.status(), StatusCode::OK);
             let html = body_of(res).await;
             assert!(html.contains("Shelf A"));

@@ -35,13 +35,15 @@ fn sample_material(name: &str) -> NewMaterial {
 
 fn sample_spool(material_id: MaterialId) -> NewSpool {
     NewSpool {
+        condition: domain::spools::SpoolCondition::New,
         material_id,
-        colour: Colour::new("#1A9E4B".into(), Some("vert sapin".into())).unwrap(),
+        colour: Some(Colour::new("#1A9E4B".into(), Some("vert sapin".into())).unwrap()),
         diameter: Diameter::Mm1_75,
         net_weight: Grams::new(1000.0).unwrap(),
         price_paid: Money::from_decimal(Decimal::from_str_exact("10.00").unwrap()).unwrap(),
         location_id: None,
         manufacturer_id: None,
+        remaining_weight: None,
     }
 }
 

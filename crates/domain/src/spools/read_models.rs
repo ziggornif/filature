@@ -1,5 +1,5 @@
 use crate::shared::{Grams, MaterialId, Money};
-use crate::spools::model::{Colour, Diameter, SpoolId, SpoolStatus, remaining_length_m};
+use crate::spools::model::{Colour, Diameter, SpoolId, SpoolStatus, SpoolType, remaining_length_m};
 
 /// Cross-adapter read model for a spool-list row: the fields a UI list view
 /// needs, joining a `Spool`'s own fields with the display-only material
@@ -13,7 +13,7 @@ use crate::spools::model::{Colour, Diameter, SpoolId, SpoolStatus, remaining_len
 pub struct SpoolListItem {
     pub id: SpoolId,
     pub material_name: String,
-    pub colour: Colour,
+    pub colour: Option<Colour>,
     pub diameter: Diameter,
     pub remaining_weight: Grams,
     pub net_weight: Grams,
@@ -43,7 +43,8 @@ pub struct SpoolDetail {
     pub id: SpoolId,
     pub material_id: MaterialId,
     pub material_name: String,
-    pub colour: Colour,
+    pub spool_type: SpoolType,
+    pub colour: Option<Colour>,
     pub diameter: Diameter,
     pub net_weight: Grams,
     pub remaining_weight: Grams,

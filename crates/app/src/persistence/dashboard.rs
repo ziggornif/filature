@@ -8,6 +8,21 @@ use crate::persistence::Db;
 use async_trait::async_trait;
 use domain::dashboard::{DashboardRepository, RepositoryError, SpoolStockRow, StockStatus};
 use domain::shared::{Grams, MaterialId, Money};
+use rust_decimal::Decimal;
+
+#[derive(sqlx::FromRow)]
+struct StockRow {
+    id: String,
+    colour_hex: Option<String>,
+    colour_name: Option<String>,
+    net_weight: f64,
+    remaining_weight: f64,
+    price_paid: Decimal,
+    status: String,
+    material_id: String,
+    material_name: String,
+    location_name: Option<String>,
+}
 
 pub struct SqlxDashboardRepository {
     pool: Db,
@@ -41,15 +56,15 @@ fn build_grams(v: f64) -> Result<Grams, RepositoryError> {
 #[async_trait]
 impl DashboardRepository for SqlxDashboardRepository {
     async fn stock_rows(&self) -> Result<Vec<SpoolStockRow>, RepositoryError> {
-        let rows = sqlx::query!(
+        let rows = sqlx::query_as::<_, StockRow>(
             r#"SELECT s.id, s.colour_hex, s.colour_name, s.net_weight,
                       s.remaining_weight, s.price_paid, s.status,
                       m.id AS material_id, m.name AS material_name,
-                      l.name AS "location_name?"
+                      l.name AS location_name
                FROM spools s
                JOIN materials m ON m.id = s.material_id
                LEFT JOIN locations l ON l.id = s.location_id
-               WHERE s.status <> 'Archived'"#
+               WHERE s.status <> 'Archived'"#,
         )
         .fetch_all(&self.pool)
         .await
@@ -61,7 +76,7 @@ impl DashboardRepository for SqlxDashboardRepository {
                     spool_id: r.id,
                     material_id: MaterialId::new(r.material_id),
                     material_name: r.material_name,
-                    colour_hex: r.colour_hex,
+                    colour_hex: r.colour_hex.unwrap_or_default(),
                     colour_name: r.colour_name,
                     status: build_status(&r.status)?,
                     remaining_weight: build_grams(r.remaining_weight)?,

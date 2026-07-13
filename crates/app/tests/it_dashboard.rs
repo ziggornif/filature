@@ -37,13 +37,15 @@ fn sample_location(name: &str) -> NewLocation {
 
 fn sample_spool(material_id: MaterialId, net: f64, price: &str) -> NewSpool {
     NewSpool {
+        condition: domain::spools::SpoolCondition::New,
         material_id,
-        colour: Colour::new("#1A9E4B".into(), Some("vert sapin".into())).unwrap(),
+        colour: Some(Colour::new("#1A9E4B".into(), Some("vert sapin".into())).unwrap()),
         diameter: Diameter::Mm1_75,
         net_weight: Grams::new(net).unwrap(),
         price_paid: Money::from_decimal(Decimal::from_str_exact(price).unwrap()).unwrap(),
         location_id: None,
         manufacturer_id: None,
+        remaining_weight: None,
     }
 }
 
@@ -123,7 +125,7 @@ async fn stock_rows_excludes_archived_and_maps_fields_correctly() {
     assert_eq!(row1.material_id, mat_a.id);
     assert_eq!(row1.material_name, "Dash-PLA");
     assert_eq!(row1.colour_hex, "#1A9E4B");
-    assert_eq!(row1.colour_name, Some("vert sapin".to_string()));
+    assert_eq!(row1.colour_name, Some("#1A9E4B".to_string()));
     assert_eq!(row1.status, StockStatus::Sealed);
     assert_eq!(row1.remaining_weight.value(), 1000.0);
     assert_eq!(row1.net_weight.value(), 1000.0);

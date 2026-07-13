@@ -76,6 +76,10 @@ pub enum DomainError {
     UnknownDiameter(String),
     #[error("unknown spool status: {0}")]
     UnknownSpoolStatus(String),
+    #[error("unknown spool type: {0}")]
+    UnknownSpoolType(String),
+    #[error("unknown spool condition: {0}")]
+    UnknownSpoolCondition(String),
     #[error("price must not be negative, got {0}")]
     NegativeMoney(Decimal),
     #[error("spool is archived and cannot be modified")]
