@@ -1,15 +1,16 @@
 <section id="spool-wizard" class="spool-wizard spool-wizard--condition">
   <header class="wizard-header">
     <div>
-      <h1>{{ t(key="spools.new.title") }}</h1>
+      <h1>{% if edit_mode %}{{ t(key="spools.edit.title") }}{% else %}{{ t(key="spools.new.title") }}{% endif %}</h1>
       <p>{{ t(key="spools.wizard.condition.prompt") }}</p>
     </div>
-    <a class="button button--secondary" href="/spools">{{ t(key="common.cancel") }}</a>
+    <a class="button button--secondary" href="{% if edit_mode %}/spools/{{ id }}{% else %}/spools{% endif %}">{{ t(key="common.cancel") }}</a>
   </header>
   <div class="condition-grid">
-    {% for condition in ["new", "opened", "refill"] %}
+    {% if edit_mode %}{% set conditions = ["new", "opened"] %}{% else %}{% set conditions = ["new", "opened", "refill"] %}{% endif %}
+    {% for condition in conditions %}
       <button class="condition-card" type="button"
-              hx-get="/spools/new/details?condition={{ condition }}"
+              hx-get="{% if edit_mode %}/spools/{{ id }}/edit/details?condition={{ condition }}{% else %}/spools/new/details?condition={{ condition }}{% endif %}"
               hx-target="#spool-wizard" hx-swap="outerHTML">
         <span class="condition-card__icon" aria-hidden="true">
           {% if condition == "opened" %}

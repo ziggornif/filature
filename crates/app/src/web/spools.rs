@@ -21,8 +21,8 @@ use axum::{
 use domain::manufacturers::{ManufacturerName, NewManufacturer};
 use domain::shared::{DomainError, Grams, LocationId, ManufacturerId, MaterialId, Money};
 use domain::spools::{
-    Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolCondition, SpoolDetail, SpoolFilter,
-    SpoolId, SpoolListItem, SpoolSort, SpoolStatus, SpoolType,
+    Colour, Diameter, EditSpool, NewSpool, RepositoryError, Spool, SpoolCondition, SpoolDetail,
+    SpoolFilter, SpoolId, SpoolListItem, SpoolSort, SpoolStatus,
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -517,6 +517,46 @@ fn parse_manufacturer_id(raw: &str) -> Option<ManufacturerId> {
     }
 }
 
+enum ManufacturerResolutionError {
+    InvalidName,
+    Response(Response),
+}
+
+async fn resolve_manufacturer_id(
+    st: &AppState,
+    form: &SpoolForm,
+) -> Result<Option<ManufacturerId>, ManufacturerResolutionError> {
+    if form.manufacturer_id != "__other" {
+        return Ok(parse_manufacturer_id(&form.manufacturer_id));
+    }
+    let name = ManufacturerName::new(form.manufacturer_name.clone())
+        .map_err(|_| ManufacturerResolutionError::InvalidName)?;
+    match st
+        .manufacturers
+        .add(NewManufacturer {
+            name: name.clone(),
+            country: None,
+        })
+        .await
+    {
+        Ok(created) => Ok(Some(created.id)),
+        Err(domain::manufacturers::RepositoryError::Duplicate(_)) => st
+            .manufacturers
+            .list()
+            .await
+            .map_err(|e| ManufacturerResolutionError::Response(internal_error(e)))?
+            .into_iter()
+            .find(|manufacturer| manufacturer.name == name)
+            .map(|manufacturer| Some(manufacturer.id))
+            .ok_or_else(|| {
+                ManufacturerResolutionError::Response(internal_error(
+                    "duplicate manufacturer could not be resolved",
+                ))
+            }),
+        Err(e) => Err(ManufacturerResolutionError::Response(internal_error(e))),
+    }
+}
+
 impl SpoolForm {
     /// Validates the raw form, rejecting invalid
     /// hex/diameter/weight/price/material with an i18n key (the caller
@@ -589,31 +629,32 @@ impl SpoolForm {
         })
     }
 
-    /// Maps the raw form into a domain `Spool` (edit path), carrying over
-    /// `remaining_weight` and `status` from the spool's current state —
-    /// this form never edits those, so the caller supplies them from a
-    /// prior `SpoolsUseCases::view` rather than trusting the form for them.
-    /// `location_id` IS taken from the submitted form (preselected from the
-    /// spool's current location by the caller — see `edit_page`); blank ⇒
-    /// unassign.
-    fn to_edit(
-        &self,
-        id: SpoolId,
-        remaining_weight: Grams,
-        status: SpoolStatus,
-        spool_type: SpoolType,
-    ) -> Result<Spool, &'static str> {
+    /// Maps the raw form into the edit use case's command. Status and
+    /// remaining weight are derived from the selected condition by the
+    /// domain service, exactly as on creation.
+    fn to_edit(&self, id: SpoolId) -> Result<EditSpool, &'static str> {
         let f = self.parse()?;
-        Ok(Spool {
+        let condition = SpoolCondition::parse(self.condition.trim())
+            .map_err(|_| "spools.new.error.condition")?;
+        let remaining_weight = if condition == SpoolCondition::Opened {
+            let value = self
+                .remaining_weight
+                .trim()
+                .parse::<f64>()
+                .map_err(|_| "spools.new.error.remaining_weight")?;
+            Some(Grams::new(value).map_err(|_| "spools.new.error.remaining_weight")?)
+        } else {
+            None
+        };
+        Ok(EditSpool {
             id,
+            condition,
             material_id: f.material_id,
-            spool_type,
             colour: f.colour,
             diameter: f.diameter,
             net_weight: f.net_weight,
             remaining_weight,
             price_paid: f.price_paid,
-            status,
             location_id: f.location_id,
             manufacturer_id: f.manufacturer_id,
         })
@@ -667,6 +708,11 @@ async fn render_form(
     ctx.insert("price_paid", &form.price_paid);
     ctx.insert("error_key", &error_key);
     ctx.insert("wizard_step", "details");
+    ctx.insert("edit_mode", &false);
+    ctx.insert(
+        "net_weight_is_custom",
+        &net_weight_is_custom(&form.net_weight),
+    );
     let template = if full_page {
         "spools_new.html"
     } else {
@@ -678,10 +724,18 @@ async fn render_form(
     }
 }
 
+fn net_weight_is_custom(net_weight: &str) -> bool {
+    !matches!(
+        net_weight,
+        "" | "250" | "500" | "750" | "900" | "1000" | "2000" | "3000" | "5000"
+    )
+}
+
 fn render_condition(st: &AppState, locale: &str, theme_attr: &str, full_page: bool) -> Response {
     let mut ctx = Context::new();
     ctx.insert("page", "spools");
     ctx.insert("wizard_step", "condition");
+    ctx.insert("edit_mode", &false);
     let template = if full_page {
         "spools_new.html"
     } else {
@@ -751,45 +805,22 @@ async fn create(
         }
     };
 
-    if form.manufacturer_id == "__other" {
-        let name = match ManufacturerName::new(form.manufacturer_name.clone()) {
-            Ok(name) => name,
-            Err(_) => {
-                return render_form(
-                    &st,
-                    &locale,
-                    theme.data_attr(),
-                    StatusCode::UNPROCESSABLE_ENTITY,
-                    &form,
-                    Some("spools.new.error.manufacturer"),
-                    true,
-                )
-                .await;
-            }
-        };
-        let id = match st
-            .manufacturers
-            .add(NewManufacturer {
-                name: name.clone(),
-                country: None,
-            })
-            .await
-        {
-            Ok(created) => created.id,
-            Err(domain::manufacturers::RepositoryError::Duplicate(_)) => match st
-                .manufacturers
-                .list()
-                .await
-                .ok()
-                .and_then(|items| items.into_iter().find(|m| m.name == name))
-            {
-                Some(existing) => existing.id,
-                None => return internal_error("duplicate manufacturer could not be resolved"),
-            },
-            Err(e) => return internal_error(e),
-        };
-        new.manufacturer_id = Some(id);
-    }
+    new.manufacturer_id = match resolve_manufacturer_id(&st, &form).await {
+        Ok(id) => id,
+        Err(ManufacturerResolutionError::InvalidName) => {
+            return render_form(
+                &st,
+                &locale,
+                theme.data_attr(),
+                StatusCode::UNPROCESSABLE_ENTITY,
+                &form,
+                Some("spools.new.error.manufacturer"),
+                true,
+            )
+            .await;
+        }
+        Err(ManufacturerResolutionError::Response(response)) => return response,
+    };
 
     match st.spools.add(new).await {
         Ok(created) => Redirect::to(&format!("/spools/{}", created.id.as_str())).into_response(),
@@ -1065,11 +1096,10 @@ async fn restore(
 struct EditFormRender<'a> {
     status: StatusCode,
     id: &'a str,
-    error_key: Option<&'static str>,
+    error_key: Option<&'a str>,
     /// The full page (extends `base.html`) on a fresh `GET
-    /// /spools/{id}/edit`, or just the `<form>` fragment (matching its own
-    /// `hx-target="this"` / `hx-swap="outerHTML"`) when re-rendering a
-    /// failed `PUT /spools/{id}` in place.
+    /// /spools/{id}/edit`, or just the shared wizard fragment when
+    /// re-rendering a failed `PUT /spools/{id}` in place.
     full_page: bool,
 }
 
@@ -1103,16 +1133,26 @@ async fn render_edit_form(
     ctx.insert("manufacturer_id", &form.manufacturer_id);
     ctx.insert("manufacturer_name", &form.manufacturer_name);
     ctx.insert("colour_hex", &form.colour_hex);
-    ctx.insert("colour_name", &form.colour_name);
+    let derived_colour_name = Colour::from_hex(form.colour_hex.clone())
+        .ok()
+        .and_then(|colour| colour.name().map(str::to_string))
+        .unwrap_or_default();
+    ctx.insert("colour_name", &derived_colour_name);
     ctx.insert("diameter", &form.diameter);
     ctx.insert("net_weight", &form.net_weight);
     ctx.insert("remaining_weight", &form.remaining_weight);
     ctx.insert("price_paid", &form.price_paid);
     ctx.insert("error_key", &opts.error_key);
+    ctx.insert("wizard_step", "details");
+    ctx.insert("edit_mode", &true);
+    ctx.insert(
+        "net_weight_is_custom",
+        &net_weight_is_custom(&form.net_weight),
+    );
     let template = if opts.full_page {
         "spools_edit.html"
     } else {
-        "_spool_edit_form.html"
+        "_spool_wizard_details.html"
     };
     match st.renderer.render(template, locale, theme_attr, ctx) {
         Ok(html) => (opts.status, Html(html)).into_response(),
@@ -1120,25 +1160,10 @@ async fn render_edit_form(
     }
 }
 
-async fn edit_page(
-    State(st): State<AppState>,
-    headers: HeaderMap,
-    Path(id): Path<String>,
-) -> Response {
-    let locale = resolve_locale(&headers, &st);
-    let theme = resolve_theme(&headers);
-
-    let detail = match st.spools.view(SpoolId::new(id.clone())).await {
-        Ok(d) => d,
-        Err(RepositoryError::NotFound(_)) => return not_found(&st, &locale),
-        Err(e) => return internal_error(e),
-    };
-
-    let form = SpoolForm {
+fn edit_form(detail: &SpoolDetail) -> SpoolForm {
+    SpoolForm {
         condition: if detail.status == SpoolStatus::Open {
             "opened".to_string()
-        } else if detail.spool_type == SpoolType::Recharge {
-            "refill".to_string()
         } else {
             "new".to_string()
         },
@@ -1161,7 +1186,47 @@ async fn edit_page(
         manufacturer_id: detail.manufacturer_id.clone().unwrap_or_default(),
         manufacturer_name: String::new(),
         remaining_weight: detail.remaining_weight.value().to_string(),
+    }
+}
+
+fn render_edit_condition(
+    st: &AppState,
+    locale: &str,
+    theme_attr: &str,
+    id: &str,
+    full_page: bool,
+) -> Response {
+    let mut ctx = Context::new();
+    ctx.insert("page", "spools");
+    ctx.insert("wizard_step", "condition");
+    ctx.insert("edit_mode", &true);
+    ctx.insert("id", id);
+    let template = if full_page {
+        "spools_edit.html"
+    } else {
+        "_spool_wizard_condition.html"
     };
+    match st.renderer.render(template, locale, theme_attr, ctx) {
+        Ok(html) => Html(html).into_response(),
+        Err(e) => internal_error(e),
+    }
+}
+
+async fn edit_page(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let theme = resolve_theme(&headers);
+
+    let detail = match st.spools.view(SpoolId::new(id.clone())).await {
+        Ok(d) => d,
+        Err(RepositoryError::NotFound(_)) => return not_found(&st, &locale),
+        Err(e) => return internal_error(e),
+    };
+
+    let form = edit_form(&detail);
     render_edit_form(
         &st,
         &locale,
@@ -1177,11 +1242,56 @@ async fn edit_page(
     .await
 }
 
+async fn edit_condition_step(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    match st.spools.view(SpoolId::new(id.clone())).await {
+        Ok(_) => render_edit_condition(&st, &locale, "", &id, false),
+        Err(RepositoryError::NotFound(_)) => not_found(&st, &locale),
+        Err(e) => internal_error(e),
+    }
+}
+
+async fn edit_details_step(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Query(query): Query<ConditionQuery>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let condition = match SpoolCondition::parse(&query.condition) {
+        Ok(SpoolCondition::New | SpoolCondition::Opened) => query.condition,
+        _ => return render_edit_condition(&st, &locale, "", &id, false),
+    };
+    let detail = match st.spools.view(SpoolId::new(id.clone())).await {
+        Ok(detail) => detail,
+        Err(RepositoryError::NotFound(_)) => return not_found(&st, &locale),
+        Err(e) => return internal_error(e),
+    };
+    let mut form = edit_form(&detail);
+    form.condition = condition;
+    render_edit_form(
+        &st,
+        &locale,
+        "",
+        &form,
+        EditFormRender {
+            status: StatusCode::OK,
+            id: &id,
+            error_key: None,
+            full_page: false,
+        },
+    )
+    .await
+}
+
 /// `PUT /spools/{id}`, issued by the edit form's own `hx-put` (a genuine
 /// HTTP PUT via htmx's JS, same mechanism the materials table's inline
-/// edits use — no method-override hack). Loads the spool's current
-/// `remaining_weight`/`status` so they're preserved (this form never edits
-/// them), then delegates the net-weight clamp to `SpoolsUseCases::edit`.
+/// edits use — no method-override hack). Delegates all status/remaining
+/// derivation to the edit use case.
 async fn update(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -1192,18 +1302,7 @@ async fn update(
     let theme = resolve_theme(&headers);
     let spool_id = SpoolId::new(id.clone());
 
-    let current = match st.spools.view(spool_id.clone()).await {
-        Ok(d) => d,
-        Err(RepositoryError::NotFound(_)) => return not_found(&st, &locale),
-        Err(e) => return internal_error(e),
-    };
-
-    let spool = match form.to_edit(
-        spool_id,
-        current.remaining_weight,
-        current.status,
-        current.spool_type,
-    ) {
+    let mut spool = match form.to_edit(spool_id) {
         Ok(s) => s,
         Err(key) => {
             return render_edit_form(
@@ -1222,13 +1321,33 @@ async fn update(
         }
     };
 
+    spool.manufacturer_id = match resolve_manufacturer_id(&st, &form).await {
+        Ok(id) => id,
+        Err(ManufacturerResolutionError::InvalidName) => {
+            return render_edit_form(
+                &st,
+                &locale,
+                theme.data_attr(),
+                &form,
+                EditFormRender {
+                    status: StatusCode::UNPROCESSABLE_ENTITY,
+                    id: &id,
+                    error_key: Some("spools.new.error.manufacturer"),
+                    full_page: false,
+                },
+            )
+            .await;
+        }
+        Err(ManufacturerResolutionError::Response(response)) => return response,
+    };
+
     match st.spools.edit(spool).await {
         // htmx's `HX-Redirect` header triggers a full client-side navigation
         // (`window.location`) rather than swapping this response into the
-        // form's target — success leaves the edit form for the spool list.
+        // form's target — success leaves the edit form for the spool detail.
         Ok(_) => Response::builder()
             .status(StatusCode::OK)
-            .header("HX-Redirect", "/spools")
+            .header("HX-Redirect", format!("/spools/{id}"))
             .body(Body::empty())
             .unwrap(),
         Err(RepositoryError::UnknownMaterial(_)) => {
@@ -1298,6 +1417,8 @@ pub fn routes() -> Router<AppState> {
         .route("/spools/new/condition", get(condition_step))
         .route("/spools/new/details", get(details_step))
         .route("/spools/{id}/edit", get(edit_page))
+        .route("/spools/{id}/edit/condition", get(edit_condition_step))
+        .route("/spools/{id}/edit/details", get(edit_details_step))
         .route("/spools/{id}", get(detail_page).put(update))
         .route("/spools/{id}/remaining", post(set_remaining))
         .route("/spools/{id}/consume", post(consume))
@@ -1311,6 +1432,7 @@ mod tests {
     use super::*;
     use crate::web::i18n::Catalog;
     use crate::web::templates::Renderer;
+    use domain::spools::SpoolType;
 
     fn view(id: &str, status: &str) -> SpoolView {
         SpoolView {
@@ -1613,6 +1735,31 @@ mod tests {
         r.render("spools_new.html", locale, "", ctx).unwrap()
     }
 
+    fn render_edit_form_template(locale: &str) -> String {
+        let r = Renderer::new(Catalog::load("en"));
+        let mut ctx = Context::new();
+        ctx.insert("id", "01HSP");
+        ctx.insert("materials", &vec![material_option()]);
+        ctx.insert("locations", &vec![location_option()]);
+        ctx.insert("manufacturers", &vec![manufacturer_option()]);
+        ctx.insert("wizard_step", "details");
+        ctx.insert("edit_mode", &true);
+        ctx.insert("condition", "opened");
+        ctx.insert("material_id", "01HMAT");
+        ctx.insert("location_id", "01HLOC");
+        ctx.insert("manufacturer_id", "01HMFR");
+        ctx.insert("manufacturer_name", "");
+        ctx.insert("colour_hex", "#C62828");
+        ctx.insert("colour_name", "Red");
+        ctx.insert("diameter", "2.85");
+        ctx.insert("net_weight", "1234.5");
+        ctx.insert("net_weight_is_custom", &true);
+        ctx.insert("remaining_weight", "456.7");
+        ctx.insert("price_paid", "31.20");
+        ctx.insert("error_key", &Option::<&str>::None);
+        r.render("spools_edit.html", locale, "", ctx).unwrap()
+    }
+
     #[test]
     fn new_form_lists_material_option_no_raw_keys() {
         let html = render_new_form("en");
@@ -1661,6 +1808,38 @@ mod tests {
         let html = r.render("spools_new.html", "en", "", ctx).unwrap();
         assert!(html.contains("must be a valid #RRGGBB hex code"));
         assert!(html.contains(r#"value="not-a-hex""#)); // submitted value echoed back
+    }
+
+    #[test]
+    fn edit_form_reuses_wizard_details_and_prefills_all_supported_fields() {
+        let html = render_edit_form_template("en");
+        assert!(html.contains(r#"class="spool-wizard-form""#));
+        assert!(html.contains(r#"hx-put="/spools/01HSP""#));
+        assert!(html.contains(r#"value="opened""#));
+        assert!(html.contains(r#"value="01HMAT" selected"#));
+        assert!(html.contains(r#"value="01HMFR" selected"#));
+        assert!(html.contains(r#"value="01HLOC" selected"#));
+        assert!(html.contains(r##"value="#C62828""##));
+        assert!(html.contains(r#"value="2.85" checked"#));
+        assert!(html.contains(r#"value="custom" selected"#));
+        assert!(html.contains(r#"value="1234.5""#));
+        assert!(html.contains(r#"name="remaining_weight""#));
+        assert!(html.contains(r#"value="456.7""#));
+        assert!(html.contains(r#"value="31.20""#));
+        assert!(html.contains("/spools/01HSP/edit/condition"));
+        assert!(!html.contains("spools.edit."));
+        assert!(!html.contains("spools.colour."));
+    }
+
+    #[test]
+    fn edit_form_renders_in_non_default_french_locale() {
+        let html = render_edit_form_template("fr");
+        assert!(html.contains("Modifier la bobine"));
+        assert!(html.contains("Entamée"));
+        assert!(html.contains("Enregistrer les modifications"));
+        assert!(html.contains("Poids restant"));
+        assert!(!html.contains("spools.edit."));
+        assert!(!html.contains("spools.condition."));
     }
 
     fn valid_form(material_id: &str) -> SpoolForm {
@@ -1806,14 +1985,7 @@ mod tests {
     fn to_edit_maps_selected_location_to_some() {
         let mut f = valid_form("01HMAT");
         f.location_id = "01HLOC".to_string();
-        let spool = f
-            .to_edit(
-                SpoolId::new("01HSP"),
-                Grams::new(1000.0).unwrap(),
-                SpoolStatus::Sealed,
-                SpoolType::Complete,
-            )
-            .unwrap();
+        let spool = f.to_edit(SpoolId::new("01HSP")).unwrap();
         assert_eq!(spool.location_id, Some(LocationId::new("01HLOC")));
     }
 
@@ -1821,15 +1993,19 @@ mod tests {
     fn to_edit_maps_blank_location_to_none() {
         let mut f = valid_form("01HMAT");
         f.location_id = "".to_string();
-        let spool = f
-            .to_edit(
-                SpoolId::new("01HSP"),
-                Grams::new(1000.0).unwrap(),
-                SpoolStatus::Sealed,
-                SpoolType::Complete,
-            )
-            .unwrap();
+        let spool = f.to_edit(SpoolId::new("01HSP")).unwrap();
         assert_eq!(spool.location_id, None);
+    }
+
+    #[test]
+    fn to_edit_normalizes_custom_colour_and_accepts_no_colour() {
+        let mut form = valid_form("01HMAT");
+        form.colour_hex = "abc".to_string();
+        let edit = form.to_edit(SpoolId::new("01HSP")).unwrap();
+        assert_eq!(edit.colour.unwrap().hex(), "#AABBCC");
+
+        form.colour_hex.clear();
+        assert_eq!(form.to_edit(SpoolId::new("01HSP")).unwrap().colour, None);
     }
 
     // --- Handler-level tests: exercise `new_page`/`create` directly against
@@ -2115,6 +2291,57 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn get_edit_prefills_opened_custom_weight_and_french_locale() {
+            let (st, material_id) = test_state().await;
+            let mut form = valid_form(&material_id);
+            form.condition = "opened".to_string();
+            form.net_weight = "1234.5".to_string();
+            form.remaining_weight = "456.7".to_string();
+            form.colour_hex = "abc".to_string();
+            let created = st.spools.add(form.to_new().unwrap()).await.unwrap();
+            let mut headers = HeaderMap::new();
+            headers.insert("cookie", "lang=fr".parse().unwrap());
+
+            let res = edit_page(State(st), headers, Path(created.id.as_str().to_string())).await;
+            assert_eq!(res.status(), StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains("Modifier la bobine"));
+            assert!(html.contains("Entamée"));
+            assert!(html.contains(r##"value="#AABBCC""##));
+            assert!(html.contains(r#"value="custom" selected"#));
+            assert!(html.contains(r#"value="1234.5""#));
+            assert!(html.contains(r#"value="456.7""#));
+            assert!(!html.contains("spools.edit."));
+        }
+
+        #[tokio::test]
+        async fn edit_change_returns_status_choices_then_reloads_shared_details() {
+            let (st, material_id) = test_state().await;
+            let created = st.spools.add(valid_new_spool(&material_id)).await.unwrap();
+            let id = created.id.as_str().to_string();
+
+            let choices =
+                edit_condition_step(State(st.clone()), HeaderMap::new(), Path(id.clone())).await;
+            let html = body_of(choices).await;
+            assert!(html.contains(&format!("/spools/{id}/edit/details?condition=opened")));
+            assert!(!html.contains("condition=refill"));
+
+            let details = edit_details_step(
+                State(st),
+                HeaderMap::new(),
+                Path(id.clone()),
+                Query(ConditionQuery {
+                    condition: "opened".to_string(),
+                }),
+            )
+            .await;
+            let html = body_of(details).await;
+            assert!(html.contains(r#"class="spool-wizard-form""#));
+            assert!(html.contains(&format!(r#"hx-put="/spools/{id}""#)));
+            assert!(html.contains(r#"name="remaining_weight""#));
+        }
+
+        #[tokio::test]
         async fn get_edit_unknown_id_returns_404() {
             let (st, _material_id) = test_state().await;
             let res = edit_page(
@@ -2127,18 +2354,16 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn put_valid_changes_preserves_remaining_and_status() {
+        async fn put_opened_changes_colour_and_derives_remaining_and_status() {
             let (st, material_id) = test_state().await;
             let spools = st.spools.clone();
-            let mut created = spools.add(valid_new_spool(&material_id)).await.unwrap();
-            // Simulate a spool that's been opened and drawn down before this edit.
-            created.status = SpoolStatus::Open;
-            created.remaining_weight = Grams::new(800.0).unwrap();
-            spools.edit(created.clone()).await.unwrap();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
 
             let mut form = valid_form(&material_id);
             form.colour_hex = "#00FF00".to_string();
             form.colour_name = "vert".to_string();
+            form.condition = "opened".to_string();
+            form.remaining_weight = "800".to_string();
             let res = update(
                 State(st),
                 HeaderMap::new(),
@@ -2149,7 +2374,7 @@ mod tests {
             assert_eq!(res.status(), StatusCode::OK);
             assert_eq!(
                 res.headers().get("HX-Redirect").unwrap().to_str().unwrap(),
-                "/spools"
+                format!("/spools/{}", created.id.as_str())
             );
 
             let detail = spools.view(created.id.clone()).await.unwrap();
@@ -2163,12 +2388,12 @@ mod tests {
         async fn put_lowering_net_below_remaining_clamps_remaining() {
             let (st, material_id) = test_state().await;
             let spools = st.spools.clone();
-            let mut created = spools.add(valid_new_spool(&material_id)).await.unwrap();
-            created.remaining_weight = Grams::new(800.0).unwrap();
-            spools.edit(created.clone()).await.unwrap();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
 
             let mut form = valid_form(&material_id);
             form.net_weight = "500".to_string();
+            form.condition = "opened".to_string();
+            form.remaining_weight = "800".to_string();
             let res = update(
                 State(st),
                 HeaderMap::new(),
@@ -2213,10 +2438,12 @@ mod tests {
         async fn get_detail_renders_spool_fields_and_derived_values() {
             let (st, material_id) = test_state().await;
             let spools = st.spools.clone();
-            let mut created = spools.add(valid_new_spool(&material_id)).await.unwrap();
+            let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
             // Draw the spool down so remaining ratio/length differ from net.
-            created.remaining_weight = Grams::new(800.0).unwrap();
-            spools.edit(created.clone()).await.unwrap();
+            spools
+                .set_remaining(created.id.clone(), Grams::new(800.0).unwrap())
+                .await
+                .unwrap();
 
             let res = detail_page(
                 State(st),

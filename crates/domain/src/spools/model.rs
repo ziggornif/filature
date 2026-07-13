@@ -197,6 +197,43 @@ pub struct NewSpool {
     pub remaining_weight: Option<Grams>,
 }
 
+/// Data accepted by the edit-spool use case. The current entity is loaded by
+/// the use case so callers cannot accidentally overwrite fields that are not
+/// editable (notably the physical spool type).
+#[derive(Debug, Clone, PartialEq)]
+pub struct EditSpool {
+    pub id: SpoolId,
+    pub condition: SpoolCondition,
+    pub material_id: MaterialId,
+    pub colour: Option<Colour>,
+    pub diameter: Diameter,
+    pub net_weight: Grams,
+    pub price_paid: Money,
+    pub location_id: Option<LocationId>,
+    pub manufacturer_id: Option<ManufacturerId>,
+    /// Only used for an opened spool; ignored for a new spool.
+    pub remaining_weight: Option<Grams>,
+}
+
+impl EditSpool {
+    pub fn status(&self) -> SpoolStatus {
+        match self.condition {
+            SpoolCondition::Opened => SpoolStatus::Open,
+            SpoolCondition::New | SpoolCondition::Refill => SpoolStatus::Sealed,
+        }
+    }
+
+    pub fn derived_remaining_weight(&self) -> Grams {
+        match self.condition {
+            SpoolCondition::Opened => {
+                let entered = self.remaining_weight.unwrap_or(self.net_weight);
+                Grams::new(entered.value().min(self.net_weight.value())).unwrap()
+            }
+            SpoolCondition::New | SpoolCondition::Refill => self.net_weight,
+        }
+    }
+}
+
 impl NewSpool {
     pub fn spool_type(&self) -> SpoolType {
         match self.condition {

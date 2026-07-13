@@ -2,9 +2,9 @@
   <header class="wizard-header wizard-header--details">
     <div>
       <div class="wizard-title-row">
-        <h1>{{ t(key="spools.new.title") }}</h1>
+        <h1>{% if edit_mode %}{{ t(key="spools.edit.title") }}{% else %}{{ t(key="spools.new.title") }}{% endif %}</h1>
         <span class="condition-badge">{{ t(key="spools.condition." ~ condition) }}</span>
-        <button type="button" class="button-link" hx-get="/spools/new/condition"
+        <button type="button" class="button-link" hx-get="{% if edit_mode %}/spools/{{ id }}/edit/condition{% else %}/spools/new/condition{% endif %}"
                 hx-target="#spool-wizard" hx-swap="outerHTML">{{ t(key="spools.wizard.change") }}</button>
       </div>
       <p>{{ t(key="spools.wizard.details.subtitle") }}</p>
@@ -13,7 +13,8 @@
 
   {% if error_key %}<p class="form-error" role="alert">{{ t(key=error_key) }}</p>{% endif %}
 
-  <form class="spool-wizard-form" method="post" action="/spools">
+  <form class="spool-wizard-form"{% if edit_mode %} hx-put="/spools/{{ id }}" hx-target="#spool-wizard" hx-swap="outerHTML"
+        hx-on::before-swap="if(event.detail.xhr.status === 422){event.detail.shouldSwap = true; event.detail.isError = false;}"{% else %} method="post" action="/spools"{% endif %}>
     <input type="hidden" name="condition" value="{{ condition }}">
 
     <section class="wizard-panel">
@@ -49,7 +50,7 @@
             {"hex":"#1F5FB0", "key":"blue"}, {"hex":"transparent", "key":"transparent"}
           ] %}
           {% for preset in presets %}
-            <button type="button" class="colour-preset{% if colour_hex | upper == preset.hex %} is-selected{% endif %}"
+            <button type="button" class="colour-preset{% if colour_hex == preset.hex or colour_hex | upper == preset.hex %} is-selected{% endif %}"
                     data-hex="{{ preset.hex }}" data-name="{{ t(key='spools.colour.preset.' ~ preset.key) }}">
               <span style="--swatch:{{ preset.hex }}"></span>
               <small>{{ t(key="spools.colour.preset." ~ preset.key) }}</small>
@@ -86,14 +87,14 @@
         <label>{{ t(key="spools.new.net_weight") }}
           <select class="net-weight-preset">
             {% for weight in [250, 500, 750, 900, 1000, 2000, 3000, 5000] %}
-              <option value="{{ weight }}"{% if (net_weight == "1000" and weight == 1000) or (not net_weight and weight == 1000) %} selected{% endif %}>{{ weight }} g{% if weight == 1000 %} — {{ t(key="common.default") }}{% endif %}</option>
+              <option value="{{ weight }}"{% if (net_weight == weight ~ "") or (not net_weight and weight == 1000) %} selected{% endif %}>{{ weight }} g{% if weight == 1000 %} — {{ t(key="common.default") }}{% endif %}</option>
             {% endfor %}
-            <option value="custom">{{ t(key="common.other") }}</option>
+            <option value="custom"{% if net_weight_is_custom %} selected{% endif %}>{{ t(key="common.other") }}</option>
           </select>
         </label>
       </div>
-      <label class="net-weight-custom is-hidden">{{ t(key="spools.new.net_weight_custom") }}
-        <input type="number" step="0.1" min="0.1" inputmode="decimal">
+      <label class="net-weight-custom{% if not net_weight_is_custom %} is-hidden{% endif %}">{{ t(key="spools.new.net_weight_custom") }}
+        <input type="number" step="0.1" min="0.1" inputmode="decimal" value="{% if net_weight_is_custom %}{{ net_weight }}{% endif %}">
       </label>
       <input type="hidden" name="net_weight" value="{% if net_weight %}{{ net_weight }}{% else %}1000{% endif %}">
       {% if condition == "opened" %}
@@ -120,8 +121,8 @@
     </section>
 
     <div class="wizard-actions">
-      <a class="button button--secondary" href="/spools">{{ t(key="common.cancel") }}</a>
-      <button type="submit" class="button button--primary">{{ t(key="spools.new.submit") }}</button>
+      <a class="button button--secondary" href="{% if edit_mode %}/spools/{{ id }}{% else %}/spools{% endif %}">{{ t(key="common.cancel") }}</a>
+      <button type="submit" class="button button--primary">{% if edit_mode %}{{ t(key="spools.edit.submit") }}{% else %}{{ t(key="spools.new.submit") }}{% endif %}</button>
     </div>
   </form>
 </section>

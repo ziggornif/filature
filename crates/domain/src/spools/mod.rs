@@ -7,7 +7,7 @@ pub mod usecases;
 pub mod stubs;
 
 pub use model::{
-    Colour, Diameter, NewSpool, Spool, SpoolCondition, SpoolId, SpoolStatus, SpoolType,
+    Colour, Diameter, EditSpool, NewSpool, Spool, SpoolCondition, SpoolId, SpoolStatus, SpoolType,
     remaining_length_m,
 };
 pub use ports::api::SpoolsUseCases;

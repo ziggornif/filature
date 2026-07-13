@@ -1,5 +1,5 @@
 use crate::shared::{Grams, LocationId, Money};
-use crate::spools::model::{NewSpool, Spool, SpoolId};
+use crate::spools::model::{EditSpool, NewSpool, Spool, SpoolId};
 use crate::spools::ports::api::SpoolsUseCases;
 use crate::spools::ports::spi::{RepositoryError, SpoolFilter, SpoolRepository, SpoolSort};
 use crate::spools::read_models::{SpoolDetail, SpoolListItem};
@@ -22,10 +22,24 @@ impl SpoolsUseCases for SpoolsService {
         self.repo.insert(s).await
     }
 
-    async fn edit(&self, mut s: Spool) -> Result<Spool, RepositoryError> {
-        let new_net = s.net_weight;
-        s.set_net_clamping(new_net);
-        self.repo.update(s).await
+    async fn edit(&self, edit: EditSpool) -> Result<Spool, RepositoryError> {
+        let remaining_weight = edit.derived_remaining_weight();
+        let status = edit.status();
+        let mut spool = self
+            .repo
+            .find(&edit.id)
+            .await?
+            .ok_or_else(|| RepositoryError::NotFound(edit.id.clone()))?;
+        spool.material_id = edit.material_id;
+        spool.colour = edit.colour;
+        spool.diameter = edit.diameter;
+        spool.net_weight = edit.net_weight;
+        spool.remaining_weight = remaining_weight;
+        spool.price_paid = edit.price_paid;
+        spool.status = status;
+        spool.location_id = edit.location_id;
+        spool.manufacturer_id = edit.manufacturer_id;
+        self.repo.update(spool).await
     }
 
     async fn list(
@@ -106,7 +120,9 @@ impl SpoolsUseCases for SpoolsService {
 mod tests {
     use super::*;
     use crate::shared::{DomainError, Grams, LocationId, MaterialId, Money};
-    use crate::spools::model::{Colour, Diameter, SpoolCondition, SpoolStatus, SpoolType};
+    use crate::spools::model::{
+        Colour, Diameter, EditSpool, SpoolCondition, SpoolStatus, SpoolType,
+    };
     use crate::spools::stubs::StubSpoolRepository;
 
     fn svc() -> SpoolsService {
@@ -127,6 +143,21 @@ mod tests {
         }
     }
 
+    fn edit_spool(spool: &Spool, condition: SpoolCondition) -> EditSpool {
+        EditSpool {
+            id: spool.id.clone(),
+            condition,
+            material_id: spool.material_id.clone(),
+            colour: spool.colour.clone(),
+            diameter: spool.diameter,
+            net_weight: spool.net_weight,
+            price_paid: spool.price_paid,
+            location_id: spool.location_id.clone(),
+            manufacturer_id: spool.manufacturer_id.clone(),
+            remaining_weight: Some(spool.remaining_weight),
+        }
+    }
+
     #[tokio::test]
     async fn add_persists_sealed_and_full() {
         let s = svc();
@@ -138,16 +169,45 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn edit_clamps_remaining_when_net_lowered_below_it() {
+    async fn edit_opened_clamps_entered_remaining_and_derives_status() {
         let s = svc();
-        let mut created = s.add(sample_new_spool("material-1")).await.unwrap();
-        // Simulate remaining having been drawn down before this edit.
-        created.remaining_weight = Grams::new(800.0).unwrap();
-        s.edit(created.clone()).await.unwrap();
-        created.net_weight = Grams::new(500.0).unwrap();
-        let edited = s.edit(created).await.unwrap();
+        let created = s.add(sample_new_spool("material-1")).await.unwrap();
+        let mut edit = edit_spool(&created, SpoolCondition::Opened);
+        edit.net_weight = Grams::new(500.0).unwrap();
+        edit.remaining_weight = Some(Grams::new(800.0).unwrap());
+        let edited = s.edit(edit).await.unwrap();
         assert_eq!(edited.remaining_weight.value(), 500.0);
         assert_eq!(edited.net_weight.value(), 500.0);
+        assert_eq!(edited.status, SpoolStatus::Open);
+    }
+
+    #[tokio::test]
+    async fn edit_new_resets_remaining_to_net_and_derives_sealed_status() {
+        let s = svc();
+        let created = s.add(sample_new_spool("material-1")).await.unwrap();
+        s.set_remaining(created.id.clone(), Grams::new(250.0).unwrap())
+            .await
+            .unwrap();
+        let edited = s
+            .edit(edit_spool(&created, SpoolCondition::New))
+            .await
+            .unwrap();
+        assert_eq!(edited.remaining_weight.value(), 1000.0);
+        assert_eq!(edited.status, SpoolStatus::Sealed);
+        assert_eq!(edited.spool_type, SpoolType::Complete);
+    }
+
+    #[tokio::test]
+    async fn edit_preserves_existing_physical_spool_type() {
+        let s = svc();
+        let mut new = sample_new_spool("material-1");
+        new.condition = SpoolCondition::Refill;
+        let created = s.add(new).await.unwrap();
+        let edited = s
+            .edit(edit_spool(&created, SpoolCondition::New))
+            .await
+            .unwrap();
+        assert_eq!(edited.spool_type, SpoolType::Recharge);
     }
 
     #[tokio::test]
@@ -190,9 +250,9 @@ mod tests {
     async fn list_applies_status_filter() {
         let s = svc();
         let created = s.add(sample_new_spool("material-1")).await.unwrap();
-        let mut opened = created.clone();
-        opened.status = SpoolStatus::Open;
-        s.edit(opened).await.unwrap();
+        s.set_remaining(created.id, Grams::new(900.0).unwrap())
+            .await
+            .unwrap();
         s.add(sample_new_spool("material-1")).await.unwrap(); // stays Sealed
 
         let sealed_only = s
@@ -213,13 +273,15 @@ mod tests {
     #[tokio::test]
     async fn list_applies_remaining_ratio_sort() {
         let s = svc();
-        let mut low = s.add(sample_new_spool("material-1")).await.unwrap();
-        low.remaining_weight = Grams::new(100.0).unwrap();
-        s.edit(low.clone()).await.unwrap();
+        let low = s.add(sample_new_spool("material-1")).await.unwrap();
+        s.set_remaining(low.id.clone(), Grams::new(100.0).unwrap())
+            .await
+            .unwrap();
 
-        let mut high = s.add(sample_new_spool("material-1")).await.unwrap();
-        high.remaining_weight = Grams::new(900.0).unwrap();
-        s.edit(high.clone()).await.unwrap();
+        let high = s.add(sample_new_spool("material-1")).await.unwrap();
+        s.set_remaining(high.id.clone(), Grams::new(900.0).unwrap())
+            .await
+            .unwrap();
 
         let asc = s
             .list(SpoolFilter::default(), SpoolSort::RemainingRatioAsc)
