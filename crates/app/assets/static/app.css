@@ -1894,6 +1894,8 @@ a {
   gap: 10px;
 }
 .spool-detail-material {
+  flex: none;
+  white-space: nowrap;
   padding: 4px 9px;
   border: 1px solid var(--border-strong);
   border-radius: 6px;
