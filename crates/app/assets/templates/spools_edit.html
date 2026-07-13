@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>{{ t(key="spools.edit.title") }}</h1>
-  {% include "_spool_edit_form.html" %}
+  <div id="spool-wizard">
+    {% if wizard_step == "details" %}
+      {% include "_spool_wizard_details.html" %}
+    {% else %}
+      {% include "_spool_wizard_condition.html" %}
+    {% endif %}
+  </div>
 {% endblock content %}
