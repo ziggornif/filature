@@ -161,9 +161,47 @@ body {
 }
 
 .sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 11px;
   padding: 10px 20px;
   color: var(--muted);
   text-decoration: none;
+}
+
+.sidebar nav a svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.sidebar nav a.active svg,
+.sidebar nav a:hover svg {
+  color: var(--text);
+}
+
+.sidebar-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-brand-logo {
+  flex: none;
+  color: var(--text);
+}
+
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dashboard-header .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .sidebar nav a:hover {
