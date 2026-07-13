@@ -696,7 +696,6 @@
                 <div style="display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:2px">
                   <button onClick="{{ form.setDiam175 }}" style="flex:1;padding:7px 0;border:none;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:12px;font-weight:500;color:{{ form.diam175Fg }};background:{{ form.diam175Bg }}">1.75</button>
                   <button onClick="{{ form.setDiam285 }}" style="flex:1;padding:7px 0;border:none;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:12px;font-weight:500;color:{{ form.diam285Fg }};background:{{ form.diam285Bg }}">2.85</button>
-                  <button onClick="{{ form.setDiam300 }}" style="flex:1;padding:7px 0;border:none;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:12px;font-weight:500;color:{{ form.diam300Fg }};background:{{ form.diam300Bg }}">3.0</button>
                 </div>
               </div>
               <div>
@@ -1056,8 +1055,7 @@ class Component extends DCLogic {
         })),
         diam175Bg: f.diameter==='1.75'?'var(--accent)':'transparent', diam175Fg: f.diameter==='1.75'?'var(--accent-fg)':'var(--muted)',
         diam285Bg: f.diameter==='2.85'?'var(--accent)':'transparent', diam285Fg: f.diameter==='2.85'?'var(--accent-fg)':'var(--muted)',
-        diam300Bg: f.diameter==='3.0'?'var(--accent)':'transparent', diam300Fg: f.diameter==='3.0'?'var(--accent-fg)':'var(--muted)',
-        setDiam175: ()=>this.updateForm({diameter:'1.75'}), setDiam285: ()=>this.updateForm({diameter:'2.85'}), setDiam300: ()=>this.updateForm({diameter:'3.0'}),
+        setDiam175: ()=>this.updateForm({diameter:'1.75'}), setDiam285: ()=>this.updateForm({diameter:'2.85'}),
         netPresetOptions: [...this.netPresets().map(v=>({v:String(v), label: (v===1000?v+' g (défaut)':v+' g')})), {v:'custom', label:'Autre…'}],
         isCustomNet: f.netPreset==='custom',
         onNetPreset:(e)=>this.updateForm({netPreset:e.target.value}),

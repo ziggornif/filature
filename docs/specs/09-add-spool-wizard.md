@@ -17,7 +17,7 @@ The hi-fi design is authoritative in `init_assets/design_handoff_filature/Filatu
 - **Step 2 — Details.** Shows the chosen condition as a badge with a "Changer" affordance that returns to step 1. Fields:
   - Material (select over the Material referential), Manufacturer (select over the Manufacturer referential + an "Autre…" escape that lets a new brand be named).
   - **Colour** via the reworked picker (see below).
-  - **Diameter** as a segmented control. *(Open question — see Out of scope: whether the set is {1.75, 2.85} or adds 3.0.)*
+  - **Diameter** as a segmented control over the two standards **1.75 / 2.85 mm**.
   - **Net Weight** chosen from presets `250 / 500 / 750 / 900 / 1000 (default) / 2000 / 3000 / 5000 g`, plus "Autre…" revealing a free numeric entry. Entered directly per ADR-0004.
   - **Remaining Weight** field is shown **only** when condition = *Entamée*; hidden otherwise.
   - Storage location, Price Paid, purchase/opened dates, notes as today.
@@ -28,7 +28,7 @@ The hi-fi design is authoritative in `init_assets/design_handoff_filature/Filatu
 
 **Key interfaces:** (glossary + API/SPI terms — locate, don't assume paths)
 - `Spool` — gains a **Spool Type** attribute (`Complete` | `Recharge`). New glossary term + persistence column/migration.
-- `Diameter` — the enum of standard diameters; extend **only if** the 3.0 decision lands (see Out of scope).
+- `Diameter` — the enum of the two standard diameters (1.75 / 2.85 mm); unchanged.
 - `Colour` — hex with a name that is now **derived**, not free-typed (glossary currently says "optional free-text name" — update it to match).
 - `SpoolStatus` — unchanged set (Sealed/Open/Empty/Archived); the initial value is derived from the chosen condition, never hard-forced to Sealed.
 - The add-spool **API port** use case — input now carries condition, spool type, optional colour, net weight (preset or custom), and (conditionally) remaining weight; it derives status + remaining.
@@ -48,7 +48,7 @@ The hi-fi design is authoritative in `init_assets/design_handoff_filature/Filatu
 - Editing an existing Spool through this form — that is slice `11`/#33 (shares these components).
 - Wiring the dashboard "＋ Ajouter une bobine" button — slice `10`/#34.
 - Any tare / weighing gesture (removed per ADR-0004).
-- **Diameter 3.0 is unresolved:** the glossary defines exactly two standards (1.75 / 2.85). Do **not** silently add 3.0 — the diameter set is settled with the PO before this slice extends the `Diameter` enum. If confirmed, extending the enum + its parse/label + a persistence check is in scope; if not, keep the two-value control.
+- Adding a 3.0 mm diameter — decided against; the Diameter set stays 1.75 / 2.85.
 - NFC/QR tag autofill (separate future opportunity).
 
 **References:**
