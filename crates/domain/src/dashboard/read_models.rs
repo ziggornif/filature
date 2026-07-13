@@ -1,5 +1,5 @@
 use crate::dashboard::model::{SpoolStockRow, StockStatus};
-use crate::shared::{Grams, Money};
+use crate::shared::{Grams, LowStockThreshold, Money};
 use rust_decimal::Decimal;
 use std::collections::HashMap;
 
@@ -41,7 +41,7 @@ pub struct DashboardOverview {
     pub total_count: usize,
     pub active_count: usize,
     pub empty_count: usize,
-    /// Count of low-stock rows (ratio ≤ `LOW_STOCK_RATIO` and remaining > 0).
+    /// Count of low-stock rows (ratio ≤ configured threshold and remaining > 0).
     pub alert_count: usize,
     /// One row per material with ≥1 supplied row, ordered by remaining
     /// weight descending then material name (deterministic).
@@ -68,7 +68,7 @@ impl DashboardOverview {
     /// Guards every division: `Grams::ratio_of` handles zero-net rows, and
     /// the mini-bar fraction guards a zero max weight (including the
     /// empty-input case) — both yield `0.0` rather than panicking.
-    pub fn from_rows(rows: Vec<SpoolStockRow>) -> Self {
+    pub fn from_rows(rows: Vec<SpoolStockRow>, threshold: LowStockThreshold) -> Self {
         let total_count = rows.len();
         let mut active_count = 0usize;
         let mut empty_count = 0usize;
@@ -90,7 +90,7 @@ impl DashboardOverview {
             let ratio_decimal = Decimal::try_from(ratio).unwrap_or(Decimal::ZERO);
             stock_value += ratio_decimal * row.price_paid.value();
 
-            if row.is_low_stock() {
+            if row.is_low_stock(threshold) {
                 soon_empty.push(SoonEmptyItem {
                     spool_id: row.spool_id.clone(),
                     material_name: row.material_name.clone(),
@@ -171,8 +171,11 @@ impl DashboardOverview {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dashboard::model::LOW_STOCK_RATIO;
     use crate::shared::MaterialId;
+
+    fn default_threshold() -> LowStockThreshold {
+        LowStockThreshold::default()
+    }
 
     #[allow(clippy::too_many_arguments)]
     fn row(
@@ -223,7 +226,7 @@ mod tests {
             (1200, 2),
             None,
         );
-        let overview = DashboardOverview::from_rows(vec![full, half]);
+        let overview = DashboardOverview::from_rows(vec![full, half], default_threshold());
         assert_eq!(overview.stock_value, Money::new(3100, 2).unwrap());
     }
 
@@ -261,7 +264,7 @@ mod tests {
                 None,
             ),
         ];
-        let overview = DashboardOverview::from_rows(rows);
+        let overview = DashboardOverview::from_rows(rows, default_threshold());
         assert_eq!(overview.total_remaining.value(), 1400.0);
         assert_eq!(overview.total_count, 3);
         assert_eq!(overview.active_count, 2);
@@ -281,7 +284,7 @@ mod tests {
             (1000, 2),
             None,
         );
-        let overview = DashboardOverview::from_rows(vec![r]);
+        let overview = DashboardOverview::from_rows(vec![r], default_threshold());
         assert_eq!(overview.alert_count, 1);
         assert_eq!(overview.soon_empty.len(), 1);
     }
@@ -299,7 +302,7 @@ mod tests {
             (1000, 2),
             None,
         );
-        let overview = DashboardOverview::from_rows(vec![r]);
+        let overview = DashboardOverview::from_rows(vec![r], default_threshold());
         assert_eq!(overview.alert_count, 0);
         assert!(overview.soon_empty.is_empty());
     }
@@ -316,7 +319,7 @@ mod tests {
             (1000, 2),
             None,
         );
-        let overview = DashboardOverview::from_rows(vec![r]);
+        let overview = DashboardOverview::from_rows(vec![r], default_threshold());
         assert_eq!(overview.alert_count, 0);
         assert!(overview.soon_empty.is_empty());
     }
@@ -334,7 +337,7 @@ mod tests {
             (1000, 2),
             None,
         );
-        let overview = DashboardOverview::from_rows(vec![r]);
+        let overview = DashboardOverview::from_rows(vec![r], default_threshold());
         assert_eq!(overview.alert_count, 1);
         assert_eq!(overview.soon_empty.len(), 1);
     }
@@ -373,7 +376,7 @@ mod tests {
                 None,
             ),
         ];
-        let overview = DashboardOverview::from_rows(rows);
+        let overview = DashboardOverview::from_rows(rows, default_threshold());
         assert_eq!(overview.material_breakdown.len(), 2);
 
         let pla = overview
@@ -407,7 +410,7 @@ mod tests {
             (1000, 2),
             None,
         )];
-        let overview = DashboardOverview::from_rows(rows);
+        let overview = DashboardOverview::from_rows(rows, default_threshold());
         assert_eq!(overview.material_breakdown.len(), 1);
         assert_eq!(overview.material_breakdown[0].bar_fraction, 1.0);
     }
@@ -427,7 +430,7 @@ mod tests {
             (1000, 2),
             None,
         )];
-        let overview = DashboardOverview::from_rows(rows);
+        let overview = DashboardOverview::from_rows(rows, default_threshold());
         assert_eq!(overview.material_breakdown.len(), 1);
         assert_eq!(overview.material_breakdown[0].material_name, "PLA");
     }
@@ -466,7 +469,7 @@ mod tests {
                 None,
             ), // not low-stock
         ];
-        let overview = DashboardOverview::from_rows(rows);
+        let overview = DashboardOverview::from_rows(rows, default_threshold());
         assert_eq!(overview.soon_empty.len(), 2);
         assert_eq!(overview.soon_empty[0].spool_id, "s2");
         assert!((overview.soon_empty[0].remaining_ratio - 0.05).abs() < 1e-9);
@@ -482,7 +485,7 @@ mod tests {
 
     #[test]
     fn empty_input_yields_all_zeros_no_panic() {
-        let overview = DashboardOverview::from_rows(Vec::new());
+        let overview = DashboardOverview::from_rows(Vec::new(), default_threshold());
         assert_eq!(overview.stock_value, Money::new(0, 0).unwrap());
         assert_eq!(overview.total_remaining.value(), 0.0);
         assert_eq!(overview.total_count, 0);
@@ -494,7 +497,20 @@ mod tests {
     }
 
     #[test]
-    fn low_stock_ratio_constant_is_015() {
-        assert_eq!(LOW_STOCK_RATIO, 0.15);
+    fn configured_threshold_changes_low_stock_result() {
+        let r = row(
+            "s1",
+            "m1",
+            "PLA",
+            StockStatus::Open,
+            200.0,
+            1000.0,
+            (1000, 2),
+            None,
+        );
+        let default = DashboardOverview::from_rows(vec![r.clone()], default_threshold());
+        let raised = DashboardOverview::from_rows(vec![r], LowStockThreshold::new(20).unwrap());
+        assert_eq!(default.alert_count, 0);
+        assert_eq!(raised.alert_count, 1);
     }
 }

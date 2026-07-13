@@ -1,9 +1,13 @@
 use domain::dashboard::{DashboardRepository, DashboardService, DashboardUseCases};
+use domain::instance_configuration::{
+    InstanceConfigurationRepository, InstanceConfigurationService, InstanceConfigurationUseCases,
+};
 use domain::locations::{LocationRepository, LocationsService, LocationsUseCases};
 use domain::manufacturers::{ManufacturerRepository, ManufacturersService, ManufacturersUseCases};
 use domain::materials::{MaterialRepository, MaterialsService, MaterialsUseCases};
 use domain::spools::{SpoolRepository, SpoolsService, SpoolsUseCases};
 use filature::persistence::dashboard::SqlxDashboardRepository;
+use filature::persistence::instance_configuration::SqlxInstanceConfigurationRepository;
 use filature::persistence::locations::SqlxLocationRepository;
 use filature::persistence::manufacturers::SqlxManufacturerRepository;
 use filature::persistence::materials::SqlxMaterialRepository;
@@ -59,6 +63,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Arc::new(SqlxDashboardRepository::new(db.clone()));
     let dashboard: Arc<dyn DashboardUseCases> = Arc::new(DashboardService::new(dash_repo));
 
+    let instance_configuration_repo: Arc<dyn InstanceConfigurationRepository> =
+        Arc::new(SqlxInstanceConfigurationRepository::new(db.clone()));
+    let instance_configuration: Arc<dyn InstanceConfigurationUseCases> = Arc::new(
+        InstanceConfigurationService::new(instance_configuration_repo),
+    );
+    // Load once during boot so a persisted configuration failure prevents the
+    // service from starting with silently different alert behaviour.
+    instance_configuration.get().await?;
+
     // Demo-auth gate (slice 08): load the `[auth]` credential and wrap the app
     // in the login/session layer. Required in production — a missing `[auth]`
     // table fails the boot here rather than silently serving an open instance.
@@ -75,6 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             locations,
             manufacturers,
             dashboard,
+            instance_configuration,
         )),
         auth,
         renderer,

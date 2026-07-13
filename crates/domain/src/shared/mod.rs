@@ -49,6 +49,11 @@ impl LocationId {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ManufacturerId(pub String);
 
+/// Instance-wide percentage at or below which a non-empty spool is low stock.
+/// Shared because both the instance-configuration and dashboard slices use it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LowStockThreshold(u8);
+
 impl ManufacturerId {
     pub fn new(s: impl Into<String>) -> Self {
         Self(s.into())
@@ -98,6 +103,33 @@ pub enum DomainError {
     BlankManufacturerName,
     #[error("manufacturer has {count} spools and cannot be deleted")]
     ManufacturerInUse { count: u64 },
+    #[error("low-stock threshold must be between 0 and 100, got {0}")]
+    InvalidLowStockThreshold(i64),
+}
+
+impl LowStockThreshold {
+    pub const DEFAULT_PERCENT: u8 = 15;
+
+    pub fn new(percent: i64) -> Result<Self, DomainError> {
+        if !(0..=100).contains(&percent) {
+            return Err(DomainError::InvalidLowStockThreshold(percent));
+        }
+        Ok(Self(percent as u8))
+    }
+
+    pub const fn percent(self) -> u8 {
+        self.0
+    }
+
+    pub fn ratio(self) -> f64 {
+        f64::from(self.0) / 100.0
+    }
+}
+
+impl Default for LowStockThreshold {
+    fn default() -> Self {
+        Self(Self::DEFAULT_PERCENT)
+    }
 }
 
 impl Grams {
@@ -259,5 +291,30 @@ mod tests {
             err.to_string(),
             "location has 1 spools and cannot be deleted"
         );
+    }
+
+    #[test]
+    fn low_stock_threshold_accepts_inclusive_bounds() {
+        assert_eq!(LowStockThreshold::new(0).unwrap().percent(), 0);
+        assert_eq!(LowStockThreshold::new(100).unwrap().percent(), 100);
+    }
+
+    #[test]
+    fn low_stock_threshold_rejects_values_outside_percentage_range() {
+        assert_eq!(
+            LowStockThreshold::new(-1),
+            Err(DomainError::InvalidLowStockThreshold(-1))
+        );
+        assert_eq!(
+            LowStockThreshold::new(101),
+            Err(DomainError::InvalidLowStockThreshold(101))
+        );
+    }
+
+    #[test]
+    fn low_stock_threshold_defaults_to_fifteen_percent() {
+        let threshold = LowStockThreshold::default();
+        assert_eq!(threshold.percent(), 15);
+        assert!((threshold.ratio() - 0.15).abs() < f64::EPSILON);
     }
 }

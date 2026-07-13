@@ -301,6 +301,7 @@ fn render_rows(
     items: Vec<SpoolListItem>,
     stock_value: &str,
     total_count: usize,
+    low_stock_threshold_pct: u8,
 ) -> Response {
     let filtered_count = items.len();
     let views: Vec<SpoolView> = items.into_iter().map(Into::into).collect();
@@ -309,6 +310,7 @@ fn render_rows(
     ctx.insert("stock_value", stock_value);
     ctx.insert("filtered_count", &filtered_count);
     ctx.insert("total_count", &total_count);
+    ctx.insert("low_stock_threshold_pct", &low_stock_threshold_pct);
     match st.renderer.render("_spool_rows.html", locale, "", ctx) {
         Ok(html) => Html(html).into_response(),
         Err(e) => internal_error(e),
@@ -340,6 +342,10 @@ async fn list_page(
 ) -> Response {
     let locale = resolve_locale(&headers, &st);
     let theme = resolve_theme(&headers);
+    let low_stock_threshold_pct = match st.instance_configuration.get().await {
+        Ok(configuration) => configuration.low_stock_threshold.percent(),
+        Err(e) => return internal_error(e),
+    };
 
     let materials = match material_options(&st).await {
         Ok(ms) => ms,
@@ -385,6 +391,7 @@ async fn list_page(
             ctx.insert("stock_value", &stock_value);
             ctx.insert("filtered_count", &filtered_count);
             ctx.insert("total_count", &total_count);
+            ctx.insert("low_stock_threshold_pct", &low_stock_threshold_pct);
             ctx.insert("page", "spools");
             match st
                 .renderer
@@ -404,6 +411,10 @@ async fn rows(
     Query(q): Query<SpoolQuery>,
 ) -> Response {
     let locale = resolve_locale(&headers, &st);
+    let low_stock_threshold_pct = match st.instance_configuration.get().await {
+        Ok(configuration) => configuration.low_stock_threshold.percent(),
+        Err(e) => return internal_error(e),
+    };
     let filter = q.to_filter();
     let stock_value = match st.spools.stock_value(filter.clone()).await {
         Ok(v) => v.to_string(),
@@ -414,7 +425,14 @@ async fn rows(
         Err(resp) => return resp,
     };
     match st.spools.list(filter, q.to_sort()).await {
-        Ok(items) => render_rows(&st, &locale, items, &stock_value, total_count),
+        Ok(items) => render_rows(
+            &st,
+            &locale,
+            items,
+            &stock_value,
+            total_count,
+            low_stock_threshold_pct,
+        ),
         Err(e) => internal_error(e),
     }
 }
@@ -1337,6 +1355,7 @@ mod tests {
     fn insert_counts(ctx: &mut Context) {
         ctx.insert("filtered_count", &1usize);
         ctx.insert("total_count", &1usize);
+        ctx.insert("low_stock_threshold_pct", &15u8);
     }
 
     fn render_list(locale: &str) -> String {
@@ -1882,6 +1901,13 @@ mod tests {
                     locations,
                     manufacturers,
                     dashboard,
+                    Arc::new(
+                        domain::instance_configuration::InstanceConfigurationService::new(
+                            Arc::new(
+                                domain::instance_configuration::stubs::StubInstanceConfigurationRepository::new(),
+                            ),
+                        ),
+                    ),
                 ),
                 seeded.id.as_str().to_string(),
             )

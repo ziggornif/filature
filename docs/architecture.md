@@ -25,6 +25,7 @@ crates/
 │       ├── spools/            # slice: the richest domain — weight/length/status/value
 │       ├── locations/         # slice: storage places (no sensor in v1)
 │       ├── dashboard/         # slice: read-only aggregates
+│       ├── instance_configuration/ # slice: global instance settings
 │       └── ports/spi/stubs/   # hand-written SPI test doubles, behind `stubs` feature
 └── app/               # composition root + all adapters + the single binary
     └── src/
@@ -76,6 +77,7 @@ TOML file, env overrides. Backup = `pg_dump` / managed Postgres.
 | `spools` | Spool lifecycle & all derived quantities (the domain-heavy slice) | add, edit, list (filter/sort), view, adjust-weight (weigh / consume), archive | `SpoolRepository`, `Clock`, `IdGenerator` |
 | `locations` | Storage places (plain in v1; Drybox specialisation deferred) | list, add, edit | `LocationRepository` |
 | `dashboard` | Read-only aggregates over spools/materials | view (value, remaining, split by material, soon-empty) | its own `StockOverviewRepository` (aggregate reads) |
+| `instance_configuration` | Global instance settings, including the Low-Stock Threshold | read/update settings | `InstanceConfigurationRepository` |
 
 No slice imports another slice. The dashboard does **not** reuse `spools`'
 `SpoolRepository`; it declares its own narrow `StockOverviewRepository` in its

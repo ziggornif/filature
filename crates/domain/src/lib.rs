@@ -1,4 +1,5 @@
 pub mod dashboard;
+pub mod instance_configuration;
 pub mod locations;
 pub mod manufacturers;
 pub mod materials;

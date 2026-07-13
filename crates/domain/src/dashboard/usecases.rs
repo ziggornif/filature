@@ -1,6 +1,7 @@
 use crate::dashboard::ports::api::DashboardUseCases;
 use crate::dashboard::ports::spi::{DashboardRepository, RepositoryError};
 use crate::dashboard::read_models::DashboardOverview;
+use crate::shared::LowStockThreshold;
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -16,9 +17,12 @@ impl DashboardService {
 
 #[async_trait]
 impl DashboardUseCases for DashboardService {
-    async fn overview(&self) -> Result<DashboardOverview, RepositoryError> {
+    async fn overview(
+        &self,
+        threshold: LowStockThreshold,
+    ) -> Result<DashboardOverview, RepositoryError> {
         let rows = self.repo.stock_rows().await?;
-        Ok(DashboardOverview::from_rows(rows))
+        Ok(DashboardOverview::from_rows(rows, threshold))
     }
 }
 
@@ -48,7 +52,10 @@ mod tests {
     async fn overview_wires_spi_rows_through_the_pure_computation() {
         let repo = StubDashboardRepository::with(vec![sample_row()]);
         let service = DashboardService::new(Arc::new(repo));
-        let overview = service.overview().await.unwrap();
+        let overview = service
+            .overview(LowStockThreshold::default())
+            .await
+            .unwrap();
         assert_eq!(overview.total_count, 1);
         assert_eq!(overview.stock_value, Money::new(2500, 2).unwrap());
     }
@@ -57,7 +64,10 @@ mod tests {
     async fn overview_on_empty_repository_is_all_zeros() {
         let repo = StubDashboardRepository::new();
         let service = DashboardService::new(Arc::new(repo));
-        let overview = service.overview().await.unwrap();
+        let overview = service
+            .overview(LowStockThreshold::default())
+            .await
+            .unwrap();
         assert_eq!(overview.total_count, 0);
         assert_eq!(overview.stock_value, Money::new(0, 0).unwrap());
     }
