@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="dashboard-header">
-    <h1>{{ t(key="nav.dashboard") }}</h1>
+    <div>
+      <h1>{{ t(key="nav.dashboard") }}</h1>
+      <p class="page-subtitle">{{ t(key="dashboard.subtitle") }}</p>
+    </div>
     <a class="button button--primary" href="/spools/new">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       <span>{{ t(key="spools.add") }}</span>
@@ -11,11 +14,15 @@
   <div class="kpi-grid">
     <div class="kpi-card" id="kpi-stock-value">
       <div class="kpi-label">{{ t(key="spools.stock_value") }}</div>
-      <div class="kpi-value">{{ stock_value }}</div>
+      <div class="kpi-value">{{ stock_value }} <span class="kpi-unit">€</span></div>
+      <div class="kpi-sub">{{ t(key="dashboard.kpi.stock_value_sub") }}</div>
     </div>
     <div class="kpi-card" id="kpi-remaining-weight">
       <div class="kpi-label">{{ t(key="dashboard.kpi.remaining_weight") }}</div>
-      <div class="kpi-value">{{ remaining_kg }} kg</div>
+      <div class="kpi-value">{{ remaining_kg }} <span class="kpi-unit">kg</span></div>
+      <div class="kpi-sub">
+        {{ t(key="dashboard.kpi.remaining_sub_prefix") }} {{ active_count }} {{ t(key="dashboard.kpi.remaining_sub_suffix") }}
+      </div>
     </div>
     <div class="kpi-card" id="kpi-spools">
       <div class="kpi-label">{{ t(key="nav.spools") }}</div>
@@ -28,6 +35,7 @@
     <div class="kpi-card kpi-card--danger" id="kpi-alerts">
       <div class="kpi-label">{{ t(key="dashboard.kpi.alerts") }}</div>
       <div class="kpi-value">{{ alert_count }}</div>
+      <div class="kpi-sub">{{ alert_count }} {{ t(key="dashboard.kpi.alerts_sub") }}</div>
     </div>
   </div>
 

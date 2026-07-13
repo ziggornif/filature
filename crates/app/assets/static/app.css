@@ -266,6 +266,12 @@ body {
   margin-top: 4px;
 }
 
+.kpi-unit {
+  font-size: 0.6em;
+  color: var(--muted);
+  font-weight: 400;
+}
+
 .kpi-sub {
   color: var(--muted);
   font-size: 12px;
