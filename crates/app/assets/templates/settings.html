@@ -7,4 +7,35 @@
     <div id="settings-msg" class="form-error" role="alert" aria-live="polite"></div>
     {% include "_low_stock_threshold_setting.html" %}
   </section>
+  <section class="settings-panel" aria-labelledby="transfer-settings-title">
+    <h2 id="transfer-settings-title">{{ t(key="settings.transfer.title") }}</h2>
+    <p class="settings-intro">{{ t(key="settings.transfer.description") }}</p>
+    {% if imported %}
+      <p class="form-success" role="status">{{ t(key="settings.transfer.imported") }}</p>
+    {% endif %}
+    {% if import_error %}
+      <p class="form-error" role="alert">{{ import_error }}</p>
+    {% endif %}
+    <div class="settings-transfer-actions">
+      <div>
+        <h3>{{ t(key="settings.transfer.export.title") }}</h3>
+        <p>{{ t(key="settings.transfer.export.help") }}</p>
+        <a class="button" href="/settings/export">{{ t(key="settings.transfer.export.action") }}</a>
+      </div>
+      <div>
+        <h3>{{ t(key="settings.transfer.import.title") }}</h3>
+        <p>{{ t(key="settings.transfer.import.help") }}</p>
+        <form method="post" action="/settings/import" enctype="multipart/form-data">
+          <label for="instance-backup">{{ t(key="settings.transfer.import.file") }}</label>
+          <input id="instance-backup" name="backup" type="file" accept="application/json,.json" required>
+          <p class="form-help">{{ t(key="settings.transfer.import.limit") }}</p>
+          <label class="checkbox-label">
+            <input name="confirm_replace" type="checkbox" value="yes" required>
+            {{ t(key="settings.transfer.import.confirm") }}
+          </label>
+          <button type="submit" class="button button-danger">{{ t(key="settings.transfer.import.action") }}</button>
+        </form>
+      </div>
+    </div>
+  </section>
 {% endblock content %}
