@@ -212,9 +212,13 @@ mod tests {
     }
 
     fn render(locale: &str) -> String {
+        render_materials(locale, &[view()])
+    }
+
+    fn render_materials(locale: &str, materials: &[MaterialView]) -> String {
         let r = Renderer::new(Catalog::load("en"));
         let mut ctx = Context::new();
-        ctx.insert("materials", &vec![view()]);
+        ctx.insert("materials", materials);
         r.render("materials.html", locale, "", ctx).unwrap()
     }
 
@@ -260,5 +264,58 @@ mod tests {
         assert!(html.contains(r#"id="materials-msg""#));
         assert!(html.contains(r#"hx-ext="response-targets""#));
         assert!(html.contains(r##"hx-target-error="#materials-msg""##)); // add form + row inputs
+    }
+
+    #[test]
+    fn table_matches_the_editable_materials_handoff() {
+        let fr = render("fr");
+
+        assert_eq!(fr.matches("<th>Séchage</th>").count(), 1);
+        assert!(!fr.contains("Séchage —"));
+        assert!(fr.contains(r#"class="material-drying""#));
+        assert!(fr.contains(r#"name="drying_temp_c""#));
+        assert!(fr.contains(r#"name="drying_time_h""#));
+        assert!(fr.contains("°C ·"));
+        assert!(fr.contains("h</span>"));
+
+        assert!(fr.contains(r#"class="material-name-badge""#));
+        assert!(fr.contains(r#"class="material-sensitivity-pill""#));
+        assert!(fr.contains("material-row--low"));
+        assert!(fr.contains(r#"hx-put="/materials/01HZID""#));
+        assert!(fr.contains("<th>Seuil %HR</th>"));
+        assert!(fr.contains("<th>Buse</th>"));
+        assert!(fr.contains("<th>Plateau</th>"));
+        assert!(fr.contains("Modifier une valeur met à jour aussitôt les longueurs restantes et les seuils d’alerte d’humidité."));
+
+        let en = render("en");
+        assert!(en.contains("<th>Drying</th>"));
+        assert!(en.contains("<th>RH threshold</th>"));
+        assert!(en.contains("<th>Nozzle</th>"));
+        assert!(en.contains("<th>Bed</th>"));
+        assert!(en.contains(
+            "Editing a value immediately updates remaining lengths and humidity alert thresholds."
+        ));
+        assert!(!en.contains("materials.footer"));
+    }
+
+    #[test]
+    fn each_sensitivity_renders_its_semantic_pill_hook() {
+        let mut low = view();
+        low.id = "LOW".into();
+        let mut medium = view();
+        medium.id = "MEDIUM".into();
+        medium.sensitivity = "Medium".into();
+        let mut high = view();
+        high.id = "HIGH".into();
+        high.sensitivity = "High".into();
+
+        let html = render_materials("fr", &[low, medium, high]);
+        assert!(html.contains("material-row--low"));
+        assert!(html.contains("material-row--medium"));
+        assert!(html.contains("material-row--high"));
+        assert_eq!(html.matches("material-sensitivity-pill").count(), 3);
+        assert!(html.contains("Faible"));
+        assert!(html.contains("Moyenne"));
+        assert!(html.contains("Élevée"));
     }
 }

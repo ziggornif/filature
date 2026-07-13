@@ -1184,29 +1184,122 @@ a {
   color: var(--muted);
 }
 
-.material-row--low td:first-child {
-  box-shadow: inset 3px 0 0 var(--ok);
-}
-.material-row--medium td:first-child {
-  box-shadow: inset 3px 0 0 var(--warn);
-}
-.material-row--high td:first-child {
-  box-shadow: inset 3px 0 0 var(--danger);
+.materials-table-scroll {
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--raised);
+  box-shadow: var(--shadow);
 }
 
-/* sensitivity select reads in its semantic colour */
-.material-row--low select[name="sensitivity"] {
+.materials-table thead {
+  background: var(--surface);
+}
+
+.materials-table thead th {
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
+.materials-table th:nth-child(2),
+.materials-table th:nth-child(5),
+.materials-table th:nth-child(6),
+.materials-table th:nth-child(7),
+.materials-table td:nth-child(2),
+.materials-table td:nth-child(5),
+.materials-table td:nth-child(6),
+.materials-table td:nth-child(7) {
+  text-align: right;
+}
+
+.materials-table tbody tr:hover {
+  background: var(--hover-bg);
+}
+
+.materials-table input.material-name-badge {
+  width: 104px;
+  border-color: var(--border-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+}
+
+.material-drying-fields {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.materials-table .material-drying-fields input {
+  width: 42px;
+  padding-inline: 5px;
+  text-align: right;
+}
+
+.materials-table .material-drying-fields input[name="drying_time_h"] {
+  width: 34px;
+}
+
+.materials-table td:nth-child(2) input {
+  width: 64px;
+  text-align: right;
+}
+
+.materials-table td:nth-child(6) input,
+.materials-table td:nth-child(7) input {
+  width: 54px;
+  text-align: right;
+}
+
+/* The editable select itself is the semantic sensitivity pill. */
+.materials-table select.material-sensitivity-pill {
+  width: auto;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+.material-row--low .material-sensitivity-pill {
   color: var(--ok);
+  background: var(--ok-bg);
+  border-color: color-mix(in srgb, var(--ok) 35%, transparent);
 }
-.material-row--medium select[name="sensitivity"] {
+.material-row--medium .material-sensitivity-pill {
   color: var(--warn);
+  background: var(--warn-bg);
+  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
 }
-.material-row--high select[name="sensitivity"] {
+.material-row--high .material-sensitivity-pill {
   color: var(--danger);
+  background: var(--danger-bg);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
 .material-threshold {
   color: var(--muted);
+  text-align: right;
+}
+
+.materials-footer-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 14px 0 0;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.materials-footer-note svg {
+  flex: 0 0 auto;
 }
 
 /* Add-forms shared shape (materials / locations): a raised strip of inputs */
@@ -1822,7 +1915,7 @@ a {
   }
 
   .materials-table {
-    min-width: 880px;
+    min-width: 760px;
   }
 
   .kpi-grid {
