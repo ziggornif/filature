@@ -1,6 +1,6 @@
 //! SQLx adapter for the dashboard slice SPI (`DashboardRepository`). A thin
 //! data-supply port: one SELECT joining `spools` to `materials` (name) and
-//! `locations` (name), excluding archived spools — no aggregation here, all
+//! `manufacturers`/`locations` (names), excluding archived spools — no aggregation here, all
 //! KPI/grouping/sorting computation happens in the domain over the rows this
 //! adapter returns (ADR-0003, PostgreSQL).
 
@@ -21,6 +21,7 @@ struct StockRow {
     status: String,
     material_id: String,
     material_name: String,
+    manufacturer_name: Option<String>,
     location_name: Option<String>,
 }
 
@@ -60,9 +61,11 @@ impl DashboardRepository for SqlxDashboardRepository {
             r#"SELECT s.id, s.colour_hex, s.colour_name, s.net_weight,
                       s.remaining_weight, s.price_paid, s.status,
                       m.id AS material_id, m.name AS material_name,
+                      mf.name AS manufacturer_name,
                       l.name AS location_name
                FROM spools s
                JOIN materials m ON m.id = s.material_id
+               LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id
                LEFT JOIN locations l ON l.id = s.location_id
                WHERE s.status <> 'Archived'"#,
         )
@@ -76,6 +79,7 @@ impl DashboardRepository for SqlxDashboardRepository {
                     spool_id: r.id,
                     material_id: MaterialId::new(r.material_id),
                     material_name: r.material_name,
+                    manufacturer_name: r.manufacturer_name,
                     colour_hex: r.colour_hex.unwrap_or_default(),
                     colour_name: r.colour_name,
                     status: build_status(&r.status)?,
