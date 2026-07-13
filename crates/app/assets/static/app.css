@@ -1132,6 +1132,18 @@ a {
     padding: 16px 15px;
   }
 
+  .materials-table-scroll {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .materials-table {
+    min-width: 880px;
+  }
+
   .kpi-grid {
     grid-template-columns: 1fr;
   }
