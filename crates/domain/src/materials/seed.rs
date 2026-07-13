@@ -29,9 +29,14 @@ pub fn builtin() -> Vec<NewMaterial> {
     use Sensitivity::*;
     vec![
         material("PLA", 1.24, 45, 6, Low, 210, 60),
+        material("PLA+", 1.24, 45, 6, Low, 215, 60),
+        material("PLA-Wood", 1.10, 45, 6, Low, 205, 60),
+        material("PLA-Silk", 1.24, 45, 6, Low, 215, 60),
+        material("PLA-Matte", 1.24, 45, 6, Low, 210, 60),
         material("PLA-CF", 1.30, 45, 6, Low, 220, 60),
         material("PETG", 1.27, 65, 6, Medium, 240, 80),
         material("PETG-CF", 1.30, 65, 6, Medium, 250, 80),
+        material("PCTG", 1.23, 65, 6, Medium, 250, 80),
         material("ASA", 1.07, 70, 4, Medium, 250, 100),
         material("ABS", 1.04, 70, 4, Medium, 245, 100),
         material("HIPS", 1.04, 65, 4, Medium, 240, 100),
@@ -43,4 +48,45 @@ pub fn builtin() -> Vec<NewMaterial> {
         material("PA-GF", 1.20, 80, 8, High, 270, 90),
         material("PC", 1.20, 90, 6, High, 270, 110),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builtin_contains_enriched_materials_with_expected_values() {
+        use Sensitivity::*;
+
+        let all = builtin();
+        let expected = [
+            material("PLA+", 1.24, 45, 6, Low, 215, 60),
+            material("PLA-Wood", 1.10, 45, 6, Low, 205, 60),
+            material("PLA-Silk", 1.24, 45, 6, Low, 215, 60),
+            material("PLA-Matte", 1.24, 45, 6, Low, 210, 60),
+            material("PCTG", 1.23, 65, 6, Medium, 250, 80),
+        ];
+
+        for expected_material in expected {
+            let actual = all
+                .iter()
+                .find(|material| material.name == expected_material.name);
+            assert_eq!(actual, Some(&expected_material));
+        }
+    }
+
+    #[test]
+    fn builtin_names_are_unique() {
+        let all = builtin();
+        let mut names: Vec<&str> = all.iter().map(|material| material.name.as_str()).collect();
+
+        assert_eq!(names.len(), 19);
+        names.sort_unstable();
+        names.dedup();
+        assert_eq!(
+            names.len(),
+            all.len(),
+            "builtin material names must be unique"
+        );
+    }
 }
