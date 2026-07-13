@@ -9,6 +9,7 @@ publish = false
 thiserror.workspace = true
 rust_decimal = { version = "1", default-features = false, features = ["std"] }
 async-trait = "0.1"
+time.workspace = true
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }

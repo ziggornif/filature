@@ -39,6 +39,9 @@ impl SpoolsUseCases for SpoolsService {
         spool.status = status;
         spool.location_id = edit.location_id;
         spool.manufacturer_id = edit.manufacturer_id;
+        spool.notes = edit.notes;
+        spool.purchased_at = edit.purchased_at;
+        spool.opened_at = edit.opened_at;
         self.repo.update(spool).await
     }
 
@@ -124,6 +127,7 @@ mod tests {
         Colour, Diameter, EditSpool, SpoolCondition, SpoolStatus, SpoolType,
     };
     use crate::spools::stubs::StubSpoolRepository;
+    use time::{Date, Month};
 
     fn svc() -> SpoolsService {
         SpoolsService::new(Arc::new(StubSpoolRepository::new()))
@@ -139,6 +143,9 @@ mod tests {
             price_paid: Money::new(2500, 2).unwrap(),
             location_id: None,
             manufacturer_id: None,
+            notes: None,
+            purchased_at: None,
+            opened_at: None,
             remaining_weight: None,
         }
     }
@@ -154,6 +161,9 @@ mod tests {
             price_paid: spool.price_paid,
             location_id: spool.location_id.clone(),
             manufacturer_id: spool.manufacturer_id.clone(),
+            notes: spool.notes.clone(),
+            purchased_at: spool.purchased_at,
+            opened_at: spool.opened_at,
             remaining_weight: Some(spool.remaining_weight),
         }
     }
@@ -166,6 +176,27 @@ mod tests {
         assert_eq!(created.spool_type, SpoolType::Complete);
         assert_eq!(created.remaining_weight.value(), created.net_weight.value());
         assert_eq!(created.net_weight.value(), 1000.0);
+    }
+
+    #[tokio::test]
+    async fn add_and_edit_preserve_notes_and_dates() {
+        let s = svc();
+        let purchased_at = Date::from_calendar_date(2026, Month::July, 1).unwrap();
+        let opened_at = Date::from_calendar_date(2026, Month::July, 12).unwrap();
+        let mut new = sample_new_spool("material-1");
+        new.notes = Some("Initial note".into());
+        new.purchased_at = Some(purchased_at);
+        let created = s.add(new).await.unwrap();
+        assert_eq!(created.notes.as_deref(), Some("Initial note"));
+        assert_eq!(created.purchased_at, Some(purchased_at));
+
+        let mut edit = edit_spool(&created, SpoolCondition::Opened);
+        edit.notes = Some("Opened for a prototype".into());
+        edit.opened_at = Some(opened_at);
+        let edited = s.edit(edit).await.unwrap();
+        assert_eq!(edited.notes.as_deref(), Some("Opened for a prototype"));
+        assert_eq!(edited.purchased_at, Some(purchased_at));
+        assert_eq!(edited.opened_at, Some(opened_at));
     }
 
     #[tokio::test]

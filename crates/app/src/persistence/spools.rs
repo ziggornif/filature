@@ -14,6 +14,7 @@ use domain::spools::{
     SpoolListItem, SpoolRepository, SpoolSort, SpoolStatus, SpoolType,
 };
 use rust_decimal::Decimal;
+use time::Date;
 use ulid::Ulid;
 
 pub struct SqlxSpoolRepository {
@@ -120,6 +121,9 @@ struct DetailRow {
     density: f64,
     location_name: Option<String>,
     manufacturer_name: Option<String>,
+    notes: Option<String>,
+    purchased_at: Option<Date>,
+    opened_at: Option<Date>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -135,6 +139,9 @@ struct SpoolRow {
     status: String,
     location_id: Option<String>,
     manufacturer_id: Option<String>,
+    notes: Option<String>,
+    purchased_at: Option<Date>,
+    opened_at: Option<Date>,
 }
 
 /// Escape the LIKE/ILIKE metacharacters (`\`, `%`, `_`) in a user-supplied
@@ -192,8 +199,9 @@ impl SpoolRepository for SqlxSpoolRepository {
         sqlx::query(
             r#"INSERT INTO spools
                (id, material_id, spool_type, colour_hex, colour_name, diameter, net_weight,
-                remaining_weight, price_paid, status, location_id, manufacturer_id)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)"#,
+                remaining_weight, price_paid, status, location_id, manufacturer_id, notes,
+                purchased_at, opened_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)"#,
         )
         .bind(&id)
         .bind(s.material_id.as_str())
@@ -207,6 +215,9 @@ impl SpoolRepository for SqlxSpoolRepository {
         .bind(status.as_str())
         .bind(location_id)
         .bind(manufacturer_id)
+        .bind(s.notes.as_deref())
+        .bind(s.purchased_at)
+        .bind(s.opened_at)
         .execute(&self.pool)
         .await
         .map_err(|e| write_error(e, s.material_id.as_str(), location_id, manufacturer_id))?;
@@ -223,6 +234,9 @@ impl SpoolRepository for SqlxSpoolRepository {
             status,
             location_id: s.location_id,
             manufacturer_id: s.manufacturer_id,
+            notes: s.notes,
+            purchased_at: s.purchased_at,
+            opened_at: s.opened_at,
         })
     }
 
@@ -235,7 +249,7 @@ impl SpoolRepository for SqlxSpoolRepository {
             r#"UPDATE spools SET
                  material_id=$2, spool_type=$3, colour_hex=$4, colour_name=$5, diameter=$6,
                  net_weight=$7, remaining_weight=$8, price_paid=$9, status=$10, location_id=$11,
-                 manufacturer_id=$12
+                 manufacturer_id=$12, notes=$13, purchased_at=$14, opened_at=$15
                WHERE id=$1"#,
         )
         .bind(s.id.as_str())
@@ -250,6 +264,9 @@ impl SpoolRepository for SqlxSpoolRepository {
         .bind(s.status.as_str())
         .bind(location_id)
         .bind(manufacturer_id)
+        .bind(s.notes.as_deref())
+        .bind(s.purchased_at)
+        .bind(s.opened_at)
         .execute(&self.pool)
         .await
         .map_err(|e| write_error(e, s.material_id.as_str(), location_id, manufacturer_id))?;
@@ -346,7 +363,8 @@ impl SpoolRepository for SqlxSpoolRepository {
                       s.location_id, s.manufacturer_id,
                       m.name AS material_name, m.density,
                       l.name AS location_name,
-                      mf.name AS manufacturer_name
+                      mf.name AS manufacturer_name,
+                      s.notes, s.purchased_at, s.opened_at
                FROM spools s
                JOIN materials m ON m.id = s.material_id
                LEFT JOIN locations l ON l.id = s.location_id
@@ -379,6 +397,9 @@ impl SpoolRepository for SqlxSpoolRepository {
             location_id: r.location_id,
             manufacturer_name: r.manufacturer_name,
             manufacturer_id: r.manufacturer_id,
+            notes: r.notes,
+            purchased_at: r.purchased_at,
+            opened_at: r.opened_at,
         }))
     }
 
@@ -386,7 +407,7 @@ impl SpoolRepository for SqlxSpoolRepository {
         let row = sqlx::query_as::<_, SpoolRow>(
             r#"SELECT id, material_id, spool_type, colour_hex, diameter,
                       net_weight, remaining_weight, price_paid, status, location_id,
-                      manufacturer_id
+                      manufacturer_id, notes, purchased_at, opened_at
                FROM spools WHERE id = $1"#,
         )
         .bind(id.as_str())
@@ -411,6 +432,9 @@ impl SpoolRepository for SqlxSpoolRepository {
             status: build_status(&r.status)?,
             location_id: r.location_id.map(LocationId::new),
             manufacturer_id: r.manufacturer_id.map(ManufacturerId::new),
+            notes: r.notes,
+            purchased_at: r.purchased_at,
+            opened_at: r.opened_at,
         }))
     }
 

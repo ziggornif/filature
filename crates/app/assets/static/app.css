@@ -2074,6 +2074,10 @@ a {
   color: var(--muted);
   font-size: 13.5px;
 }
+.spool-detail-note {
+  margin: 0;
+  white-space: pre-wrap;
+}
 .spool-detail-history-placeholder {
   display: flex;
   align-items: center;

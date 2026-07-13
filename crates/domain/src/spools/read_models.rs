@@ -1,5 +1,6 @@
 use crate::shared::{Grams, MaterialId, Money};
 use crate::spools::model::{Colour, Diameter, SpoolId, SpoolStatus, SpoolType, remaining_length_m};
+use time::Date;
 
 /// Cross-adapter read model for a spool-list row: the fields a UI list view
 /// needs, joining a `Spool`'s own fields with the display-only material
@@ -61,6 +62,9 @@ pub struct SpoolDetail {
     /// alongside `manufacturer_name` so the edit form can preselect the
     /// current manufacturer and preserve it on save.
     pub manufacturer_id: Option<String>,
+    pub notes: Option<String>,
+    pub purchased_at: Option<Date>,
+    pub opened_at: Option<Date>,
 }
 
 impl SpoolDetail {

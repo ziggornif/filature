@@ -97,6 +97,9 @@ fn to_detail(s: &Spool) -> SpoolDetail {
         location_id: s.location_id.as_ref().map(|l| l.as_str().to_string()),
         manufacturer_name: None,
         manufacturer_id: s.manufacturer_id.as_ref().map(|m| m.as_str().to_string()),
+        notes: s.notes.clone(),
+        purchased_at: s.purchased_at,
+        opened_at: s.opened_at,
     }
 }
 
@@ -119,6 +122,9 @@ impl SpoolRepository for StubSpoolRepository {
             status,
             location_id: s.location_id,
             manufacturer_id: s.manufacturer_id,
+            notes: s.notes,
+            purchased_at: s.purchased_at,
+            opened_at: s.opened_at,
         };
         rows.push(spool.clone());
         Ok(spool)
