@@ -51,55 +51,60 @@
              autocomplete="off">
     </label>
 
-    <label>
-      {{ t(key="spools.filter.material") }}
-      <select name="material_id">
-        <option value="">{{ t(key="spools.filter.all_materials") }}</option>
-        {% for m in materials %}
-          <option value="{{ m.id }}"{% if m.id == selected_material %} selected{% endif %}>{{ m.name }}</option>
-        {% endfor %}
-      </select>
-    </label>
+    <details class="spools-advanced-filters">
+      <summary>{{ t(key="spools.filter.advanced") }}</summary>
+      <div class="spools-advanced-fields">
+        <label>
+          {{ t(key="spools.filter.material") }}
+          <select name="material_id">
+            <option value="">{{ t(key="spools.filter.all_materials") }}</option>
+            {% for m in materials %}
+              <option value="{{ m.id }}"{% if m.id == selected_material %} selected{% endif %}>{{ m.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
 
-    <label>
-      {{ t(key="spools.filter.manufacturer") }}
-      <select name="manufacturer_id">
-        <option value="">{{ t(key="spools.filter.all_manufacturers") }}</option>
-        {% for mf in manufacturers %}
-          <option value="{{ mf.id }}"{% if mf.id == selected_manufacturer %} selected{% endif %}>{{ mf.name }}</option>
-        {% endfor %}
-      </select>
-    </label>
+        <label>
+          {{ t(key="spools.filter.manufacturer") }}
+          <select name="manufacturer_id">
+            <option value="">{{ t(key="spools.filter.all_manufacturers") }}</option>
+            {% for mf in manufacturers %}
+              <option value="{{ mf.id }}"{% if mf.id == selected_manufacturer %} selected{% endif %}>{{ mf.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
 
-    <label>
-      {{ t(key="spools.filter.location") }}
-      <select name="location_id">
-        <option value="">{{ t(key="spools.filter.all_locations") }}</option>
-        {% for l in locations %}
-          <option value="{{ l.id }}"{% if l.id == selected_location %} selected{% endif %}>{{ l.name }}</option>
-        {% endfor %}
-      </select>
-    </label>
+        <label>
+          {{ t(key="spools.filter.location") }}
+          <select name="location_id">
+            <option value="">{{ t(key="spools.filter.all_locations") }}</option>
+            {% for l in locations %}
+              <option value="{{ l.id }}"{% if l.id == selected_location %} selected{% endif %}>{{ l.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
 
-    <label>
-      {{ t(key="spools.filter.status") }}
-      <select name="status">
-        <option value="">{{ t(key="spools.filter.all_statuses") }}</option>
-        <option value="Sealed"{% if selected_status == "Sealed" %} selected{% endif %}>{{ t(key="spools.status.sealed") }}</option>
-        <option value="Open"{% if selected_status == "Open" %} selected{% endif %}>{{ t(key="spools.status.open") }}</option>
-        <option value="Empty"{% if selected_status == "Empty" %} selected{% endif %}>{{ t(key="spools.status.empty") }}</option>
-        <option value="Archived"{% if selected_status == "Archived" %} selected{% endif %}>{{ t(key="spools.status.archived") }}</option>
-      </select>
-    </label>
+        <label>
+          {{ t(key="spools.filter.status") }}
+          <select name="status">
+            <option value="">{{ t(key="spools.filter.all_statuses") }}</option>
+            <option value="Sealed"{% if selected_status == "Sealed" %} selected{% endif %}>{{ t(key="spools.status.sealed") }}</option>
+            <option value="Open"{% if selected_status == "Open" %} selected{% endif %}>{{ t(key="spools.status.open") }}</option>
+            <option value="Empty"{% if selected_status == "Empty" %} selected{% endif %}>{{ t(key="spools.status.empty") }}</option>
+            <option value="Archived"{% if selected_status == "Archived" %} selected{% endif %}>{{ t(key="spools.status.archived") }}</option>
+          </select>
+        </label>
 
-    <label>
-      {{ t(key="spools.filter.sort") }}
-      <select name="sort">
-        <option value="created_desc"{% if selected_sort == "created_desc" %} selected{% endif %}>{{ t(key="spools.sort.created_desc") }}</option>
-        <option value="remaining_asc"{% if selected_sort == "remaining_asc" %} selected{% endif %}>{{ t(key="spools.sort.remaining_asc") }}</option>
-        <option value="remaining_desc"{% if selected_sort == "remaining_desc" %} selected{% endif %}>{{ t(key="spools.sort.remaining_desc") }}</option>
-      </select>
-    </label>
+        <label>
+          {{ t(key="spools.filter.sort") }}
+          <select name="sort">
+            <option value="created_desc"{% if selected_sort == "created_desc" %} selected{% endif %}>{{ t(key="spools.sort.created_desc") }}</option>
+            <option value="remaining_asc"{% if selected_sort == "remaining_asc" %} selected{% endif %}>{{ t(key="spools.sort.remaining_asc") }}</option>
+            <option value="remaining_desc"{% if selected_sort == "remaining_desc" %} selected{% endif %}>{{ t(key="spools.sort.remaining_desc") }}</option>
+          </select>
+        </label>
+      </div>
+    </details>
   </form>
 
   <div id="spools-list">

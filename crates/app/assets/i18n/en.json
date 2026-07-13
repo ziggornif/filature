@@ -52,6 +52,7 @@
   "spools.stock_value": "Stock value",
   "spools.filter.search": "Search",
   "spools.filter.search_placeholder": "Search brand, colour…",
+  "spools.filter.advanced": "Advanced filters",
   "spools.filter.material": "Material",
   "spools.filter.all_materials": "All materials",
   "spools.filter.manufacturer": "Brand",

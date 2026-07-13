@@ -1425,6 +1425,22 @@ mod tests {
     }
 
     #[test]
+    fn list_page_keeps_search_visible_and_collapses_advanced_filters_by_default() {
+        let html = render_list("en");
+        let search = html.find(r#"id="spool-search""#).unwrap();
+        let details = html
+            .find(r#"<details class="spools-advanced-filters">"#)
+            .unwrap();
+        let details_end = html[details..].find("</details>").unwrap() + details;
+        let material = html.find(r#"name="material_id""#).unwrap();
+
+        assert!(search < details); // search stays outside the collapsed panel
+        assert!(details < material && material < details_end);
+        assert!(html.contains("Advanced filters"));
+        assert!(!html.contains(r#"<details class="spools-advanced-filters" open"#));
+    }
+
+    #[test]
     fn list_page_renders_card_view_alongside_table() {
         let html = render_list("en");
         // Both views are rendered; a CSS radio toggle picks which is visible.
