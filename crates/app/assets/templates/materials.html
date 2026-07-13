@@ -17,8 +17,7 @@
       <tr>
         <th>{{ t(key="materials.col.material") }}</th>
         <th>{{ t(key="materials.col.density") }}</th>
-        <th>{{ t(key="materials.col.drying") }} — {{ t(key="materials.col.temp") }}</th>
-        <th>{{ t(key="materials.col.drying") }} — {{ t(key="materials.col.time") }}</th>
+        <th>{{ t(key="materials.col.drying") }}</th>
         <th>{{ t(key="materials.col.sensitivity") }}</th>
         <th>{{ t(key="materials.col.threshold") }}</th>
         <th>{{ t(key="materials.col.nozzle") }}</th>
@@ -32,6 +31,14 @@
     </tbody>
     </table>
   </div>
+  <p class="materials-footer-note">
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/>
+      <path d="M12 8v5"/>
+      <path d="M12 16h.01"/>
+    </svg>
+    <span>{{ t(key="materials.footer") }}</span>
+  </p>
 
   <form class="material-add-form"
         hx-ext="response-targets"
@@ -49,8 +56,8 @@
       <option value="Medium">{{ t(key="materials.sensitivity.medium") }}</option>
       <option value="High">{{ t(key="materials.sensitivity.high") }}</option>
     </select>
-    <input type="number" name="nozzle_c" placeholder="{{ t(key="materials.col.nozzle") }}" required>
-    <input type="number" name="bed_c" placeholder="{{ t(key="materials.col.bed") }}" required>
+    <input type="number" name="nozzle_c" placeholder="{{ t(key="materials.field.nozzle") }}" required>
+    <input type="number" name="bed_c" placeholder="{{ t(key="materials.field.bed") }}" required>
     <button type="submit">{{ t(key="materials.add") }}</button>
   </form>
 {% endblock content %}
