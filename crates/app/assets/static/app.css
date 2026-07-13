@@ -833,6 +833,22 @@ a {
   background: var(--raised);
   border-color: var(--accent);
 }
+/* Hide the native number-input spinners in the referential tables (maquette). */
+.materials-table input[type="number"],
+.manufacturers-table input[type="number"],
+.locations-table input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.materials-table input[type="number"]::-webkit-inner-spin-button,
+.materials-table input[type="number"]::-webkit-outer-spin-button,
+.manufacturers-table input[type="number"]::-webkit-inner-spin-button,
+.manufacturers-table input[type="number"]::-webkit-outer-spin-button,
+.locations-table input[type="number"]::-webkit-inner-spin-button,
+.locations-table input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
 
 /* ============================================================
    Spools list
