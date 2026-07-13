@@ -234,6 +234,24 @@ mod tests {
     }
 
     #[test]
+    fn page_explains_that_material_settings_are_indicative() {
+        let en = render("en");
+        assert!(en.contains(
+            "Reference guide — indicative drying and printing settings. Adjust according to the brand."
+        ));
+        assert!(en.contains("These settings are starting points, not stock data."));
+        assert!(en.contains(r#"class="materials-info" role="note""#));
+        assert!(en.contains(r#"class="materials-info-icon" aria-hidden="true""#));
+
+        let fr = render("fr");
+        assert!(fr.contains("Référentiel — réglages indicatifs de séchage et d"));
+        assert!(fr.contains("impression. À ajuster selon la marque."));
+        assert!(fr.contains("Ces réglages sont des valeurs de départ, pas des données de stock."));
+        assert!(!fr.contains("materials.subtitle"));
+        assert!(!fr.contains("materials.notice"));
+    }
+
+    #[test]
     fn page_wires_the_error_feedback_slot() {
         // TD-009 wiring guard: the message slot, the response-targets extension,
         // and the per-control error routing must all be present so a 422/409

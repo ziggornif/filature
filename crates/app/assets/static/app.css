@@ -332,6 +332,12 @@ body {
   margin: 0 0 18px;
 }
 
+.page-subtitle {
+  margin: -12px 0 18px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .content h2 {
   font-size: 14px;
   font-weight: 600;
@@ -951,6 +957,24 @@ a {
 /* ============================================================
    Materials referential
    ============================================================ */
+
+.materials-info {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.materials-info-icon {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
 
 .material-row--low td:first-child {
   box-shadow: inset 3px 0 0 var(--ok);
