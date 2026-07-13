@@ -480,6 +480,54 @@ impl SpoolRepository for SqlxSpoolRepository {
 
         Money::from_decimal(value).map_err(|e| RepositoryError::Backend(e.to_string()))
     }
+
+    async fn count(&self, filter: SpoolFilter) -> Result<u64, RepositoryError> {
+        let material_id = filter.material_id.as_ref().map(|m| m.as_str());
+        let status = filter.status.map(|s| s.as_str());
+        let manufacturer_id = filter.manufacturer_id.as_ref().map(|m| m.as_str());
+        let location_id = filter.location_id.as_ref().map(|l| l.as_str());
+        let search = filter
+            .search
+            .as_deref()
+            .filter(|s| !s.is_empty())
+            .map(escape_like);
+
+        let mut query = sqlx::QueryBuilder::new(
+            r#"SELECT COUNT(*)
+               FROM spools s
+               LEFT JOIN manufacturers mf ON mf.id = s.manufacturer_id
+               WHERE s.status <> 'Archived'"#,
+        );
+        if let Some(value) = material_id {
+            query.push(" AND s.material_id = ").push_bind(value);
+        }
+        if let Some(value) = status {
+            query.push(" AND s.status = ").push_bind(value);
+        }
+        if let Some(value) = manufacturer_id {
+            query.push(" AND s.manufacturer_id = ").push_bind(value);
+        }
+        if let Some(value) = location_id {
+            query.push(" AND s.location_id = ").push_bind(value);
+        }
+        if let Some(value) = search {
+            let pattern = format!("%{value}%");
+            query
+                .push(" AND (mf.name ILIKE ")
+                .push_bind(pattern.clone())
+                .push(" OR s.colour_name ILIKE ")
+                .push_bind(pattern)
+                .push(")");
+        }
+
+        let count = query
+            .build_query_scalar::<i64>()
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| backend(e, ""))?;
+        u64::try_from(count)
+            .map_err(|_| RepositoryError::Backend("count query returned a negative value".into()))
+    }
 }
 
 #[cfg(test)]

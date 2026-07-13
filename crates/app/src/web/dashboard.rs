@@ -129,6 +129,7 @@ fn render(
     theme_attr: &str,
     overview: DashboardOverview,
     low_stock_threshold_pct: u8,
+    nav_spool_count: u64,
 ) -> Response {
     let view: DashboardView = overview.into();
     let mut ctx = Context::new();
@@ -141,6 +142,7 @@ fn render(
     ctx.insert("material_breakdown", &view.material_breakdown);
     ctx.insert("soon_empty", &view.soon_empty);
     ctx.insert("low_stock_threshold_pct", &low_stock_threshold_pct);
+    ctx.insert("nav_spool_count", &nav_spool_count);
     // Read by `base.html` to mark the "Tableau de bord" nav item active.
     ctx.insert("page", "dashboard");
     match st
@@ -161,13 +163,17 @@ async fn index(State(st): State<AppState>, headers: HeaderMap) -> Response {
     };
     let threshold = configuration.low_stock_threshold;
     match st.dashboard.overview(threshold).await {
-        Ok(overview) => render(
-            &st,
-            &locale,
-            theme.data_attr(),
-            overview,
-            threshold.percent(),
-        ),
+        Ok(overview) => {
+            let nav_spool_count = st.nav_spool_count().await;
+            render(
+                &st,
+                &locale,
+                theme.data_attr(),
+                overview,
+                threshold.percent(),
+                nav_spool_count,
+            )
+        }
         Err(e) => internal_error(e),
     }
 }
@@ -216,6 +222,7 @@ mod tests {
         ctx.insert("material_breakdown", &vec![breakdown_row()]);
         ctx.insert("soon_empty", &vec![soon_empty_row()]);
         ctx.insert("low_stock_threshold_pct", &20u8);
+        ctx.insert("nav_spool_count", &18u64);
         ctx.insert("page", "dashboard");
         ctx
     }
@@ -265,6 +272,7 @@ mod tests {
         let r = Renderer::new(Catalog::load("en"));
         let html = r.render("dashboard.html", "en", "", full_ctx()).unwrap();
         assert!(html.contains(r#"href="/" class="active""#));
+        assert!(html.contains(r#"<span class="nav-count">18</span>"#));
     }
 
     #[test]
@@ -438,6 +446,7 @@ mod tests {
             let html = body_of(res).await;
             assert!(html.contains("No stock yet."));
             assert!(html.contains("Nothing running low."));
+            assert!(html.contains(r#"<span class="nav-count">0</span>"#));
             assert!(!html.contains("dashboard.breakdown."));
             assert!(!html.contains("dashboard.soon_empty."));
         }

@@ -80,6 +80,7 @@ async fn page(
             ctx.insert("page", "settings");
             ctx.insert("imported", &(query.imported.as_deref() == Some("1")));
             ctx.insert("import_error", "");
+            ctx.insert("nav_spool_count", &st.nav_spool_count().await);
             match st
                 .renderer
                 .render("settings.html", &locale, theme.data_attr(), ctx)
@@ -124,6 +125,7 @@ async fn import_error(st: &AppState, locale: &str, theme_attr: &str, key: &str) 
     context.insert("page", "settings");
     context.insert("imported", &false);
     context.insert("import_error", &message);
+    context.insert("nav_spool_count", &st.nav_spool_count().await);
     match st
         .renderer
         .render("settings.html", locale, theme_attr, context)

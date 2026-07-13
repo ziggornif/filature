@@ -412,6 +412,7 @@ async fn list_page(
             ctx.insert("total_count", &total_count);
             ctx.insert("low_stock_threshold_pct", &low_stock_threshold_pct);
             ctx.insert("page", "spools");
+            ctx.insert("nav_spool_count", &st.nav_spool_count().await);
             match st
                 .renderer
                 .render("spools.html", &locale, theme.data_attr(), ctx)
@@ -765,6 +766,9 @@ async fn render_form(
         "net_weight_is_custom",
         &net_weight_is_custom(&form.net_weight),
     );
+    if full_page {
+        ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+    }
     let template = if full_page {
         "spools_new.html"
     } else {
@@ -783,11 +787,19 @@ fn net_weight_is_custom(net_weight: &str) -> bool {
     )
 }
 
-fn render_condition(st: &AppState, locale: &str, theme_attr: &str, full_page: bool) -> Response {
+async fn render_condition(
+    st: &AppState,
+    locale: &str,
+    theme_attr: &str,
+    full_page: bool,
+) -> Response {
     let mut ctx = Context::new();
     ctx.insert("page", "spools");
     ctx.insert("wizard_step", "condition");
     ctx.insert("edit_mode", &false);
+    if full_page {
+        ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+    }
     let template = if full_page {
         "spools_new.html"
     } else {
@@ -802,7 +814,7 @@ fn render_condition(st: &AppState, locale: &str, theme_attr: &str, full_page: bo
 async fn new_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let locale = resolve_locale(&headers, &st);
     let theme = resolve_theme(&headers);
-    render_condition(&st, &locale, theme.data_attr(), true)
+    render_condition(&st, &locale, theme.data_attr(), true).await
 }
 
 #[derive(Deserialize)]
@@ -812,7 +824,7 @@ struct ConditionQuery {
 
 async fn condition_step(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let locale = resolve_locale(&headers, &st);
-    render_condition(&st, &locale, "", false)
+    render_condition(&st, &locale, "", false).await
 }
 
 async fn details_step(
@@ -822,7 +834,7 @@ async fn details_step(
 ) -> Response {
     let locale = resolve_locale(&headers, &st);
     if SpoolCondition::parse(&query.condition).is_err() {
-        return render_condition(&st, &locale, "", false);
+        return render_condition(&st, &locale, "", false).await;
     }
     let form = SpoolForm {
         condition: query.condition,
@@ -945,6 +957,7 @@ async fn detail_page(
     ctx.insert("low_stock_threshold_pct", &low_stock_threshold_pct);
     ctx.insert("editing_remaining", &false);
     ctx.insert("is_fragment", &false);
+    ctx.insert("nav_spool_count", &st.nav_spool_count().await);
     // The page includes `_spool_detail_card.html`, which always references
     // `error_key` (to show/hide its op-error line) — insert `None` here so
     // that include doesn't hit an undefined variable on a fresh page load.
@@ -1247,6 +1260,9 @@ async fn render_edit_form(
         "net_weight_is_custom",
         &net_weight_is_custom(&form.net_weight),
     );
+    if opts.full_page {
+        ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+    }
     let template = if opts.full_page {
         "spools_edit.html"
     } else {
