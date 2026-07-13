@@ -650,7 +650,7 @@ async fn spool_location_assignment_journey() {
     // --- 3. PUT /spools/{id} resubmitting the SAME location -> the location
     // is NOT wiped by an edit that doesn't touch it.
     let form = format!(
-        "material_id={material_id}&colour_hex=%23ABCDEF&colour_name=Loc+Journey&diameter=1.75&net_weight=1000&price_paid=15.00&location_id={location_id}"
+        "condition=new&material_id={material_id}&colour_hex=%23ABCDEF&colour_name=Loc+Journey&diameter=1.75&net_weight=1000&price_paid=15.00&location_id={location_id}"
     );
     let res = app
         .clone()
@@ -677,7 +677,7 @@ async fn spool_location_assignment_journey() {
 
     // --- 4. PUT /spools/{id} with a BLANK location -> unassigns.
     let form = format!(
-        "material_id={material_id}&colour_hex=%23ABCDEF&colour_name=Loc+Journey&diameter=1.75&net_weight=1000&price_paid=15.00&location_id="
+        "condition=new&material_id={material_id}&colour_hex=%23ABCDEF&colour_name=Loc+Journey&diameter=1.75&net_weight=1000&price_paid=15.00&location_id="
     );
     let res = app
         .clone()
