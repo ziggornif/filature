@@ -3,6 +3,7 @@ use sqlx::{Pool, Postgres};
 
 pub mod dashboard;
 pub mod instance_configuration;
+pub mod instance_transfer;
 pub mod locations;
 pub mod manufacturers;
 pub mod materials;

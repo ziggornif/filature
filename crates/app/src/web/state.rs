@@ -4,6 +4,7 @@ use crate::web::i18n::Catalog;
 use crate::web::templates::Renderer;
 use domain::dashboard::DashboardUseCases;
 use domain::instance_configuration::InstanceConfigurationUseCases;
+use domain::instance_transfer::InstanceTransferUseCases;
 use domain::locations::LocationsUseCases;
 use domain::manufacturers::ManufacturersUseCases;
 use domain::materials::MaterialsUseCases;
@@ -26,6 +27,7 @@ pub struct AppState {
     pub manufacturers: Arc<dyn ManufacturersUseCases>,
     pub dashboard: Arc<dyn DashboardUseCases>,
     pub instance_configuration: Arc<dyn InstanceConfigurationUseCases>,
+    pub instance_transfer: Arc<dyn InstanceTransferUseCases>,
 }
 
 impl AppState {
@@ -39,6 +41,7 @@ impl AppState {
         manufacturers: Arc<dyn ManufacturersUseCases>,
         dashboard: Arc<dyn DashboardUseCases>,
         instance_configuration: Arc<dyn InstanceConfigurationUseCases>,
+        instance_transfer: Arc<dyn InstanceTransferUseCases>,
     ) -> Self {
         let catalog = Catalog::load(&cfg.i18n.default_locale);
         Self {
@@ -51,6 +54,7 @@ impl AppState {
             manufacturers,
             dashboard,
             instance_configuration,
+            instance_transfer,
         }
     }
 }

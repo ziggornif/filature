@@ -487,6 +487,66 @@ a {
   box-shadow: var(--shadow);
 }
 
+.settings-panel + .settings-panel {
+  margin-top: 18px;
+}
+
+.settings-transfer-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.settings-transfer-actions > div {
+  min-width: 0;
+}
+
+.settings-transfer-actions h3 {
+  margin: 0 0 7px;
+}
+
+.settings-transfer-actions p,
+.form-help {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-transfer-actions form {
+  display: grid;
+  gap: 10px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.checkbox-label input {
+  width: auto;
+  margin-top: 2px;
+}
+
+.form-success {
+  color: var(--ok);
+}
+
+.button-danger {
+  justify-self: start;
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .settings-transfer-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 .settings-intro,
 .setting-help {
   color: var(--muted);

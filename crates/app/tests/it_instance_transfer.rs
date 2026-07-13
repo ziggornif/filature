@@ -1,0 +1,58 @@
+mod support;
+
+use domain::instance_transfer::{InstanceTransferRepository, SnapshotManufacturer, TransferError};
+use filature::persistence::connect_and_migrate;
+use filature::persistence::instance_transfer::SqlxInstanceTransferRepository;
+
+#[tokio::test]
+async fn exported_snapshot_round_trips_and_failed_replace_rolls_back() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let repository = SqlxInstanceTransferRepository::new(pool.clone());
+
+    sqlx::raw_sql("DELETE FROM spools; DELETE FROM materials; DELETE FROM locations; DELETE FROM manufacturers; DELETE FROM instance_configuration")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::raw_sql(
+        r#"INSERT INTO materials
+           (id, name, density, drying_temp_c, drying_time_h, sensitivity, nozzle_c, bed_c)
+           VALUES ('mat-1', 'PLA', 1.24, 45, 6, 'Low', 210, 60);
+           INSERT INTO manufacturers (id, name, country) VALUES ('maker-1', 'Acme', 'FR');
+           INSERT INTO locations (id, name, note) VALUES ('loc-1', 'Shelf', 'Dry');
+           INSERT INTO spools
+             (id, material_id, spool_type, colour_hex, colour_name, diameter, net_weight,
+              remaining_weight, price_paid, status, location_id, manufacturer_id, created_at)
+           VALUES
+             ('spool-1', 'mat-1', 'Complete', '#AABBCC', '#AABBCC', '1.75', 1000,
+              420, 24.9900, 'Open', 'loc-1', 'maker-1', '2026-07-13T12:00:00Z');
+           INSERT INTO instance_configuration (singleton, low_stock_threshold) VALUES (TRUE, 21)"#,
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let original = repository.export_snapshot().await.unwrap();
+    sqlx::raw_sql("DELETE FROM spools; UPDATE instance_configuration SET low_stock_threshold = 99")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    repository.replace_snapshot(original.clone()).await.unwrap();
+    assert_eq!(repository.export_snapshot().await.unwrap(), original);
+
+    // This duplicate unique name fails after the transaction has already
+    // deleted existing rows and inserted the first manufacturer. Dropping the
+    // failed transaction must restore the exact prior instance.
+    let mut invalid = original.clone();
+    invalid.manufacturers.push(SnapshotManufacturer {
+        id: "maker-2".into(),
+        name: "Acme".into(),
+        country: None,
+    });
+    assert!(matches!(
+        repository.replace_snapshot(invalid).await,
+        Err(TransferError::Backend(_))
+    ));
+    assert_eq!(repository.export_snapshot().await.unwrap(), original);
+}

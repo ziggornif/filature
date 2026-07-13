@@ -2100,6 +2100,11 @@ mod tests {
                             ),
                         ),
                     ),
+                    Arc::new(domain::instance_transfer::InstanceTransferService::new(
+                        Arc::new(
+                            domain::instance_transfer::stubs::StubInstanceTransferRepository::default(),
+                        ),
+                    )),
                 ),
                 seeded.id.as_str().to_string(),
             )

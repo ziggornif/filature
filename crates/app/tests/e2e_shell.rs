@@ -60,6 +60,9 @@ async fn app() -> axum::Router {
                 domain::instance_configuration::stubs::StubInstanceConfigurationRepository::new(),
             )),
         ),
+        Arc::new(domain::instance_transfer::InstanceTransferService::new(
+            Arc::new(domain::instance_transfer::stubs::StubInstanceTransferRepository::default()),
+        )),
     ))
 }
 
