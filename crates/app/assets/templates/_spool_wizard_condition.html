@@ -1,0 +1,24 @@
+<section id="spool-wizard" class="spool-wizard spool-wizard--condition">
+  <header class="wizard-header">
+    <div>
+      <h1>{{ t(key="spools.new.title") }}</h1>
+      <p>{{ t(key="spools.wizard.condition.prompt") }}</p>
+    </div>
+    <a class="button button--secondary" href="/spools">{{ t(key="common.cancel") }}</a>
+  </header>
+  <div class="condition-grid">
+    {% for condition in ["new", "opened", "refill"] %}
+      <button class="condition-card" type="button"
+              hx-get="/spools/new/details?condition={{ condition }}"
+              hx-target="#spool-wizard" hx-swap="outerHTML">
+        <span class="condition-card__icon" aria-hidden="true">
+          {% if condition == "opened" %}◌{% elif condition == "refill" %}↧{% else %}◉{% endif %}
+        </span>
+        <span>
+          <strong>{{ t(key="spools.condition." ~ condition) }}</strong>
+          <small>{{ t(key="spools.condition." ~ condition ~ ".description") }}</small>
+        </span>
+      </button>
+    {% endfor %}
+  </div>
+</section>

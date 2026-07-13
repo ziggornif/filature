@@ -13,7 +13,7 @@ not a second canonical name. See [ADR-0001](adr/0001-language-and-i18n.md).
 
 | Term (canonical) | FR label | Definition |
 |---|---|---|
-| **Spool** | Bobine | A single physical reel of filament held in stock. Made of one Material, has a real colour, a diameter, and a remaining amount of filament. Carries its own lifecycle (see Spool Status). |
+| **Spool** | Bobine | A single physical reel or holder-less refill of filament held in stock. Made of one Material, may have a recorded colour, has a diameter, and a remaining amount of filament. Carries its own lifecycle (see Spool Status). |
 | **Material** | Matériau | An entry in the material referential (PLA, PETG, ASA, PA-CF, …). The single source of truth for a filament type's physical & handling properties: density, drying parameters, and humidity Sensitivity. Seeded at startup, editable. Referenced by Spools. |
 | **Location** | Rangement | A physical place a Spool is stored (drybox, shelf). A plain storage place in v1; a Location may later be sensor-monitored (deferred — see below). |
 | **Manufacturer** | Fabricant | The brand that produced a Spool (Prusament, Polymaker, …). An entry in a referential seeded at startup from a curated subset of the OpenPrintTag brand database, editable (add/delete). A Spool optionally references one; a Manufacturer that any Spool references cannot be deleted. Distinct from Material — the same Material (e.g. PLA) is sold by many Manufacturers. |
@@ -28,7 +28,7 @@ not a second canonical name. See [ADR-0001](adr/0001-language-and-i18n.md).
 | **Remaining Length** | Longueur restante | The Remaining Weight expressed as metres of filament, derived from the Material's density and the Spool's diameter. A presentation of the same quantity as Remaining Weight, not a stored value. |
 | **Stock Value** | Valeur du stock | The monetary worth of remaining filament: summed over Spools of `(Remaining Weight ÷ Net Weight) × Price Paid`. |
 | **Diameter** | Diamètre | The filament diameter of a Spool. One of the two market standards: **1.75 mm** or **2.85 mm**. Used with Material density to derive Remaining Length. |
-| **Colour** | Couleur | A Spool's real filament colour: a hex value (`#RRGGBB`) with an optional free-text name (e.g. `#1A9E4B` "vert sapin"). |
+| **Colour** | Couleur | A Spool's optional real filament colour: a normalized hex value (`#RRGGBB`) or Transparent. Its name is derived from the matching preset, otherwise from the upper-cased hex value; it is never free-typed. |
 | **Price Paid** | Prix payé | The amount paid for a Spool when acquired (full-spool price). Feeds Stock Value. |
 
 ## Enumerations
@@ -36,6 +36,7 @@ not a second canonical name. See [ADR-0001](adr/0001-language-and-i18n.md).
 | Term (canonical) | FR label | Definition |
 |---|---|---|
 | **Spool Status** | Statut de bobine | The lifecycle state of a Spool. One of: **Sealed** (Scellée — unopened, full), **Open** (Ouverte — in use), **Empty** (Vide — Remaining Weight reached 0), **Archived** (Archivée — retired from active stock, kept for history). |
+| **Spool Type** | Type de bobine | The physical form of stock. **Complete** is filament supplied on a holder; **Recharge** is a refill supplied without one. |
 | **Sensitivity** | Sensibilité | A Material's susceptibility to humidity. One of **Low**, **Medium**, **High**. Determines the humidity threshold at which stored Spools of that Material are considered at risk. Stored now; only consumed by the deferred Humidity feature. |
 
 ## Deferred terms (Humidity feature — post-v1, no sensors yet)

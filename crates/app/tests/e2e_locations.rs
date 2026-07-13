@@ -185,13 +185,15 @@ async fn delete_blocked_then_allowed_after_unassign() {
     let spool_repo = SqlxSpoolRepository::new(db.clone());
     let spool = spool_repo
         .insert(NewSpool {
+            condition: domain::spools::SpoolCondition::New,
             material_id: MaterialId::new(material.id.as_str().to_string()),
-            colour: Colour::new("#0F0F0F".into(), Some("guard black".into())).unwrap(),
+            colour: Some(Colour::new("#0F0F0F".into(), Some("guard black".into())).unwrap()),
             diameter: Diameter::Mm1_75,
             net_weight: Grams::new(1000.0).unwrap(),
             price_paid: Money::from_decimal(Decimal::from_str_exact("10.00").unwrap()).unwrap(),
             location_id: None,
             manufacturer_id: None,
+            remaining_weight: None,
         })
         .await
         .unwrap();

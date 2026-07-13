@@ -1,19 +1,23 @@
 use crate::shared::{DomainError, Grams, LocationId, ManufacturerId, MaterialId, Money};
 use std::f64::consts::PI;
 
-/// A spool colour: a validated `#RRGGBB` hex string plus an optional
-/// human-friendly name (e.g. "vert sapin").
+/// A spool colour whose display name is derived from its normalized value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Colour {
     hex: String,
-    name: Option<String>,
+    name: String,
 }
 
 impl Colour {
-    pub fn new(hex: String, name: Option<String>) -> Result<Self, DomainError> {
-        if !is_valid_hex(&hex) {
-            return Err(DomainError::InvalidColour(hex));
-        }
+    /// Compatibility constructor: the supplied name is deliberately ignored;
+    /// names are now derived from the normalized colour value.
+    pub fn new(hex: String, _name: Option<String>) -> Result<Self, DomainError> {
+        Self::from_hex(hex)
+    }
+
+    pub fn from_hex(hex: String) -> Result<Self, DomainError> {
+        let hex = normalize_hex(&hex).ok_or_else(|| DomainError::InvalidColour(hex.clone()))?;
+        let name = colour_name(&hex).to_string();
         Ok(Self { hex, name })
     }
 
@@ -22,15 +26,41 @@ impl Colour {
     }
 
     pub fn name(&self) -> Option<&str> {
-        self.name.as_deref()
+        Some(&self.name)
     }
 }
 
-/// Manual hex validation (no regex dependency): `#` followed by exactly
-/// 6 ASCII hex digits.
-fn is_valid_hex(s: &str) -> bool {
-    let bytes = s.as_bytes();
-    bytes.len() == 7 && bytes[0] == b'#' && bytes[1..].iter().all(|b| b.is_ascii_hexdigit())
+fn normalize_hex(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.eq_ignore_ascii_case("transparent") {
+        return Some("transparent".to_string());
+    }
+    let digits = trimmed.strip_prefix('#').unwrap_or(trimmed);
+    let expanded = match digits.len() {
+        3 if digits.bytes().all(|b| b.is_ascii_hexdigit()) => {
+            digits.chars().flat_map(|c| [c, c]).collect::<String>()
+        }
+        6 if digits.bytes().all(|b| b.is_ascii_hexdigit()) => digits.to_string(),
+        _ => return None,
+    };
+    Some(format!("#{}", expanded.to_ascii_uppercase()))
+}
+
+fn colour_name(hex: &str) -> &str {
+    match hex {
+        "#F2F0EA" => "White",
+        "#1A1A1A" => "Black",
+        "#8A8D8F" => "Grey",
+        "#E6DDC8" => "Natural",
+        "#C62828" => "Red",
+        "#E8631A" => "Orange",
+        "#F2B900" => "Yellow",
+        "#2E7D43" => "Green",
+        "#0F7D7A" => "Teal",
+        "#1F5FB0" => "Blue",
+        "transparent" => "Transparent",
+        other => other,
+    }
 }
 
 /// Filament diameter, one of the two standard sizes.
@@ -73,6 +103,49 @@ pub enum SpoolStatus {
     Archived,
 }
 
+/// Physical form of the stock item: a complete reel or a refill without a holder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpoolType {
+    Complete,
+    Recharge,
+}
+
+impl SpoolType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Complete => "Complete",
+            Self::Recharge => "Recharge",
+        }
+    }
+
+    pub fn parse(s: &str) -> Result<Self, DomainError> {
+        match s {
+            "Complete" => Ok(Self::Complete),
+            "Recharge" => Ok(Self::Recharge),
+            other => Err(DomainError::UnknownSpoolType(other.to_string())),
+        }
+    }
+}
+
+/// Condition selected at the first step of the add-spool wizard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SpoolCondition {
+    New,
+    Opened,
+    Refill,
+}
+
+impl SpoolCondition {
+    pub fn parse(s: &str) -> Result<Self, DomainError> {
+        match s {
+            "new" => Ok(Self::New),
+            "opened" => Ok(Self::Opened),
+            "refill" => Ok(Self::Refill),
+            other => Err(DomainError::UnknownSpoolCondition(other.to_string())),
+        }
+    }
+}
+
 impl SpoolStatus {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -108,18 +181,46 @@ impl SpoolId {
     }
 }
 
-/// Data required to create a new spool. Remaining weight, status and id
-/// are derived downstream (remaining starts equal to net; status defaults
-/// to `Sealed`; id is assigned by the repository).
+/// Data required to create a new spool. Type, remaining weight and initial
+/// status are derived from `condition`; the repository only assigns the id.
 #[derive(Debug, Clone, PartialEq)]
 pub struct NewSpool {
+    pub condition: SpoolCondition,
     pub material_id: MaterialId,
-    pub colour: Colour,
+    pub colour: Option<Colour>,
     pub diameter: Diameter,
     pub net_weight: Grams,
     pub price_paid: Money,
     pub location_id: Option<LocationId>,
     pub manufacturer_id: Option<ManufacturerId>,
+    /// Only used for an opened spool; ignored for the other conditions.
+    pub remaining_weight: Option<Grams>,
+}
+
+impl NewSpool {
+    pub fn spool_type(&self) -> SpoolType {
+        match self.condition {
+            SpoolCondition::Refill => SpoolType::Recharge,
+            SpoolCondition::New | SpoolCondition::Opened => SpoolType::Complete,
+        }
+    }
+
+    pub fn initial_status(&self) -> SpoolStatus {
+        match self.condition {
+            SpoolCondition::Opened => SpoolStatus::Open,
+            SpoolCondition::New | SpoolCondition::Refill => SpoolStatus::Sealed,
+        }
+    }
+
+    pub fn initial_remaining_weight(&self) -> Grams {
+        match self.condition {
+            SpoolCondition::Opened => {
+                let entered = self.remaining_weight.unwrap_or(self.net_weight);
+                Grams::new(entered.value().min(self.net_weight.value())).unwrap()
+            }
+            SpoolCondition::New | SpoolCondition::Refill => self.net_weight,
+        }
+    }
 }
 
 /// A physical spool of filament: net weight at purchase, current
@@ -128,7 +229,8 @@ pub struct NewSpool {
 pub struct Spool {
     pub id: SpoolId,
     pub material_id: MaterialId,
-    pub colour: Colour,
+    pub spool_type: SpoolType,
+    pub colour: Option<Colour>,
     pub diameter: Diameter,
     pub net_weight: Grams,
     pub remaining_weight: Grams,
@@ -243,7 +345,8 @@ mod tests {
         Spool {
             id: SpoolId::new("spool-1"),
             material_id: MaterialId::new("material-1"),
-            colour: Colour::new("#1A9E4B".into(), None).unwrap(),
+            spool_type: SpoolType::Complete,
+            colour: Some(Colour::from_hex("#1A9E4B".into()).unwrap()),
             diameter: Diameter::Mm1_75,
             net_weight: net,
             remaining_weight: remaining,
@@ -286,15 +389,50 @@ mod tests {
     }
 
     #[test]
-    fn colour_accepts_hex_and_optional_name() {
-        let c = Colour::new("#1A9E4B".into(), Some("vert sapin".into())).unwrap();
+    fn colour_normalizes_hex_and_derives_name() {
+        let c = Colour::from_hex("1a9e4b".into()).unwrap();
         assert_eq!(c.hex(), "#1A9E4B");
+        assert_eq!(c.name(), Some("#1A9E4B"));
     }
     #[test]
     fn colour_rejects_bad_hex() {
-        assert!(Colour::new("1A9E4B".into(), None).is_err()); // no #
-        assert!(Colour::new("#12345".into(), None).is_err()); // 5 digits
-        assert!(Colour::new("#zzzzzz".into(), None).is_err()); // non-hex
+        assert!(Colour::from_hex("#12345".into()).is_err()); // 5 digits
+        assert!(Colour::from_hex("#zzzzzz".into()).is_err()); // non-hex
+    }
+
+    #[test]
+    fn colour_supports_transparent_and_preset_names() {
+        assert_eq!(
+            Colour::from_hex("transparent".into()).unwrap().name(),
+            Some("Transparent")
+        );
+        assert_eq!(
+            Colour::from_hex("#c62828".into()).unwrap().name(),
+            Some("Red")
+        );
+    }
+
+    #[test]
+    fn new_spool_derives_initial_state_from_condition() {
+        let make = |condition, remaining_weight| NewSpool {
+            condition,
+            material_id: MaterialId::new("material-1"),
+            colour: None,
+            diameter: Diameter::Mm1_75,
+            net_weight: Grams::new(1000.0).unwrap(),
+            price_paid: Money::new(20, 0).unwrap(),
+            location_id: None,
+            manufacturer_id: None,
+            remaining_weight,
+        };
+        let opened = make(SpoolCondition::Opened, Some(Grams::new(1200.0).unwrap()));
+        assert_eq!(opened.initial_status(), SpoolStatus::Open);
+        assert_eq!(opened.initial_remaining_weight().value(), 1000.0);
+        assert_eq!(opened.spool_type(), SpoolType::Complete);
+        assert_eq!(
+            make(SpoolCondition::Refill, None).spool_type(),
+            SpoolType::Recharge
+        );
     }
     #[test]
     fn diameter_mm_values() {

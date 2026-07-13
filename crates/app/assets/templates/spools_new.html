@@ -1,92 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-  <h1>{{ t(key="spools.new.title") }}</h1>
-
-  {% if error_key %}
-    <p class="form-error">{{ t(key=error_key) }}</p>
-  {% endif %}
-
-  <form class="spool-add-form" method="post" action="/spools">
-    <label>
-      {{ t(key="spools.new.material") }}
-      <select name="material_id" required>
-        <option value="">{{ t(key="spools.new.material_placeholder") }}</option>
-        {% for m in materials %}
-          <option value="{{ m.id }}"{% if m.id == material_id %} selected{% endif %}>{{ m.name }}</option>
-        {% endfor %}
-      </select>
-    </label>
-
-    <div class="colour-field">
-      <label>
-        {{ t(key="spools.new.colour_hex") }}
-        <span class="colour-input-row">
-          <input type="color" class="colour-picker"
-                 value="{% if colour_hex %}{{ colour_hex }}{% else %}#000000{% endif %}"
-                 aria-label="{{ t(key='spools.new.colour_picker') }}">
-          <input type="text" name="colour_hex" placeholder="#RRGGBB" pattern="#[0-9A-Fa-f]{6}"
-                 value="{{ colour_hex }}" required>
-        </span>
-      </label>
-      <div class="colour-presets" role="group" aria-label="{{ t(key='spools.new.colour_presets') }}">
-        <button type="button" class="colour-preset" data-hex="#000000" style="--swatch:#000000" data-name="{{ t(key='spools.colour.preset.black') }}" title="{{ t(key='spools.colour.preset.black') }}"></button>
-        <button type="button" class="colour-preset" data-hex="#FFFFFF" style="--swatch:#FFFFFF" data-name="{{ t(key='spools.colour.preset.white') }}" title="{{ t(key='spools.colour.preset.white') }}"></button>
-        <button type="button" class="colour-preset" data-hex="#808080" style="--swatch:#808080" data-name="{{ t(key='spools.colour.preset.grey') }}" title="{{ t(key='spools.colour.preset.grey') }}"></button>
-        <button type="button" class="colour-preset" data-hex="#EDE6D6" style="--swatch:#EDE6D6" data-name="{{ t(key='spools.colour.preset.natural') }}" title="{{ t(key='spools.colour.preset.natural') }}"></button>
-        <button type="button" class="colour-preset" data-hex="#E1121C" style="--swatch:#E1121C" data-name="{{ t(key='spools.colour.preset.red') }}" title="{{ t(key='spools.colour.preset.red') }}"></button>
-        <button type="button" class="colour-preset" data-hex="#FF6A00" style="--swatch:#FF6A00" data-name="{{ t(key='spools.colour.preset.orange') }}" title="{{ t(key='spools.colour.preset.orange') }}"></button>
-        <button type="button" class="colour-preset" data-hex="#FFD400" style="--swatch:#FFD400" data-name="{{ t(key='spools.colour.preset.yellow') }}" title="{{ t(key='spools.colour.preset.yellow') }}"></button>
-        <button type="button" class="colour-preset" data-hex="#2BB673" style="--swatch:#2BB673" data-name="{{ t(key='spools.colour.preset.green') }}" title="{{ t(key='spools.colour.preset.green') }}"></button>
-        <button type="button" class="colour-preset" data-hex="#1560BD" style="--swatch:#1560BD" data-name="{{ t(key='spools.colour.preset.blue') }}" title="{{ t(key='spools.colour.preset.blue') }}"></button>
-        <button type="button" class="colour-preset" data-hex="#00AEEF" style="--swatch:#00AEEF" data-name="{{ t(key='spools.colour.preset.cyan') }}" title="{{ t(key='spools.colour.preset.cyan') }}"></button>
-        <button type="button" class="colour-preset" data-hex="#7A3EA1" style="--swatch:#7A3EA1" data-name="{{ t(key='spools.colour.preset.purple') }}" title="{{ t(key='spools.colour.preset.purple') }}"></button>
-        <button type="button" class="colour-preset" data-hex="#D4AF37" style="--swatch:#D4AF37" data-name="{{ t(key='spools.colour.preset.gold') }}" title="{{ t(key='spools.colour.preset.gold') }}"></button>
-      </div>
-    </div>
-
-    <label>
-      {{ t(key="spools.new.colour_name") }}
-      <input type="text" name="colour_name" value="{{ colour_name }}">
-    </label>
-
-    <label>
-      {{ t(key="spools.new.diameter") }}
-      <select name="diameter" required>
-        <option value="1.75"{% if diameter == "1.75" %} selected{% endif %}>1.75</option>
-        <option value="2.85"{% if diameter == "2.85" %} selected{% endif %}>2.85</option>
-      </select>
-    </label>
-
-    <label>
-      {{ t(key="spools.new.net_weight") }}
-      <input type="number" name="net_weight" step="0.1" min="0" value="{{ net_weight }}" required>
-    </label>
-
-    <label>
-      {{ t(key="spools.new.price_paid") }}
-      <input type="number" name="price_paid" step="0.01" min="0" value="{{ price_paid }}" required>
-    </label>
-
-    <label>
-      {{ t(key="spools.new.location") }}
-      <select name="location_id">
-        <option value="">{{ t(key="spools.location.unassigned") }}</option>
-        {% for l in locations | default(value=[]) %}
-          <option value="{{ l.id }}"{% if l.id == location_id | default(value="") %} selected{% endif %}>{{ l.name }}</option>
-        {% endfor %}
-      </select>
-    </label>
-
-    <label>
-      {{ t(key="spools.new.manufacturer") }}
-      <select name="manufacturer_id">
-        <option value="">{{ t(key="spools.manufacturer.unassigned") }}</option>
-        {% for m in manufacturers | default(value=[]) %}
-          <option value="{{ m.id }}"{% if m.id == manufacturer_id | default(value="") %} selected{% endif %}>{{ m.name }}</option>
-        {% endfor %}
-      </select>
-    </label>
-
-    <button type="submit">{{ t(key="spools.new.submit") }}</button>
-  </form>
+  <div id="spool-wizard">
+    {% if wizard_step == "details" %}
+      {% include "_spool_wizard_details.html" %}
+    {% else %}
+      {% include "_spool_wizard_condition.html" %}
+    {% endif %}
+  </div>
 {% endblock content %}

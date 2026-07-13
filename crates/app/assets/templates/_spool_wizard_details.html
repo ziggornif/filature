@@ -1,0 +1,127 @@
+<section id="spool-wizard" class="spool-wizard spool-wizard--details">
+  <header class="wizard-header wizard-header--details">
+    <div>
+      <div class="wizard-title-row">
+        <h1>{{ t(key="spools.new.title") }}</h1>
+        <span class="condition-badge">{{ t(key="spools.condition." ~ condition) }}</span>
+        <button type="button" class="button-link" hx-get="/spools/new/condition"
+                hx-target="#spool-wizard" hx-swap="outerHTML">{{ t(key="spools.wizard.change") }}</button>
+      </div>
+      <p>{{ t(key="spools.wizard.details.subtitle") }}</p>
+    </div>
+  </header>
+
+  {% if error_key %}<p class="form-error" role="alert">{{ t(key=error_key) }}</p>{% endif %}
+
+  <form class="spool-wizard-form" method="post" action="/spools">
+    <input type="hidden" name="condition" value="{{ condition }}">
+
+    <section class="wizard-panel">
+      <h2>{{ t(key="spools.wizard.identity") }}</h2>
+      <div class="wizard-fields">
+        <label>{{ t(key="spools.new.material") }}
+          <select name="material_id" required>
+            <option value="">{{ t(key="spools.new.material_placeholder") }}</option>
+            {% for m in materials %}<option value="{{ m.id }}"{% if m.id == material_id %} selected{% endif %}>{{ m.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>{{ t(key="spools.new.manufacturer") }}
+          <select name="manufacturer_id" class="manufacturer-select">
+            <option value="">{{ t(key="spools.manufacturer.unassigned") }}</option>
+            {% for m in manufacturers %}<option value="{{ m.id }}"{% if m.id == manufacturer_id %} selected{% endif %}>{{ m.name }}</option>{% endfor %}
+            <option value="__other"{% if manufacturer_id == "__other" %} selected{% endif %}>{{ t(key="common.other") }}</option>
+          </select>
+        </label>
+      </div>
+      <label class="manufacturer-other{% if manufacturer_id != "__other" %} is-hidden{% endif %}">
+        {{ t(key="spools.new.manufacturer_name") }}
+        <input type="text" name="manufacturer_name" value="{{ manufacturer_name }}">
+      </label>
+
+      <div class="colour-field" data-unset-label="{{ t(key='spools.colour.unset') }}"
+           data-invalid-label="{{ t(key='spools.new.error.colour') }}">
+        <span class="field-label">{{ t(key="spools.new.colour_hex") }}</span>
+        <div class="colour-presets" role="group" aria-label="{{ t(key='spools.new.colour_presets') }}">
+          {% set presets = [
+            {"hex":"#F2F0EA", "key":"white"}, {"hex":"#1A1A1A", "key":"black"}, {"hex":"#8A8D8F", "key":"grey"},
+            {"hex":"#E6DDC8", "key":"natural"}, {"hex":"#C62828", "key":"red"}, {"hex":"#E8631A", "key":"orange"},
+            {"hex":"#F2B900", "key":"yellow"}, {"hex":"#2E7D43", "key":"green"}, {"hex":"#0F7D7A", "key":"teal"},
+            {"hex":"#1F5FB0", "key":"blue"}, {"hex":"transparent", "key":"transparent"}
+          ] %}
+          {% for preset in presets %}
+            <button type="button" class="colour-preset{% if colour_hex | upper == preset.hex %} is-selected{% endif %}"
+                    data-hex="{{ preset.hex }}" data-name="{{ t(key='spools.colour.preset.' ~ preset.key) }}">
+              <span style="--swatch:{{ preset.hex }}"></span>
+              <small>{{ t(key="spools.colour.preset." ~ preset.key) }}</small>
+            </button>
+          {% endfor %}
+        </div>
+        <div class="colour-separator"><span>{{ t(key="spools.colour.custom") }}</span></div>
+        <div class="colour-custom-row">
+          <label class="colour-preview{% if not colour_hex %} is-unset{% endif %}" title="{{ t(key='spools.new.colour_picker') }}">
+            <span class="colour-preview__chip" style="--preview:{% if colour_hex and colour_hex != 'transparent' %}{{ colour_hex }}{% else %}#CCCCCC{% endif %}"></span>
+            <span class="colour-preview__edit" aria-hidden="true">✎</span>
+            <input type="color" class="colour-picker" value="{% if colour_hex and colour_hex != 'transparent' %}{{ colour_hex }}{% else %}#cccccc{% endif %}">
+          </label>
+          <div class="colour-text-stack">
+            <input type="text" name="colour_hex" placeholder="#RRGGBB" value="{{ colour_hex }}"
+                   aria-label="{{ t(key='spools.new.colour_hex') }}">
+            <span class="colour-derived-name">{{ colour_name }}</span>
+            <span class="colour-error" role="alert"></span>
+          </div>
+          <button type="button" class="colour-clear" aria-label="{{ t(key='spools.colour.clear') }}">✕</button>
+        </div>
+        <p class="colour-hint">{% if not colour_hex %}{{ t(key="spools.colour.hint") }}{% endif %}</p>
+      </div>
+    </section>
+
+    <section class="wizard-panel">
+      <h2>{{ t(key="spools.wizard.measurements") }}</h2>
+      <div class="wizard-fields wizard-fields--measurements">
+        <fieldset class="diameter-control">
+          <legend>{{ t(key="spools.new.diameter") }}</legend>
+          <label><input type="radio" name="diameter" value="1.75"{% if diameter != "2.85" %} checked{% endif %}><span>1.75</span></label>
+          <label><input type="radio" name="diameter" value="2.85"{% if diameter == "2.85" %} checked{% endif %}><span>2.85</span></label>
+        </fieldset>
+        <label>{{ t(key="spools.new.net_weight") }}
+          <select class="net-weight-preset">
+            {% for weight in [250, 500, 750, 900, 1000, 2000, 3000, 5000] %}
+              <option value="{{ weight }}"{% if (net_weight == "1000" and weight == 1000) or (not net_weight and weight == 1000) %} selected{% endif %}>{{ weight }} g{% if weight == 1000 %} — {{ t(key="common.default") }}{% endif %}</option>
+            {% endfor %}
+            <option value="custom">{{ t(key="common.other") }}</option>
+          </select>
+        </label>
+      </div>
+      <label class="net-weight-custom is-hidden">{{ t(key="spools.new.net_weight_custom") }}
+        <input type="number" step="0.1" min="0.1" inputmode="decimal">
+      </label>
+      <input type="hidden" name="net_weight" value="{% if net_weight %}{{ net_weight }}{% else %}1000{% endif %}">
+      {% if condition == "opened" %}
+        <label class="remaining-field">{{ t(key="spools.new.remaining_weight") }}
+          <input type="number" name="remaining_weight" step="0.1" min="0" value="{{ remaining_weight }}" required>
+          <small>{{ t(key="spools.new.remaining_help") }}</small>
+        </label>
+      {% endif %}
+    </section>
+
+    <section class="wizard-panel">
+      <h2>{{ t(key="spools.wizard.storage_purchase") }}</h2>
+      <div class="wizard-fields">
+        <label>{{ t(key="spools.new.location") }}
+          <select name="location_id">
+            <option value="">{{ t(key="spools.location.unassigned") }}</option>
+            {% for l in locations %}<option value="{{ l.id }}"{% if l.id == location_id %} selected{% endif %}>{{ l.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>{{ t(key="spools.new.price_paid") }}
+          <input type="number" name="price_paid" step="0.01" min="0" value="{{ price_paid }}" required>
+        </label>
+      </div>
+    </section>
+
+    <div class="wizard-actions">
+      <a class="button button--secondary" href="/spools">{{ t(key="common.cancel") }}</a>
+      <button type="submit" class="button button--primary">{{ t(key="spools.new.submit") }}</button>
+    </div>
+  </form>
+</section>

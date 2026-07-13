@@ -107,7 +107,7 @@ async fn add_then_list_then_view_spool() {
 
     // --- POST /spools: add a spool for that material.
     let form = format!(
-        "material_id={material_id}&colour_hex=%231A9E4B&colour_name=Test+Green&diameter=1.75&net_weight=1000&price_paid=24.90"
+        "condition=new&material_id={material_id}&colour_hex=%231A9E4B&colour_name=Test+Green&diameter=1.75&net_weight=1000&price_paid=24.90"
     );
     let res = app
         .clone()
@@ -120,9 +120,13 @@ async fn add_then_list_then_view_spool() {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::SEE_OTHER);
-    assert_eq!(
-        res.headers().get("location").unwrap().to_str().unwrap(),
-        "/spools"
+    assert!(
+        res.headers()
+            .get("location")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .starts_with("/spools/")
     );
 
     // --- GET /spools: the new spool shows up in the full list page.
@@ -173,7 +177,7 @@ async fn add_then_list_then_view_spool() {
         .unwrap();
     let created = items
         .iter()
-        .find(|i| i.colour.hex() == "#1A9E4B")
+        .find(|i| i.colour.as_ref().is_some_and(|c| c.hex() == "#1A9E4B"))
         .expect("the spool just posted is present in the filtered list");
     let spool_id = created.id.as_str().to_string();
 
@@ -190,8 +194,9 @@ async fn add_then_list_then_view_spool() {
     assert_eq!(res.status(), StatusCode::OK);
     let detail_html = body_of(res).await;
     assert!(detail_html.contains(&material_name));
+    // Colour name is derived from the hex now (never free-typed): #1A9E4B is
+    // not a preset, so the displayed name is the upper-cased hex itself.
     assert!(detail_html.contains("#1A9E4B"));
-    assert!(detail_html.contains("Test Green"));
     assert!(detail_html.contains("1.75"));
     assert!(detail_html.contains("1000")); // net + remaining weight (equal on a fresh spool)
     assert!(detail_html.contains("100%")); // remaining ratio on a fresh spool
@@ -226,7 +231,7 @@ async fn consume_archive_restore_journey() {
     // colour unique to this test, so it can be picked out of the shared
     // container's rows later.
     let form = format!(
-        "material_id={material_id}&colour_hex=%23FF00A0&colour_name=Journey+Pink&diameter=1.75&net_weight=1000&price_paid=24.99"
+        "condition=new&material_id={material_id}&colour_hex=%23FF00A0&colour_name=Journey+Pink&diameter=1.75&net_weight=1000&price_paid=24.99"
     );
     let res = app
         .clone()
@@ -254,7 +259,7 @@ async fn consume_archive_restore_journey() {
         .unwrap();
     let created = items
         .iter()
-        .find(|i| i.colour.hex() == "#FF00A0")
+        .find(|i| i.colour.as_ref().is_some_and(|c| c.hex() == "#FF00A0"))
         .expect("the spool just posted is present in the filtered list");
     let spool_id = created.id.as_str().to_string();
     let row_marker = format!("spool-row-{spool_id}");
@@ -442,7 +447,7 @@ async fn stock_value_stat_respects_material_filter() {
     // Material A: 1000g @ 20.00, drawn down to 400g remaining (via
     // `consume` over the router) -> (400/1000) * 20.00 = 8.00.
     let form_a = format!(
-        "material_id={mat_a_id}&colour_hex=%23112233&colour_name=Filter+A&diameter=1.75&net_weight=1000&price_paid=20.00"
+        "condition=new&material_id={mat_a_id}&colour_hex=%23112233&colour_name=Filter+A&diameter=1.75&net_weight=1000&price_paid=20.00"
     );
     let res = app
         .clone()
@@ -458,7 +463,7 @@ async fn stock_value_stat_respects_material_filter() {
 
     // Material B: 1000g @ 50.00, left sealed -> full value 50.00.
     let form_b = format!(
-        "material_id={mat_b_id}&colour_hex=%23445566&colour_name=Filter+B&diameter=1.75&net_weight=1000&price_paid=50.00"
+        "condition=new&material_id={mat_b_id}&colour_hex=%23445566&colour_name=Filter+B&diameter=1.75&net_weight=1000&price_paid=50.00"
     );
     let res = app
         .clone()
@@ -486,7 +491,7 @@ async fn stock_value_stat_respects_material_filter() {
         .unwrap();
     let spool_a_id = a_items
         .iter()
-        .find(|i| i.colour.hex() == "#112233")
+        .find(|i| i.colour.as_ref().is_some_and(|c| c.hex() == "#112233"))
         .expect("spool A just posted")
         .id
         .as_str()
@@ -578,7 +583,7 @@ async fn spool_location_assignment_journey() {
     // --- 1. POST /spools with a location selected -> persists, and the
     // detail page shows the assigned location's name.
     let form = format!(
-        "material_id={material_id}&colour_hex=%23ABCDEF&colour_name=Loc+Journey&diameter=1.75&net_weight=1000&price_paid=15.00&location_id={location_id}"
+        "condition=new&material_id={material_id}&colour_hex=%23ABCDEF&colour_name=Loc+Journey&diameter=1.75&net_weight=1000&price_paid=15.00&location_id={location_id}"
     );
     let res = app
         .clone()
@@ -606,7 +611,7 @@ async fn spool_location_assignment_journey() {
         .unwrap();
     let created = items
         .iter()
-        .find(|i| i.colour.hex() == "#ABCDEF")
+        .find(|i| i.colour.as_ref().is_some_and(|c| c.hex() == "#ABCDEF"))
         .expect("the spool just posted is present in the filtered list");
     let spool_id = created.id.as_str().to_string();
 

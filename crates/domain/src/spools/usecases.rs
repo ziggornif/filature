@@ -106,7 +106,7 @@ impl SpoolsUseCases for SpoolsService {
 mod tests {
     use super::*;
     use crate::shared::{DomainError, Grams, LocationId, MaterialId, Money};
-    use crate::spools::model::{Colour, Diameter, SpoolStatus};
+    use crate::spools::model::{Colour, Diameter, SpoolCondition, SpoolStatus, SpoolType};
     use crate::spools::stubs::StubSpoolRepository;
 
     fn svc() -> SpoolsService {
@@ -115,13 +115,15 @@ mod tests {
 
     fn sample_new_spool(material_id: &str) -> NewSpool {
         NewSpool {
+            condition: SpoolCondition::New,
             material_id: MaterialId::new(material_id),
-            colour: Colour::new("#1A9E4B".into(), None).unwrap(),
+            colour: Some(Colour::from_hex("#1A9E4B".into()).unwrap()),
             diameter: Diameter::Mm1_75,
             net_weight: Grams::new(1000.0).unwrap(),
             price_paid: Money::new(2500, 2).unwrap(),
             location_id: None,
             manufacturer_id: None,
+            remaining_weight: None,
         }
     }
 
@@ -130,6 +132,7 @@ mod tests {
         let s = svc();
         let created = s.add(sample_new_spool("material-1")).await.unwrap();
         assert_eq!(created.status, SpoolStatus::Sealed);
+        assert_eq!(created.spool_type, SpoolType::Complete);
         assert_eq!(created.remaining_weight.value(), created.net_weight.value());
         assert_eq!(created.net_weight.value(), 1000.0);
     }

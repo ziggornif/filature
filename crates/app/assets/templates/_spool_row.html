@@ -1,6 +1,6 @@
 <tr id="spool-row-{{ s.id }}" class="spool-row spool-row--{{ s.status | lower }}" style="--row-colour:{{ s.colour_hex }}">
   <td>
-    <span class="colour-swatch"
+    <span class="colour-swatch{% if not s.colour_hex %} colour-swatch--unset{% endif %}"
           style="background:{{ s.colour_hex }}"
           title="{{ s.colour_label }}"></span>
   </td>
