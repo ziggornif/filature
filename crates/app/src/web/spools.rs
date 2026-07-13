@@ -23,6 +23,7 @@ use domain::shared::{DomainError, Grams, LocationId, ManufacturerId, MaterialId,
 use domain::spools::{
     Colour, Diameter, EditSpool, NewSpool, RepositoryError, Spool, SpoolCondition, SpoolDetail,
     SpoolFilter, SpoolId, SpoolListItem, SpoolSort, SpoolStatus,
+    remaining_length_m as calculate_length_m,
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -109,7 +110,9 @@ pub struct SpoolDetailView {
     pub remaining_weight: f64,
     pub remaining_pct: u8,
     pub remaining_length_m: f64,
+    pub total_length_m: f64,
     pub price_paid: String,
+    pub current_value: String,
     pub status: String, // "Sealed" | "Open" | "Empty" | "Archived"
     /// The assigned location's display name, or `None` when unassigned —
     /// the detail card shows this (or the "unassigned" label).
@@ -125,6 +128,13 @@ impl From<SpoolDetail> for SpoolDetailView {
     fn from(d: SpoolDetail) -> Self {
         let remaining_pct = (d.remaining_ratio() * 100.0).round();
         let remaining_length_m = round1(d.remaining_length_m());
+        let total_length_m = round1(calculate_length_m(d.net_weight, d.density, d.diameter));
+        let current_value = Money::from_decimal(
+            d.price_paid.value()
+                * Decimal::from_f64_retain(d.remaining_ratio()).unwrap_or(Decimal::ZERO),
+        )
+        .map(|value| value.to_string())
+        .unwrap_or_else(|_| "0.00".to_string());
         let (colour_hex, colour_label, has_colour_name) = d
             .colour
             .as_ref()
@@ -147,7 +157,9 @@ impl From<SpoolDetail> for SpoolDetailView {
             remaining_weight: round1(d.remaining_weight.value()),
             remaining_pct: remaining_pct as u8, // saturating cast — no panic on out-of-range ratios
             remaining_length_m,
+            total_length_m,
             price_paid: d.price_paid.to_string(),
+            current_value,
             status: d.status.as_str().to_string(),
             location_name: d.location_name.clone(),
             location_id: d.location_id.clone(),
@@ -880,11 +892,19 @@ async fn detail_page(
         Ok(ls) => ls,
         Err(resp) => return resp,
     };
+    let low_stock_threshold_pct = match st.instance_configuration.get().await {
+        Ok(configuration) => configuration.low_stock_threshold.percent(),
+        Err(e) => return internal_error(e),
+    };
 
     let view: SpoolDetailView = detail.into();
     let mut ctx = Context::new();
     ctx.insert("spool", &view);
     ctx.insert("locations", &locations);
+    ctx.insert("page", "spools");
+    ctx.insert("low_stock_threshold_pct", &low_stock_threshold_pct);
+    ctx.insert("editing_remaining", &false);
+    ctx.insert("is_fragment", &false);
     // The page includes `_spool_detail_card.html`, which always references
     // `error_key` (to show/hide its op-error line) — insert `None` here so
     // that include doesn't hit an undefined variable on a fresh page load.
@@ -898,17 +918,17 @@ async fn detail_page(
     }
 }
 
-/// Renders the detail-card fragment (`_spool_detail_card.html`) — the
-/// weight/status `<dl>` plus the op forms (set-remaining/consume/archive or
-/// restore) — used both standalone (an op handler's htmx `outerHTML` swap
-/// target) and `{% include %}`d inside the full detail page. `error_key`,
-/// when set, is shown as a localized op-error line inside the card.
+/// Renders the autonomous detail fragment (`_spool_detail_card.html`) — hero,
+/// information cards and stock operations — both after htmx mutations and as
+/// an include in the full page. `error_key`, when set, is shown as a localized
+/// operation error inside the fragment.
 async fn render_card(
     st: &AppState,
     locale: &str,
     status: StatusCode,
     detail: SpoolDetail,
     error_key: Option<&str>,
+    editing_remaining: bool,
 ) -> Response {
     // The card is re-rendered by every op handler (weight/consume/archive/
     // restore/reassign), not just the reassign one — so it fetches the
@@ -918,11 +938,18 @@ async fn render_card(
         Ok(ls) => ls,
         Err(resp) => return resp,
     };
+    let low_stock_threshold_pct = match st.instance_configuration.get().await {
+        Ok(configuration) => configuration.low_stock_threshold.percent(),
+        Err(e) => return internal_error(e),
+    };
     let view: SpoolDetailView = detail.into();
     let mut ctx = Context::new();
     ctx.insert("spool", &view);
     ctx.insert("locations", &locations);
     ctx.insert("error_key", &error_key);
+    ctx.insert("low_stock_threshold_pct", &low_stock_threshold_pct);
+    ctx.insert("editing_remaining", &editing_remaining);
+    ctx.insert("is_fragment", &true);
     match st
         .renderer
         .render("_spool_detail_card.html", locale, "", ctx)
@@ -944,8 +971,36 @@ async fn render_card_for(
     error_key: Option<&str>,
 ) -> Response {
     match st.spools.view(id).await {
-        Ok(detail) => render_card(st, locale, status, detail, error_key).await,
+        Ok(detail) => render_card(st, locale, status, detail, error_key, false).await,
         Err(RepositoryError::NotFound(_)) => not_found(st, locale),
+        Err(e) => internal_error(e),
+    }
+}
+
+/// Returns the detail fragment in its normal display state. It is used by
+/// the inline remaining-weight form's cancel action, so cancelling never
+/// navigates away from the detail screen.
+async fn detail_card(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    render_card_for(&st, &locale, SpoolId::new(id), StatusCode::OK, None).await
+}
+
+/// Opens the hero's inline remaining-weight editor. The response is the
+/// same autonomous fragment returned by mutations, with only its editor
+/// state changed.
+async fn edit_remaining(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    match st.spools.view(SpoolId::new(id)).await {
+        Ok(detail) => render_card(&st, &locale, StatusCode::OK, detail, None, true).await,
+        Err(RepositoryError::NotFound(_)) => not_found(&st, &locale),
         Err(e) => internal_error(e),
     }
 }
@@ -1420,7 +1475,12 @@ pub fn routes() -> Router<AppState> {
         .route("/spools/{id}/edit/condition", get(edit_condition_step))
         .route("/spools/{id}/edit/details", get(edit_details_step))
         .route("/spools/{id}", get(detail_page).put(update))
-        .route("/spools/{id}/remaining", post(set_remaining))
+        .route("/spools/{id}/card", get(detail_card))
+        .route("/spools/{id}/remaining/edit", get(edit_remaining))
+        .route(
+            "/spools/{id}/remaining",
+            post(set_remaining).put(set_remaining),
+        )
         .route("/spools/{id}/consume", post(consume))
         .route("/spools/{id}/archive", post(archive))
         .route("/spools/{id}/restore", post(restore))
@@ -1645,7 +1705,9 @@ mod tests {
             remaining_weight: 800.0,
             remaining_pct: 80,
             remaining_length_m: 268.2,
+            total_length_m: 335.2,
             price_paid: "24.99".into(),
+            current_value: "19.99".into(),
             status: "Open".into(),
             location_name: Some("Shelf A".into()),
             location_id: Some("01HLOC".into()),
@@ -1672,7 +1734,15 @@ mod tests {
         assert!(html.contains("800"));
         assert!(html.contains("80%"));
         assert!(html.contains("24.99"));
+        assert!(html.contains("19.99")); // current value at 80% remaining
+        assert!(html.contains("335.2")); // total filament length
         assert!(html.contains("/spools/01HSP/edit"));
+        assert!(html.contains(r#"class="spool-detail-hero""#));
+        assert!(html.contains(r#"class="spool-detail-info-grid""#));
+        assert!(html.contains("Consumption history"));
+        assert!(html.contains("No notes for this spool."));
+        assert!(html.contains(r#"hx-post="/spools/01HSP/archive""#));
+        assert!(html.contains(r#"hx-get="/spools/01HSP/remaining/edit""#));
         assert!(html.contains("Shelf A")); // assigned location name shown
         assert!(html.contains("Prusament")); // manufacturer name shown
         assert!(!html.contains("spools.col."));
@@ -1684,9 +1754,49 @@ mod tests {
     #[test]
     fn detail_page_localises_to_french() {
         let html = render_detail("fr");
-        assert!(html.contains("Détail de la bobine") || html.contains("Matériau"));
+        assert!(html.contains("Bobines"));
+        assert!(html.contains("Valeur actuelle"));
+        assert!(html.contains("Historique de consommation"));
+        assert!(html.contains("Aucune note pour cette bobine."));
         assert!(!html.contains("spools.col."));
         assert!(!html.contains("spools.detail."));
+    }
+
+    #[test]
+    fn detail_fragment_renders_inline_weight_editor_with_put_and_cancel_get() {
+        let r = Renderer::new(Catalog::load("en"));
+        let mut ctx = Context::new();
+        ctx.insert("spool", &detail_view("01HSP"));
+        ctx.insert("locations", &vec![location_option()]);
+        ctx.insert("error_key", &Option::<&str>::None);
+        ctx.insert("editing_remaining", &true);
+        ctx.insert("is_fragment", &true);
+        ctx.insert("low_stock_threshold_pct", &15u8);
+        let html = r.render("_spool_detail_card.html", "en", "", ctx).unwrap();
+
+        assert!(html.contains(r#"hx-put="/spools/01HSP/remaining""#));
+        assert!(html.contains(r#"hx-get="/spools/01HSP/card""#));
+        assert!(html.contains(r#"value="800.0""#));
+        assert!(!html.contains("Adjust weight"));
+        assert!(!html.contains("spools."));
+    }
+
+    #[test]
+    fn detail_fragment_applies_configured_low_stock_gauge_state() {
+        let r = Renderer::new(Catalog::load("en"));
+        let mut spool = detail_view("01HSP");
+        spool.remaining_pct = 12;
+        let mut ctx = Context::new();
+        ctx.insert("spool", &spool);
+        ctx.insert("locations", &Vec::<LocationOption>::new());
+        ctx.insert("error_key", &Option::<&str>::None);
+        ctx.insert("editing_remaining", &false);
+        ctx.insert("is_fragment", &false);
+        ctx.insert("low_stock_threshold_pct", &15u8);
+        let html = r.render("_spool_detail_card.html", "en", "", ctx).unwrap();
+
+        assert!(html.contains("spool-detail-gauge gauge--low"));
+        assert!(html.contains("detail-weight--low"));
     }
 
     #[test]
@@ -2555,20 +2665,22 @@ mod tests {
             let created = spools.add(valid_new_spool(&material_id)).await.unwrap();
             let id = created.id.as_str().to_string();
             let restore_post = format!(r#"hx-post="/spools/{id}/restore""#);
-            let remaining_post = format!(r#"hx-post="/spools/{id}/remaining""#);
+            let remaining_put = format!(r#"hx-put="/spools/{id}/remaining""#);
+            let remaining_edit = format!(r#"hx-get="/spools/{id}/remaining/edit""#);
             let consume_post = format!(r#"hx-post="/spools/{id}/consume""#);
 
             let archived = archive(State(st.clone()), HeaderMap::new(), Path(id.clone())).await;
             assert_eq!(archived.status(), StatusCode::OK);
             let html = body_of(archived).await;
             assert!(html.contains(&restore_post)); // Restore control shown
-            assert!(!html.contains(&remaining_post)); // weight forms hidden
+            assert!(!html.contains(&remaining_put)); // weight forms hidden
+            assert!(!html.contains(&remaining_edit));
             assert!(!html.contains(&consume_post));
 
             let restored = restore(State(st), HeaderMap::new(), Path(id)).await;
             assert_eq!(restored.status(), StatusCode::OK);
             let html = body_of(restored).await;
-            assert!(html.contains(&remaining_post)); // ops forms shown again
+            assert!(html.contains(&remaining_edit)); // inline weight control shown again
             assert!(html.contains(&consume_post));
             assert!(!html.contains(&restore_post));
         }
@@ -2871,7 +2983,8 @@ mod tests {
             // Tera HTML-escapes the apostrophe (`&#39;`) — match the actual
             // rendered entity, not the raw catalog string.
             assert!(html.contains("Enregistrer l&#39;utilisation"));
-            assert!(html.contains("Archiver"));
+            assert!(html.contains("Ajuster le poids"));
+            assert!(html.contains("Opérations de stock"));
             assert!(!html.contains("spools.")); // no raw i18n key leaks
         }
     }
