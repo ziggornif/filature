@@ -22,10 +22,12 @@ async fn exported_snapshot_round_trips_and_failed_replace_rolls_back() {
            INSERT INTO locations (id, name, note) VALUES ('loc-1', 'Shelf', 'Dry');
            INSERT INTO spools
              (id, material_id, spool_type, colour_hex, colour_name, diameter, net_weight,
-              remaining_weight, price_paid, status, location_id, manufacturer_id, created_at)
+              remaining_weight, price_paid, status, location_id, manufacturer_id, notes,
+              purchased_at, opened_at, created_at)
            VALUES
              ('spool-1', 'mat-1', 'Complete', '#AABBCC', '#AABBCC', '1.75', 1000,
-              420, 24.9900, 'Open', 'loc-1', 'maker-1', '2026-07-13T12:00:00Z');
+              420, 24.9900, 'Open', 'loc-1', 'maker-1', 'Prototype spool',
+              '2026-07-01', '2026-07-12', '2026-07-13T12:00:00Z');
            INSERT INTO instance_configuration (singleton, low_stock_threshold) VALUES (TRUE, 21)"#,
     )
     .execute(&pool)
@@ -33,6 +35,15 @@ async fn exported_snapshot_round_trips_and_failed_replace_rolls_back() {
     .unwrap();
 
     let original = repository.export_snapshot().await.unwrap();
+    assert_eq!(original.spools[0].notes.as_deref(), Some("Prototype spool"));
+    assert_eq!(
+        original.spools[0].purchased_at.unwrap().to_string(),
+        "2026-07-01"
+    );
+    assert_eq!(
+        original.spools[0].opened_at.unwrap().to_string(),
+        "2026-07-12"
+    );
     sqlx::raw_sql("DELETE FROM spools; UPDATE instance_configuration SET low_stock_threshold = 99")
         .execute(&pool)
         .await

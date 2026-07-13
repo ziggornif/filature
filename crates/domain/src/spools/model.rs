@@ -1,5 +1,6 @@
 use crate::shared::{DomainError, Grams, LocationId, ManufacturerId, MaterialId, Money};
 use std::f64::consts::PI;
+use time::Date;
 
 /// A spool colour whose display name is derived from its normalized value.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -193,6 +194,9 @@ pub struct NewSpool {
     pub price_paid: Money,
     pub location_id: Option<LocationId>,
     pub manufacturer_id: Option<ManufacturerId>,
+    pub notes: Option<String>,
+    pub purchased_at: Option<Date>,
+    pub opened_at: Option<Date>,
     /// Only used for an opened spool; ignored for the other conditions.
     pub remaining_weight: Option<Grams>,
 }
@@ -211,6 +215,9 @@ pub struct EditSpool {
     pub price_paid: Money,
     pub location_id: Option<LocationId>,
     pub manufacturer_id: Option<ManufacturerId>,
+    pub notes: Option<String>,
+    pub purchased_at: Option<Date>,
+    pub opened_at: Option<Date>,
     /// Only used for an opened spool; ignored for a new spool.
     pub remaining_weight: Option<Grams>,
 }
@@ -275,6 +282,9 @@ pub struct Spool {
     pub status: SpoolStatus,
     pub location_id: Option<LocationId>,
     pub manufacturer_id: Option<ManufacturerId>,
+    pub notes: Option<String>,
+    pub purchased_at: Option<Date>,
+    pub opened_at: Option<Date>,
 }
 
 impl Spool {
@@ -391,6 +401,9 @@ mod tests {
             status: SpoolStatus::Open,
             location_id: None,
             manufacturer_id: None,
+            notes: None,
+            purchased_at: None,
+            opened_at: None,
         }
     }
 
@@ -460,6 +473,9 @@ mod tests {
             price_paid: Money::new(20, 0).unwrap(),
             location_id: None,
             manufacturer_id: None,
+            notes: None,
+            purchased_at: None,
+            opened_at: None,
             remaining_weight,
         };
         let opened = make(SpoolCondition::Opened, Some(Grams::new(1200.0).unwrap()));

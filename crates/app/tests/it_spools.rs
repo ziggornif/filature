@@ -16,6 +16,7 @@ use filature::persistence::manufacturers::SqlxManufacturerRepository;
 use filature::persistence::materials::SqlxMaterialRepository;
 use filature::persistence::spools::SqlxSpoolRepository;
 use rust_decimal::Decimal;
+use time::{Date, Month};
 
 fn sample_location(name: &str) -> NewLocation {
     NewLocation {
@@ -48,6 +49,9 @@ fn sample_spool(material_id: MaterialId, net: f64, price: &str) -> NewSpool {
         price_paid: Money::from_decimal(Decimal::from_str_exact(price).unwrap()).unwrap(),
         location_id: None,
         manufacturer_id: None,
+        notes: None,
+        purchased_at: None,
+        opened_at: None,
         remaining_weight: None,
     }
 }
@@ -61,10 +65,11 @@ async fn insert_get_full_roundtrip() {
 
     let material = materials.insert(sample_material("PLA-A")).await.unwrap();
 
-    let created = spools
-        .insert(sample_spool(material.id.clone(), 1000.0, "24.99"))
-        .await
-        .unwrap();
+    let mut new = sample_spool(material.id.clone(), 1000.0, "24.99");
+    new.notes = Some("Prototype spool".into());
+    new.purchased_at = Some(Date::from_calendar_date(2026, Month::July, 1).unwrap());
+    new.opened_at = Some(Date::from_calendar_date(2026, Month::July, 12).unwrap());
+    let created = spools.insert(new).await.unwrap();
 
     assert_eq!(created.id.as_str().len(), 26); // ULID
     assert_eq!(created.material_id, material.id);
@@ -78,6 +83,9 @@ async fn insert_get_full_roundtrip() {
     assert_eq!(created.colour.as_ref().unwrap().hex(), "#1A9E4B");
     assert_eq!(created.colour.as_ref().unwrap().name(), Some("#1A9E4B"));
     assert_eq!(created.diameter, Diameter::Mm1_75);
+    assert_eq!(created.notes.as_deref(), Some("Prototype spool"));
+    assert_eq!(created.purchased_at.unwrap().to_string(), "2026-07-01");
+    assert_eq!(created.opened_at.unwrap().to_string(), "2026-07-12");
 
     let detail = spools.get(&created.id).await.unwrap().unwrap();
     assert_eq!(detail.id, created.id);
@@ -94,6 +102,9 @@ async fn insert_get_full_roundtrip() {
         Money::from_decimal(Decimal::from_str_exact("24.99").unwrap()).unwrap()
     );
     assert_eq!(detail.status, SpoolStatus::Sealed);
+    assert_eq!(detail.notes.as_deref(), Some("Prototype spool"));
+    assert_eq!(detail.purchased_at.unwrap().to_string(), "2026-07-01");
+    assert_eq!(detail.opened_at.unwrap().to_string(), "2026-07-12");
 }
 
 #[tokio::test]
@@ -141,6 +152,8 @@ async fn update_persists_changes() {
     created.status = SpoolStatus::Open;
     created.remaining_weight = Grams::new(400.0).unwrap();
     created.price_paid = Money::from_decimal(Decimal::from_str_exact("21.50").unwrap()).unwrap();
+    created.notes = Some("Updated note".into());
+    created.opened_at = Some(Date::from_calendar_date(2026, Month::July, 13).unwrap());
 
     let updated = spools.update(created.clone()).await.unwrap();
     assert_eq!(updated.colour.as_ref().unwrap().hex(), "#FF0000");
@@ -155,6 +168,8 @@ async fn update_persists_changes() {
     let detail = spools.get(&created.id).await.unwrap().unwrap();
     assert_eq!(detail.colour.as_ref().unwrap().hex(), "#FF0000");
     assert_eq!(detail.status, SpoolStatus::Open);
+    assert_eq!(detail.notes.as_deref(), Some("Updated note"));
+    assert_eq!(detail.opened_at.unwrap().to_string(), "2026-07-13");
     assert_eq!(detail.remaining_weight.value(), 400.0);
     assert_eq!(
         detail.price_paid,
@@ -314,6 +329,9 @@ async fn list_filters_by_manufacturer_location_and_search() {
         price_paid: Money::from_decimal(Decimal::from_str_exact("10.00").unwrap()).unwrap(),
         location_id: Some(loc.clone()),
         manufacturer_id: Some(mfr.clone()),
+        notes: None,
+        purchased_at: None,
+        opened_at: None,
         remaining_weight: None,
     };
 
@@ -480,6 +498,9 @@ async fn update_unknown_id_returns_not_found() {
         status: SpoolStatus::Sealed,
         location_id: None,
         manufacturer_id: None,
+        notes: None,
+        purchased_at: None,
+        opened_at: None,
     };
 
     let err = spools.update(fake.clone()).await.unwrap_err();

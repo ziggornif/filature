@@ -28,6 +28,7 @@ use domain::spools::{
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tera::Context;
+use time::{Date, format_description};
 
 /// Template-shaped view of a `SpoolListItem`: plain strings/numbers plus the
 /// derived percentage/length fields (the domain never exposes a "view
@@ -122,6 +123,9 @@ pub struct SpoolDetailView {
     pub location_id: Option<String>,
     /// The manufacturer's display name, or `None` when unattributed.
     pub manufacturer_name: Option<String>,
+    pub notes: Option<String>,
+    pub purchased_at: Option<String>,
+    pub opened_at: Option<String>,
 }
 
 impl From<SpoolDetail> for SpoolDetailView {
@@ -164,6 +168,9 @@ impl From<SpoolDetail> for SpoolDetailView {
             location_name: d.location_name.clone(),
             location_id: d.location_id.clone(),
             manufacturer_name: d.manufacturer_name.clone(),
+            notes: d.notes.clone(),
+            purchased_at: d.purchased_at.map(|date| date.to_string()),
+            opened_at: d.opened_at.map(|date| date.to_string()),
         }
     }
 }
@@ -485,6 +492,12 @@ pub struct SpoolForm {
     pub manufacturer_id: String,
     #[serde(default)]
     pub manufacturer_name: String,
+    #[serde(default)]
+    pub notes: String,
+    #[serde(default)]
+    pub purchased_at: String,
+    #[serde(default)]
+    pub opened_at: String,
 }
 
 /// The fields shared by `NewSpool` (create) and an edited `Spool` (update) —
@@ -498,6 +511,21 @@ struct SpoolFormFields {
     price_paid: Money,
     location_id: Option<LocationId>,
     manufacturer_id: Option<ManufacturerId>,
+    notes: Option<String>,
+    purchased_at: Option<Date>,
+    opened_at: Option<Date>,
+}
+
+fn parse_optional_date(raw: &str) -> Result<Option<Date>, &'static str> {
+    let value = raw.trim();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let format = format_description::parse_borrowed::<2>("[year]-[month]-[day]")
+        .map_err(|_| "spools.new.error.date")?;
+    Date::parse(value, &format)
+        .map(Some)
+        .map_err(|_| "spools.new.error.date")
 }
 
 /// Maps a raw `location_id` form value to the domain optional id: blank or
@@ -609,6 +637,9 @@ impl SpoolForm {
             price_paid,
             location_id: parse_location_id(&self.location_id),
             manufacturer_id: parse_manufacturer_id(&self.manufacturer_id),
+            notes: (!self.notes.trim().is_empty()).then(|| self.notes.trim().to_string()),
+            purchased_at: parse_optional_date(&self.purchased_at)?,
+            opened_at: parse_optional_date(&self.opened_at)?,
         })
     }
 
@@ -637,6 +668,9 @@ impl SpoolForm {
             price_paid: f.price_paid,
             location_id: f.location_id,
             manufacturer_id: f.manufacturer_id,
+            notes: f.notes,
+            purchased_at: f.purchased_at,
+            opened_at: f.opened_at,
             remaining_weight,
         })
     }
@@ -669,6 +703,9 @@ impl SpoolForm {
             price_paid: f.price_paid,
             location_id: f.location_id,
             manufacturer_id: f.manufacturer_id,
+            notes: f.notes,
+            purchased_at: f.purchased_at,
+            opened_at: f.opened_at,
         })
     }
 }
@@ -718,6 +755,9 @@ async fn render_form(
     ctx.insert("net_weight", &form.net_weight);
     ctx.insert("remaining_weight", &form.remaining_weight);
     ctx.insert("price_paid", &form.price_paid);
+    ctx.insert("notes", &form.notes);
+    ctx.insert("purchased_at", &form.purchased_at);
+    ctx.insert("opened_at", &form.opened_at);
     ctx.insert("error_key", &error_key);
     ctx.insert("wizard_step", "details");
     ctx.insert("edit_mode", &false);
@@ -1197,6 +1237,9 @@ async fn render_edit_form(
     ctx.insert("net_weight", &form.net_weight);
     ctx.insert("remaining_weight", &form.remaining_weight);
     ctx.insert("price_paid", &form.price_paid);
+    ctx.insert("notes", &form.notes);
+    ctx.insert("purchased_at", &form.purchased_at);
+    ctx.insert("opened_at", &form.opened_at);
     ctx.insert("error_key", &opts.error_key);
     ctx.insert("wizard_step", "details");
     ctx.insert("edit_mode", &true);
@@ -1241,6 +1284,15 @@ fn edit_form(detail: &SpoolDetail) -> SpoolForm {
         manufacturer_id: detail.manufacturer_id.clone().unwrap_or_default(),
         manufacturer_name: String::new(),
         remaining_weight: detail.remaining_weight.value().to_string(),
+        notes: detail.notes.clone().unwrap_or_default(),
+        purchased_at: detail
+            .purchased_at
+            .map(|date| date.to_string())
+            .unwrap_or_default(),
+        opened_at: detail
+            .opened_at
+            .map(|date| date.to_string())
+            .unwrap_or_default(),
     }
 }
 
@@ -1712,6 +1764,9 @@ mod tests {
             location_name: Some("Shelf A".into()),
             location_id: Some("01HLOC".into()),
             manufacturer_name: Some("Prusament".into()),
+            notes: None,
+            purchased_at: None,
+            opened_at: None,
         }
     }
 
@@ -1760,6 +1815,23 @@ mod tests {
         assert!(html.contains("Aucune note pour cette bobine."));
         assert!(!html.contains("spools.col."));
         assert!(!html.contains("spools.detail."));
+    }
+
+    #[test]
+    fn detail_page_renders_notes_and_dates_when_present() {
+        let r = Renderer::new(Catalog::load("en"));
+        let mut spool = detail_view("01HSP");
+        spool.notes = Some("Opened for a prototype".into());
+        spool.purchased_at = Some("2026-07-01".into());
+        spool.opened_at = Some("2026-07-12".into());
+        let mut ctx = Context::new();
+        ctx.insert("spool", &spool);
+        ctx.insert("locations", &vec![location_option()]);
+        let html = r.render("spools_detail.html", "en", "", ctx).unwrap();
+        assert!(html.contains("Opened for a prototype"));
+        assert!(html.contains("2026-07-01"));
+        assert!(html.contains("2026-07-12"));
+        assert!(!html.contains("No notes for this spool."));
     }
 
     #[test]
@@ -1841,6 +1913,9 @@ mod tests {
         ctx.insert("net_weight", "");
         ctx.insert("remaining_weight", "");
         ctx.insert("price_paid", "");
+        ctx.insert("notes", "");
+        ctx.insert("purchased_at", "");
+        ctx.insert("opened_at", "");
         ctx.insert("error_key", &Option::<&str>::None);
         r.render("spools_new.html", locale, "", ctx).unwrap()
     }
@@ -1866,6 +1941,9 @@ mod tests {
         ctx.insert("net_weight_is_custom", &true);
         ctx.insert("remaining_weight", "456.7");
         ctx.insert("price_paid", "31.20");
+        ctx.insert("notes", "Opened for a prototype");
+        ctx.insert("purchased_at", "2026-07-01");
+        ctx.insert("opened_at", "2026-07-12");
         ctx.insert("error_key", &Option::<&str>::None);
         r.render("spools_edit.html", locale, "", ctx).unwrap()
     }
@@ -1914,6 +1992,9 @@ mod tests {
         ctx.insert("net_weight", "1000");
         ctx.insert("remaining_weight", "");
         ctx.insert("price_paid", "24.99");
+        ctx.insert("notes", "");
+        ctx.insert("purchased_at", "");
+        ctx.insert("opened_at", "");
         ctx.insert("error_key", &Some("spools.new.error.colour"));
         let html = r.render("spools_new.html", "en", "", ctx).unwrap();
         assert!(html.contains("must be a valid #RRGGBB hex code"));
@@ -1936,6 +2017,11 @@ mod tests {
         assert!(html.contains(r#"name="remaining_weight""#));
         assert!(html.contains(r#"value="456.7""#));
         assert!(html.contains(r#"value="31.20""#));
+        assert!(html.contains(r#"name="purchased_at" value="2026-07-01""#));
+        assert!(html.contains(r#"name="opened_at" value="2026-07-12""#));
+        assert!(
+            html.contains(r#"<textarea name="notes" rows="4">Opened for a prototype</textarea>"#)
+        );
         assert!(html.contains("/spools/01HSP/edit/condition"));
         assert!(!html.contains("spools.edit."));
         assert!(!html.contains("spools.colour."));
@@ -1965,6 +2051,9 @@ mod tests {
             manufacturer_id: "".to_string(),
             manufacturer_name: "".to_string(),
             remaining_weight: "".to_string(),
+            notes: "".to_string(),
+            purchased_at: "".to_string(),
+            opened_at: "".to_string(),
         }
     }
 
@@ -1976,7 +2065,11 @@ mod tests {
 
     #[test]
     fn to_new_maps_valid_form_to_domain_values() {
-        let new = valid_form("01HMAT").to_new().unwrap();
+        let mut form = valid_form("01HMAT");
+        form.notes = "  Keep dry  ".into();
+        form.purchased_at = "2026-07-01".into();
+        form.opened_at = "2026-07-12".into();
+        let new = form.to_new().unwrap();
         assert_eq!(new.material_id, MaterialId::new("01HMAT"));
         assert_eq!(new.colour.as_ref().unwrap().hex(), "#1A9E4B");
         assert_eq!(new.colour.as_ref().unwrap().name(), Some("#1A9E4B"));
@@ -1986,6 +2079,16 @@ mod tests {
             new.price_paid,
             Money::from_decimal(Decimal::from_str_exact("24.99").unwrap()).unwrap()
         );
+        assert_eq!(new.notes.as_deref(), Some("Keep dry"));
+        assert_eq!(new.purchased_at.unwrap().to_string(), "2026-07-01");
+        assert_eq!(new.opened_at.unwrap().to_string(), "2026-07-12");
+    }
+
+    #[test]
+    fn to_new_rejects_invalid_optional_date() {
+        let mut form = valid_form("01HMAT");
+        form.purchased_at = "2026-02-30".into();
+        assert_eq!(form.to_new(), Err("spools.new.error.date"));
     }
 
     #[test]

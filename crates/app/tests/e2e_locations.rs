@@ -201,6 +201,9 @@ async fn delete_blocked_then_allowed_after_unassign() {
             price_paid: Money::from_decimal(Decimal::from_str_exact("10.00").unwrap()).unwrap(),
             location_id: None,
             manufacturer_id: None,
+            notes: None,
+            purchased_at: None,
+            opened_at: None,
             remaining_weight: None,
         })
         .await

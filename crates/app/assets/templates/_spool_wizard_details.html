@@ -117,7 +117,16 @@
         <label>{{ t(key="spools.new.price_paid") }}
           <input type="number" name="price_paid" step="0.01" min="0" value="{{ price_paid }}" required>
         </label>
+        <label>{{ t(key="spools.new.purchased_at") }}
+          <input type="date" name="purchased_at" value="{{ purchased_at }}">
+        </label>
+        <label>{{ t(key="spools.new.opened_at") }}
+          <input type="date" name="opened_at" value="{{ opened_at }}">
+        </label>
       </div>
+      <label>{{ t(key="spools.new.notes") }}
+        <textarea name="notes" rows="4">{{ notes }}</textarea>
+      </label>
     </section>
 
     <div class="wizard-actions">

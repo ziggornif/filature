@@ -1,6 +1,7 @@
 use rust_decimal::Decimal;
 use std::collections::HashSet;
 use thiserror::Error;
+use time::Date;
 
 pub const FORMAT: &str = "filature-instance";
 pub const VERSION: u32 = 1;
@@ -78,6 +79,9 @@ pub struct SnapshotSpool {
     pub status: SnapshotSpoolStatus,
     pub location_id: Option<String>,
     pub manufacturer_id: Option<String>,
+    pub notes: Option<String>,
+    pub purchased_at: Option<Date>,
+    pub opened_at: Option<Date>,
     pub created_at: String,
 }
 
@@ -327,6 +331,9 @@ mod tests {
                     status: SnapshotSpoolStatus::Open,
                     location_id: None,
                     manufacturer_id: None,
+                    notes: Some("Test spool".into()),
+                    purchased_at: Some(Date::from_ordinal_date(2026, 1).unwrap()),
+                    opened_at: None,
                     created_at: "1970-01-01T00:00:00Z".into(),
                 }],
                 configuration: SnapshotConfiguration {

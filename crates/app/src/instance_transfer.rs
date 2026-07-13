@@ -12,7 +12,7 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use thiserror::Error;
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+use time::{Date, OffsetDateTime, format_description, format_description::well_known::Rfc3339};
 
 #[derive(Debug, Error)]
 pub enum CodecError {
@@ -104,7 +104,26 @@ struct WireSpool {
     status: WireSpoolStatus,
     location_id: Option<String>,
     manufacturer_id: Option<String>,
+    #[serde(default)]
+    notes: Option<String>,
+    #[serde(default)]
+    purchased_at: Option<String>,
+    #[serde(default)]
+    opened_at: Option<String>,
     created_at: String,
+}
+
+fn format_date(date: Date) -> Result<String, CodecError> {
+    let format = format_description::parse_borrowed::<2>("[year]-[month]-[day]")
+        .map_err(|error| CodecError::Timestamp(error.to_string()))?;
+    date.format(&format)
+        .map_err(|error| CodecError::Timestamp(error.to_string()))
+}
+
+fn parse_date(value: String) -> Result<Date, CodecError> {
+    let format = format_description::parse_borrowed::<2>("[year]-[month]-[day]")
+        .map_err(|error| CodecError::Timestamp(error.to_string()))?;
+    Date::parse(&value, &format).map_err(|error| CodecError::Timestamp(error.to_string()))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -238,6 +257,9 @@ impl TryFrom<&SnapshotSpool> for WireSpool {
             },
             location_id: spool.location_id.clone(),
             manufacturer_id: spool.manufacturer_id.clone(),
+            notes: spool.notes.clone(),
+            purchased_at: spool.purchased_at.map(format_date).transpose()?,
+            opened_at: spool.opened_at.map(format_date).transpose()?,
             created_at: {
                 OffsetDateTime::parse(&spool.created_at, &Rfc3339)
                     .map_err(|error| CodecError::Timestamp(error.to_string()))?;
@@ -346,6 +368,9 @@ impl TryFrom<WireSpool> for SnapshotSpool {
             },
             location_id: spool.location_id,
             manufacturer_id: spool.manufacturer_id,
+            notes: spool.notes,
+            purchased_at: spool.purchased_at.map(parse_date).transpose()?,
+            opened_at: spool.opened_at.map(parse_date).transpose()?,
             created_at: {
                 OffsetDateTime::parse(&spool.created_at, &Rfc3339)
                     .map_err(|error| CodecError::Timestamp(error.to_string()))?;
@@ -372,6 +397,20 @@ mod tests {
     #[test]
     fn round_trip_preserves_the_document() {
         let document = decode(VALID.as_bytes()).unwrap();
+        assert_eq!(document.content.spools[0].notes, None);
+        assert_eq!(document.content.spools[0].purchased_at, None);
+        assert_eq!(document.content.spools[0].opened_at, None);
+        let decoded_again = decode(&encode(&document).unwrap()).unwrap();
+        assert_eq!(decoded_again, document);
+    }
+
+    #[test]
+    fn round_trip_preserves_optional_notes_and_dates() {
+        let json = VALID.replace(
+            "\"created_at\":\"2026-07-13T12:00:00Z\"",
+            "\"notes\":\"Opened for a prototype\",\"purchased_at\":\"2026-07-01\",\"opened_at\":\"2026-07-12\",\"created_at\":\"2026-07-13T12:00:00Z\"",
+        );
+        let document = decode(json.as_bytes()).unwrap();
         let decoded_again = decode(&encode(&document).unwrap()).unwrap();
         assert_eq!(decoded_again, document);
     }

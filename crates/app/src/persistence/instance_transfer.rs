@@ -8,8 +8,8 @@ use domain::instance_transfer::{
     SnapshotSpoolStatus, SnapshotSpoolType, TransferError,
 };
 use rust_decimal::Decimal;
-use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
+use time::{Date, OffsetDateTime};
 
 pub struct SqlxInstanceTransferRepository {
     pool: Db,
@@ -69,6 +69,9 @@ struct SpoolRow {
     status: String,
     location_id: Option<String>,
     manufacturer_id: Option<String>,
+    notes: Option<String>,
+    purchased_at: Option<Date>,
+    opened_at: Option<Date>,
     created_at: OffsetDateTime,
 }
 
@@ -170,7 +173,8 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
         let spools = sqlx::query_as::<_, SpoolRow>(
             r#"SELECT id, material_id, spool_type, colour_hex, colour_name, diameter,
                       net_weight, remaining_weight, price_paid, status, location_id,
-                      manufacturer_id, created_at FROM spools ORDER BY id"#,
+                      manufacturer_id, notes, purchased_at, opened_at, created_at
+               FROM spools ORDER BY id"#,
         )
         .fetch_all(&mut *transaction)
         .await
@@ -190,6 +194,9 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
                 status: status(&row.status)?,
                 location_id: row.location_id,
                 manufacturer_id: row.manufacturer_id,
+                notes: row.notes,
+                purchased_at: row.purchased_at,
+                opened_at: row.opened_at,
                 created_at: row.created_at.format(&Rfc3339).map_err(backend)?,
             })
         })
@@ -293,8 +300,9 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
             sqlx::query(
                 r#"INSERT INTO spools
                    (id, material_id, spool_type, colour_hex, colour_name, diameter, net_weight,
-                    remaining_weight, price_paid, status, location_id, manufacturer_id, created_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)"#,
+                    remaining_weight, price_paid, status, location_id, manufacturer_id, notes,
+                    purchased_at, opened_at, created_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)"#,
             )
             .bind(spool.id)
             .bind(spool.material_id)
@@ -308,6 +316,9 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
             .bind(spool.status.as_str())
             .bind(spool.location_id)
             .bind(spool.manufacturer_id)
+            .bind(spool.notes)
+            .bind(spool.purchased_at)
+            .bind(spool.opened_at)
             .bind(created_at)
             .execute(&mut *transaction)
             .await

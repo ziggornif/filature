@@ -74,8 +74,8 @@
     <div><span>{{ t(key="spools.new.price_paid") }}</span><strong>{{ spool.price_paid }} €</strong></div>
     <div><span>{{ t(key="spools.detail.storage") }}</span><strong>{{ spool.location_name | default(value=t(key="spools.location.unassigned")) }}</strong></div>
     <div><span>{{ t(key="spools.detail.supplier_manufacturer") }}</span><strong>{{ spool.manufacturer_name | default(value=t(key="spools.manufacturer.unassigned")) }}</strong></div>
-    <div><span>{{ t(key="spools.detail.purchased_on") }}</span><strong>{{ t(key="spools.detail.not_provided") }}</strong></div>
-    <div><span>{{ t(key="spools.detail.opened_on") }}</span><strong>{{ t(key="spools.detail.not_provided") }}</strong></div>
+    <div><span>{{ t(key="spools.detail.purchased_on") }}</span><strong>{{ spool.purchased_at | default(value=t(key="spools.detail.not_provided")) }}</strong></div>
+    <div><span>{{ t(key="spools.detail.opened_on") }}</span><strong>{{ spool.opened_at | default(value=t(key="spools.detail.not_provided")) }}</strong></div>
     <div><span>{{ t(key="spools.col.status") }}</span><strong class="spool-status--{{ spool.status | lower }}">
       {% if spool.status == "Sealed" %}{{ t(key="spools.status.sealed") }}
       {% elif spool.status == "Open" %}{{ t(key="spools.status.open") }}
@@ -113,7 +113,8 @@
 
   <section class="spool-detail-panel">
     <h2>{{ t(key="spools.detail.notes") }}</h2>
-    <p class="spool-detail-empty-copy">{{ t(key="spools.detail.notes_empty") }}</p>
+    {% if spool.notes %}<p class="spool-detail-note">{{ spool.notes }}</p>
+    {% else %}<p class="spool-detail-empty-copy">{{ t(key="spools.detail.notes_empty") }}</p>{% endif %}
   </section>
 
   <section class="spool-detail-panel">

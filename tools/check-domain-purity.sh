@@ -11,8 +11,9 @@ set -euo pipefail
 #                   and therefore serde itself, never enters the domain tree)
 #   time          : date/time TYPES only (Clock is an SPI; no now() in domain)
 #   arrayvec, num-traits : transitive, pure-computation deps of rust_decimal itself
+#   deranged, num-conv, powerfmt : transitive, pure-computation deps of time
 #                   (no framework/IO surface) — not independently added by domain.
-ALLOW="thiserror|rust_decimal|time|arrayvec|num-traits"
+ALLOW="thiserror|rust_decimal|time|arrayvec|num-traits|deranged|num-conv|powerfmt"
 
 # -e normal,no-proc-macro: only runtime deps, excluding proc-macro crates (e.g.
 # thiserror-impl and its own proc-macro2/quote/syn/unicode-ident chain) and
