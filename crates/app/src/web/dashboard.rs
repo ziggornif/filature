@@ -225,7 +225,7 @@ mod tests {
         let r = Renderer::new(Catalog::load("en"));
         let html = r.render("dashboard.html", "en", "", full_ctx()).unwrap();
         assert!(html.contains("137.50"));
-        assert!(html.contains("4.2 kg"));
+        assert!(html.contains(r#"4.2 <span class="kpi-unit">kg</span>"#));
         assert!(html.contains(r#"id="kpi-spools""#));
         assert!(html.contains("PLA"));
         assert!(html.contains("width: 100%"));
@@ -252,7 +252,7 @@ mod tests {
         let r = Renderer::new(Catalog::load("en"));
         let html = r.render("dashboard.html", "en", "", empty_ctx()).unwrap();
         assert!(html.contains("0.00"));
-        assert!(html.contains("0 kg"));
+        assert!(html.contains(r#"0 <span class="kpi-unit">kg</span>"#));
         assert!(html.contains("No stock yet."));
         assert!(html.contains("Nothing running low."));
         assert!(!html.contains("dashboard.breakdown."));
