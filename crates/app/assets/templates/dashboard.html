@@ -41,14 +41,21 @@
 
   <div class="dashboard-grid">
     <section class="dashboard-panel" id="dashboard-breakdown">
-      <h2>{{ t(key="dashboard.breakdown.title") }}</h2>
+      <div class="dashboard-panel-header">
+        <h2>{{ t(key="dashboard.breakdown.title") }}</h2>
+        <span class="dashboard-panel-caption">{{ t(key="dashboard.breakdown.caption") }}</span>
+      </div>
       {% if material_breakdown | length > 0 %}
         <ul class="material-breakdown">
           {% for row in material_breakdown %}
             <li class="material-breakdown-row">
-              <span class="material-breakdown-name">{{ row.material_name }}</span>
-              <span class="material-breakdown-count">{{ row.spool_count }}</span>
-              <span class="material-breakdown-weight">{{ row.remaining_kg }} kg</span>
+              <div class="material-breakdown-summary">
+                <div class="material-breakdown-label">
+                  <strong class="material-breakdown-name">{{ row.material_name }}</strong>
+                  <span class="material-breakdown-count">{{ row.spool_count }} {{ t(key="dashboard.breakdown.spool_short") }}</span>
+                </div>
+                <span class="material-breakdown-weight">{{ row.remaining_kg }} kg</span>
+              </div>
               <span class="material-breakdown-bar">
                 <span class="material-breakdown-bar-fill" style="width: {{ row.bar_pct }}%"></span>
               </span>
@@ -61,20 +68,26 @@
     </section>
 
     <section class="dashboard-panel" id="dashboard-soon-empty">
-      <h2>{{ t(key="dashboard.soon_empty.title") }}</h2>
+      <div class="dashboard-panel-header">
+        <h2>{{ t(key="dashboard.soon_empty.title") }}</h2>
+        <span class="dashboard-panel-caption">{{ t(key="dashboard.soon_empty.threshold") }} {{ low_stock_threshold_pct }} %</span>
+      </div>
       {% if soon_empty | length > 0 %}
         <ul class="soon-empty-list">
           {% for item in soon_empty %}
             <li class="soon-empty-row">
               <a href="/spools/{{ item.spool_id }}">
                 <span class="colour-swatch"
-                      style="background:{{ item.colour_hex }}; display:inline-block; width:14px; height:14px; border-radius:3px;"
+                      style="background:{{ item.colour_hex }};"
                       title="{{ item.colour_label }}"></span>
-                <span class="soon-empty-material">{{ item.material_name }}</span>
-                <span class="soon-empty-location">
-                  {% if item.location_name %}{{ item.location_name }}{% else %}{{ t(key="spools.location.unassigned") }}{% endif %}
+                <span class="soon-empty-description">
+                  <strong class="soon-empty-name">{% if item.manufacturer_name %}{{ item.manufacturer_name }}{% else %}{{ t(key="spools.manufacturer.unassigned") }}{% endif %} · {{ item.colour_label }}</strong>
+                  <span class="soon-empty-meta">{{ item.material_name }} · {% if item.location_name %}{{ item.location_name }}{% else %}{{ t(key="spools.location.unassigned") }}{% endif %}</span>
                 </span>
-                <span class="soon-empty-remaining">{{ item.remaining_g }} g · {{ item.remaining_pct }}%</span>
+                <span class="soon-empty-stock">
+                  <strong class="soon-empty-remaining">{{ item.remaining_g }} g</strong>
+                  <span class="soon-empty-percent">{{ item.remaining_pct }} %</span>
+                </span>
               </a>
             </li>
           {% endfor %}

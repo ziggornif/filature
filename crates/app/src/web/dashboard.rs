@@ -45,6 +45,7 @@ impl From<MaterialStockRow> for MaterialBreakdownView {
 #[derive(Serialize)]
 pub struct SoonEmptyView {
     pub spool_id: String,
+    pub manufacturer_name: Option<String>,
     pub material_name: String,
     pub colour_hex: String,
     /// The colour's human name if set, else the hex code — same convention
@@ -59,6 +60,7 @@ impl From<SoonEmptyItem> for SoonEmptyView {
     fn from(item: SoonEmptyItem) -> Self {
         Self {
             spool_id: item.spool_id,
+            manufacturer_name: item.manufacturer_name,
             material_name: item.material_name,
             colour_label: item
                 .colour_name
@@ -121,7 +123,13 @@ fn pct(fraction: f64) -> u8 {
     (fraction * 100.0).round() as u8
 }
 
-fn render(st: &AppState, locale: &str, theme_attr: &str, overview: DashboardOverview) -> Response {
+fn render(
+    st: &AppState,
+    locale: &str,
+    theme_attr: &str,
+    overview: DashboardOverview,
+    low_stock_threshold_pct: u8,
+) -> Response {
     let view: DashboardView = overview.into();
     let mut ctx = Context::new();
     ctx.insert("stock_value", &view.stock_value);
@@ -132,6 +140,7 @@ fn render(st: &AppState, locale: &str, theme_attr: &str, overview: DashboardOver
     ctx.insert("alert_count", &view.alert_count);
     ctx.insert("material_breakdown", &view.material_breakdown);
     ctx.insert("soon_empty", &view.soon_empty);
+    ctx.insert("low_stock_threshold_pct", &low_stock_threshold_pct);
     // Read by `base.html` to mark the "Tableau de bord" nav item active.
     ctx.insert("page", "dashboard");
     match st
@@ -150,12 +159,15 @@ async fn index(State(st): State<AppState>, headers: HeaderMap) -> Response {
         Ok(configuration) => configuration,
         Err(e) => return internal_error(e),
     };
-    match st
-        .dashboard
-        .overview(configuration.low_stock_threshold)
-        .await
-    {
-        Ok(overview) => render(&st, &locale, theme.data_attr(), overview),
+    let threshold = configuration.low_stock_threshold;
+    match st.dashboard.overview(threshold).await {
+        Ok(overview) => render(
+            &st,
+            &locale,
+            theme.data_attr(),
+            overview,
+            threshold.percent(),
+        ),
         Err(e) => internal_error(e),
     }
 }
@@ -183,6 +195,7 @@ mod tests {
     fn soon_empty_row() -> SoonEmptyView {
         SoonEmptyView {
             spool_id: "01HSP".into(),
+            manufacturer_name: Some("Prusament".into()),
             material_name: "PETG".into(),
             colour_hex: "#1A9E4B".into(),
             colour_label: "vert sapin".into(),
@@ -202,6 +215,7 @@ mod tests {
         ctx.insert("alert_count", &1usize);
         ctx.insert("material_breakdown", &vec![breakdown_row()]);
         ctx.insert("soon_empty", &vec![soon_empty_row()]);
+        ctx.insert("low_stock_threshold_pct", &20u8);
         ctx.insert("page", "dashboard");
         ctx
     }
@@ -216,6 +230,7 @@ mod tests {
         ctx.insert("alert_count", &0usize);
         ctx.insert("material_breakdown", &Vec::<MaterialBreakdownView>::new());
         ctx.insert("soon_empty", &Vec::<SoonEmptyView>::new());
+        ctx.insert("low_stock_threshold_pct", &15u8);
         ctx.insert("page", "dashboard");
         ctx
     }
@@ -228,11 +243,16 @@ mod tests {
         assert!(html.contains(r#"4.2 <span class="kpi-unit">kg</span>"#));
         assert!(html.contains(r#"id="kpi-spools""#));
         assert!(html.contains("PLA"));
+        assert!(html.contains("3 spools"));
+        assert!(html.contains("remaining weight"));
         assert!(html.contains("width: 100%"));
+        assert!(html.contains("threshold 20 %"));
+        assert!(html.contains("Prusament · vert sapin"));
+        assert!(html.contains("PETG · Shelf A"));
         assert!(html.contains("PETG"));
         assert!(html.contains("Shelf A"));
         assert!(html.contains("42.0 g"));
-        assert!(html.contains("4%"));
+        assert!(html.contains("4 %"));
         assert!(html.contains("/spools/01HSP"));
         assert!(!html.contains("dashboard.kpi."));
         assert!(!html.contains("dashboard.breakdown."));
@@ -266,6 +286,8 @@ mod tests {
         assert!(html.contains("Tableau de bord"));
         assert!(html.contains("Répartition par matériau"));
         assert!(html.contains("Bientôt vides"));
+        assert!(html.contains("poids restant"));
+        assert!(html.contains("seuil 15 %"));
         assert!(html.contains("Aucun stock pour le moment."));
         assert!(!html.contains("dashboard.breakdown."));
         assert!(!html.contains("dashboard.soon_empty."));
@@ -297,6 +319,7 @@ mod tests {
             }],
             soon_empty: vec![SoonEmptyItem {
                 spool_id: "01HSP".into(),
+                manufacturer_name: Some("Prusament".into()),
                 material_name: "PLA".into(),
                 colour_hex: "#1A9E4B".into(),
                 colour_name: None,
@@ -315,6 +338,10 @@ mod tests {
         assert_eq!(view.material_breakdown[0].remaining_kg, 0.5);
         assert_eq!(view.material_breakdown[0].bar_pct, 100);
         assert_eq!(view.soon_empty[0].remaining_pct, 5);
+        assert_eq!(
+            view.soon_empty[0].manufacturer_name.as_deref(),
+            Some("Prusament")
+        );
         assert_eq!(view.soon_empty[0].colour_label, "#1A9E4B"); // no name -> hex
     }
 
@@ -421,6 +448,7 @@ mod tests {
                 spool_id: "01HSP".to_string(),
                 material_id: MaterialId::new("m1"),
                 material_name: "PLA".to_string(),
+                manufacturer_name: Some("Prusament".to_string()),
                 colour_hex: "#1A9E4B".to_string(),
                 colour_name: Some("vert sapin".to_string()),
                 status: StockStatus::Open,
@@ -448,6 +476,7 @@ mod tests {
                 spool_id: "01HSP".to_string(),
                 material_id: MaterialId::new("m1"),
                 material_name: "PLA".to_string(),
+                manufacturer_name: None,
                 colour_hex: "#1A9E4B".to_string(),
                 colour_name: None,
                 status: StockStatus::Open,
@@ -469,6 +498,7 @@ mod tests {
             assert_eq!(res.status(), axum::http::StatusCode::OK);
             let html = body_of(res).await;
             assert!(html.contains(r#"<div class="kpi-value">1</div>"#));
+            assert!(html.contains("threshold 20 %"));
             assert!(html.contains("/spools/01HSP"));
         }
     }

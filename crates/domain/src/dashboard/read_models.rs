@@ -20,6 +20,7 @@ pub struct MaterialStockRow {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SoonEmptyItem {
     pub spool_id: String,
+    pub manufacturer_name: Option<String>,
     pub material_name: String,
     pub colour_hex: String,
     pub colour_name: Option<String>,
@@ -93,6 +94,7 @@ impl DashboardOverview {
             if row.is_low_stock(threshold) {
                 soon_empty.push(SoonEmptyItem {
                     spool_id: row.spool_id.clone(),
+                    manufacturer_name: row.manufacturer_name.clone(),
                     material_name: row.material_name.clone(),
                     colour_hex: row.colour_hex.clone(),
                     colour_name: row.colour_name.clone(),
@@ -192,6 +194,7 @@ mod tests {
             spool_id: spool_id.to_string(),
             material_id: MaterialId::new(material_id),
             material_name: material_name.to_string(),
+            manufacturer_name: Some("Prusament".to_string()),
             colour_hex: "#1A9E4B".to_string(),
             colour_name: None,
             status,
@@ -481,6 +484,10 @@ mod tests {
         );
         assert_eq!(overview.soon_empty[0].location_name, None);
         assert_eq!(overview.soon_empty[0].material_name, "PLA");
+        assert_eq!(
+            overview.soon_empty[0].manufacturer_name,
+            Some("Prusament".to_string())
+        );
     }
 
     #[test]

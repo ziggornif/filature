@@ -100,6 +100,7 @@ mod tests {
         ctx.insert("alert_count", &0usize);
         ctx.insert("material_breakdown", &Vec::<serde_json::Value>::new());
         ctx.insert("soon_empty", &Vec::<serde_json::Value>::new());
+        ctx.insert("low_stock_threshold_pct", &15u8);
         ctx
     }
 

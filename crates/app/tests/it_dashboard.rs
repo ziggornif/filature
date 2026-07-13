@@ -2,6 +2,7 @@ mod support;
 
 use domain::dashboard::{DashboardOverview, DashboardRepository, StockStatus};
 use domain::locations::{LocationName, LocationRepository, NewLocation};
+use domain::manufacturers::{ManufacturerName, ManufacturerRepository, NewManufacturer};
 use domain::materials::{
     Density, DryingParams, MaterialName, MaterialRepository, NewMaterial, Sensitivity, Temperature,
 };
@@ -10,6 +11,7 @@ use domain::spools::{Colour, Diameter, NewSpool, SpoolFilter, SpoolRepository, S
 use filature::persistence::connect_and_migrate;
 use filature::persistence::dashboard::SqlxDashboardRepository;
 use filature::persistence::locations::SqlxLocationRepository;
+use filature::persistence::manufacturers::SqlxManufacturerRepository;
 use filature::persistence::materials::SqlxMaterialRepository;
 use filature::persistence::spools::SqlxSpoolRepository;
 use rust_decimal::Decimal;
@@ -55,6 +57,7 @@ async fn stock_rows_excludes_archived_and_maps_fields_correctly() {
     let pool = connect_and_migrate(&url).await.unwrap();
     let materials = SqlxMaterialRepository::new(pool.clone());
     let locations = SqlxLocationRepository::new(pool.clone());
+    let manufacturers = SqlxManufacturerRepository::new(pool.clone());
     let spools = SqlxSpoolRepository::new(pool.clone());
     let dashboard = SqlxDashboardRepository::new(pool.clone());
 
@@ -65,6 +68,13 @@ async fn stock_rows_excludes_archived_and_maps_fields_correctly() {
         .unwrap();
     let location = locations
         .insert(sample_location("Dash-Shelf"))
+        .await
+        .unwrap();
+    let manufacturer = manufacturers
+        .insert(NewManufacturer {
+            name: ManufacturerName::new("Dash-Prusament").unwrap(),
+            country: Some("CZ".to_string()),
+        })
         .await
         .unwrap();
 
@@ -82,6 +92,7 @@ async fn stock_rows_excludes_archived_and_maps_fields_correctly() {
     s2.status = SpoolStatus::Open;
     s2.remaining_weight = Grams::new(100.0).unwrap();
     s2.location_id = Some(location.id.clone());
+    s2.manufacturer_id = Some(manufacturer.id.clone());
     spools.update(s2.clone()).await.unwrap();
 
     // s3: Empty at 0g — not low-stock (already finished), no location.
@@ -124,6 +135,7 @@ async fn stock_rows_excludes_archived_and_maps_fields_correctly() {
     let row1 = rows.iter().find(|r| r.spool_id == s1.id.as_str()).unwrap();
     assert_eq!(row1.material_id, mat_a.id);
     assert_eq!(row1.material_name, "Dash-PLA");
+    assert_eq!(row1.manufacturer_name, None);
     assert_eq!(row1.colour_hex, "#1A9E4B");
     assert_eq!(row1.colour_name, Some("#1A9E4B".to_string()));
     assert_eq!(row1.status, StockStatus::Sealed);
@@ -139,6 +151,7 @@ async fn stock_rows_excludes_archived_and_maps_fields_correctly() {
     assert_eq!(row2.material_id, mat_a.id);
     assert_eq!(row2.status, StockStatus::Open);
     assert_eq!(row2.remaining_weight.value(), 100.0);
+    assert_eq!(row2.manufacturer_name, Some("Dash-Prusament".to_string()));
     assert_eq!(row2.location_name, Some("Dash-Shelf".to_string()));
 
     let row3 = rows.iter().find(|r| r.spool_id == s3.id.as_str()).unwrap();

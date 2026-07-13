@@ -38,6 +38,7 @@ mod tests {
             spool_id: "s1".to_string(),
             material_id: MaterialId::new("m1"),
             material_name: "PLA".to_string(),
+            manufacturer_name: None,
             colour_hex: "#1A9E4B".to_string(),
             colour_name: None,
             status: StockStatus::Sealed,

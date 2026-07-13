@@ -27,6 +27,7 @@ pub struct SpoolStockRow {
     pub spool_id: String,
     pub material_id: MaterialId,
     pub material_name: String,
+    pub manufacturer_name: Option<String>,
     pub colour_hex: String,
     pub colour_name: Option<String>,
     pub status: StockStatus,
