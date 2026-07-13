@@ -123,13 +123,18 @@ Ne portez pas la logique JS du proto (state en mémoire, `setState`) ; elle simu
   - **Historique de consommation** : état « à venir » (le suivi par impression arrivera plus tard — ne pas inventer de données).
 - **Longueur (m)** calculée depuis la masse : `L_m = (masse_g / densité) / (π·(d/2/10)²) / 100` (d en mm ; ex. Ø1.75). La densité vient du référentiel matériaux.
 
-### 5. Formulaire ajout / édition
-- **Purpose** : saisie rapide, geste répété. Ouvert par les boutons « Ajouter » (mode add) ou « Éditer » du détail (mode edit, prérempli).
-- **Layout** : header (titre + Annuler / Enregistrer). Colonne max 680px, 3 cartes-sections :
-  - **Identité** : select Matériau, input Marque, **Couleur** (input nom + `<input type=color>` + rangée de pastilles préréglées, dont « Transparent »).
-  - **Mesures** : Diamètre en segmenté (1.75 / 2.85 mm) ; input **Poids net filament (g)** ; encart **« Ou peser la bobine → poids net déduit »** : `Poids total pesé (g)` − `Tare bobine vide (g)` = **Net filament** (recalculé en direct, affiché en gros accent). C'est le cas d'usage clé « je pèse → tare auto → net déduit ».
+### 5. Formulaire ajout / édition — **wizard 2 écrans**
+> Révisé (juillet 2026). L'ancien geste « peser → tare → net déduit » est **supprimé** :
+> décision produit = **poids net uniquement** (comme à l'achat). Le formulaire est un
+> **wizard 2 écrans**, partagé add/edit. Source de vérité = `Filature.dc.html` + le
+> view-model JS ; ce README suit le proto.
+- **Purpose** : saisie rapide, geste répété. Ouvert par « Ajouter » (mode add, part de l'écran 1) ou « Éditer » du détail (mode edit, prérempli, ouvre directement l'écran 2).
+- **Écran 1 — État** : 3 cartes (icône + titre + description). **Neuve** (restant = net, statut Scellée) · **Entamée** (on saisit le restant, statut Ouverte) · **Recharge** (refill sans support, assumée neuve en v1, statut Scellée). Grille `--etat-cols` : 3 col ≥1040px → 1 col ≤760px.
+- **Écran 2 — Détails** : header (titre + **badge d'état** + lien « Changer » qui revient à l'écran 1 ; Annuler / Enregistrer). Colonne max 680px, 3 cartes-sections :
+  - **Identité** : select Matériau, **select Marque** (liste + « Autre… »), **Couleur** — pas de champ « nom de couleur » saisi : le nom est **dérivé automatiquement du hex** (nom de la pastille préréglée si ça matche, sinon le code hex, ex. « #C62828 » ; `transparent` → « Transparent »), et c'est cette valeur dérivée qui est stockée. UI : **grille de pastilles préréglées** (libellé sous chacune, dont « Transparent »), séparateur « ou personnalisée », puis pastille de prévisualisation = `<input type="color">` caché (badge crayon en overlay) + champ hex texte (`#RRGGBB`, normalisation au blur — accepte `#RGB` et ajoute `#`) + libellé dérivé + message d'erreur inline si hex invalide + bouton ✕ pour effacer. **État « aucune couleur »** = pastille blanc barré rouge (diagonale danger).
+  - **Mesures** : Diamètre en segmenté (**1.75 / 2.85 mm**) ; **Poids net = select de presets** (`250 / 500 / 750 / 900 / 1000` défaut `/ 2000 / 3000 / 5000 g`) + « Autre… » → champ libre. **Si état = Entamée** : encart `--warn-bg` **« Poids restant (g) »** (absent sinon).
   - **Rangement & achat** : select Rangement, Prix (€), dates Acheté le / Ouvert le, Notes (textarea).
-- À l'enregistrement : add → crée la bobine (reste = net, statut Scellée) puis ouvre son détail ; edit → met à jour puis revient au détail.
+- À l'enregistrement : `remaining = Entamée ? min(net, saisi) : net` ; `status = Entamée ? Ouverte : Scellée`. add → crée puis ouvre le détail ; edit → met à jour puis revient au détail.
 
 ### 6. Référentiel matériaux
 - **Purpose** : écran de config, moins fréquent. **Source unique** des valeurs par défaut : modifier une sensibilité met à jour partout les seuils d'humidité et les longueurs (via la densité).

@@ -38,7 +38,7 @@ never decoration.
 ## Screens (6, specified in the handoff README §Screens)
 
 Dashboard · Spools list (table + card views, inline weight edit) · Spool detail ·
-Add/Edit form (weigh→tare→net live calc — the key gesture) · Materials table ·
+Add/Edit form (**wizard 2 écrans** — état → détails ; poids net par presets, **pas de tare**) · Materials table ·
 **Humidity panel (deferred — post-v1, no sensors).**
 
 ## Interaction principles (htmx, server-rendered)
