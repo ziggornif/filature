@@ -8,7 +8,7 @@ use domain::instance_transfer::InstanceTransferUseCases;
 use domain::locations::LocationsUseCases;
 use domain::manufacturers::ManufacturersUseCases;
 use domain::materials::MaterialsUseCases;
-use domain::spools::SpoolsUseCases;
+use domain::spools::{SpoolFilter, SpoolsUseCases};
 use std::sync::Arc;
 
 /// Wires the DB pool + renderer + default locale +
@@ -56,5 +56,9 @@ impl AppState {
             instance_configuration,
             instance_transfer,
         }
+    }
+
+    pub(crate) async fn nav_spool_count(&self) -> u64 {
+        self.spools.count(SpoolFilter::default()).await.unwrap_or(0)
     }
 }

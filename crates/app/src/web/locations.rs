@@ -121,6 +121,7 @@ async fn list_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
             let mut ctx = Context::new();
             ctx.insert("locations", &views);
             ctx.insert("page", "locations");
+            ctx.insert("nav_spool_count", &st.nav_spool_count().await);
             match st
                 .renderer
                 .render("locations.html", &locale, theme.data_attr(), ctx)

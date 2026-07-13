@@ -117,6 +117,10 @@ impl SpoolsUseCases for SpoolsService {
     async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError> {
         self.repo.stock_value(filter).await
     }
+
+    async fn count(&self, filter: SpoolFilter) -> Result<u64, RepositoryError> {
+        self.repo.count(filter).await
+    }
 }
 
 #[cfg(all(test, feature = "stubs"))]
@@ -406,6 +410,7 @@ mod tests {
             .unwrap();
         assert!(default_list.iter().all(|i| i.id != created.id));
         assert_eq!(default_list.len(), 1);
+        assert_eq!(s.count(SpoolFilter::default()).await.unwrap(), 1);
 
         let archived_list = s
             .list(
@@ -430,6 +435,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(default_list_after_restore.len(), 2);
+        assert_eq!(s.count(SpoolFilter::default()).await.unwrap(), 2);
     }
 
     #[tokio::test]

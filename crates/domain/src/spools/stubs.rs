@@ -209,4 +209,13 @@ impl SpoolRepository for StubSpoolRepository {
             .fold(Decimal::ZERO, |acc, v| acc + v);
         Money::from_decimal(sum).map_err(RepositoryError::Domain)
     }
+
+    async fn count(&self, filter: SpoolFilter) -> Result<u64, RepositoryError> {
+        let rows = self.rows.lock().unwrap();
+        Ok(rows
+            .iter()
+            .filter(|r| matches_filter(r, &filter))
+            .filter(|r| r.status != SpoolStatus::Archived)
+            .count() as u64)
+    }
 }

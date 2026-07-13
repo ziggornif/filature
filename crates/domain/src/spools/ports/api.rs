@@ -24,4 +24,5 @@ pub trait SpoolsUseCases: Send + Sync {
         location: Option<LocationId>,
     ) -> Result<Spool, RepositoryError>;
     async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError>;
+    async fn count(&self, filter: SpoolFilter) -> Result<u64, RepositoryError>;
 }

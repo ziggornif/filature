@@ -61,4 +61,5 @@ pub trait SpoolRepository: Send + Sync {
     /// Sum of `(remaining/net) * price_paid` over non-archived spools
     /// matching `filter`.
     async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError>;
+    async fn count(&self, filter: SpoolFilter) -> Result<u64, RepositoryError>;
 }
