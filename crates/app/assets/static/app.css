@@ -1136,6 +1136,14 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .spool-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .spool-card {
+    min-width: 0;
+  }
+
   .spools-filter-bar label,
   .spools-filter-bar select,
   .spools-filter-bar input[type="search"] {
