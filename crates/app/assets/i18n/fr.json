@@ -32,6 +32,8 @@
   "settings.save": "Enregistrer",
   "settings.saved": "Enregistré.",
   "materials.title": "Matériaux",
+  "materials.subtitle": "Référentiel — réglages indicatifs de séchage et d'impression. À ajuster selon la marque.",
+  "materials.notice": "Ces réglages sont des valeurs de départ, pas des données de stock.",
   "materials.col.material": "Matériau",
   "materials.col.density": "Densité (g/cm³)",
   "materials.col.drying": "Séchage",

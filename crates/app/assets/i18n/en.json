@@ -32,6 +32,8 @@
   "settings.save": "Save",
   "settings.saved": "Saved.",
   "materials.title": "Materials",
+  "materials.subtitle": "Reference guide — indicative drying and printing settings. Adjust according to the brand.",
+  "materials.notice": "These settings are starting points, not stock data.",
   "materials.col.material": "Material",
   "materials.col.density": "Density (g/cm³)",
   "materials.col.drying": "Drying",
