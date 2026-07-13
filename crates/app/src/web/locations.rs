@@ -264,6 +264,16 @@ mod tests {
     }
 
     #[test]
+    fn table_uses_the_shared_referential_style_without_breaking_edit_and_delete() {
+        let html = render("en");
+        assert!(html.contains(r#"class="table-scroll referential-table-scroll""#));
+        assert!(html.contains(r#"class="locations-table referential-table""#));
+        assert!(html.contains(r#"class="referential-name-badge" type="text" name="name""#));
+        assert!(html.contains(r#"hx-put="/locations/01HZID""#));
+        assert!(html.contains(r#"hx-delete="/locations/01HZID""#));
+    }
+
+    #[test]
     fn page_wires_the_error_feedback_slot() {
         // TD-009 wiring guard (mirrors the materials test): slot + extension +
         // per-control error routing all present.

@@ -1,6 +1,6 @@
 <tr id="location-row-{{ l.id }}" class="location-row">
   <td>
-    <input type="text" name="name" value="{{ l.name }}"
+    <input class="referential-name-badge" type="text" name="name" value="{{ l.name }}"
            hx-put="/locations/{{ l.id }}" hx-target="closest tr" hx-swap="outerHTML"
            hx-trigger="change" hx-include="closest tr" hx-target-error="#locations-msg">
   </td>
