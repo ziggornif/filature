@@ -1,11 +1,4 @@
-use crate::shared::{Grams, MaterialId, Money};
-
-/// A spool is "soon-empty" (low-stock) when its remaining ratio is at or
-/// below this threshold *and* it still has weight remaining (a 0 g spool is
-/// `Empty`/finished, not "soon-empty"). Named domain constant so the rule is
-/// unit-testable without a database, mirroring how `Sensitivity`'s humidity
-/// thresholds are pure-derived rather than stored.
-pub const LOW_STOCK_RATIO: f64 = 0.15;
+use crate::shared::{Grams, LowStockThreshold, MaterialId, Money};
 
 /// Lifecycle status of a spool, as relevant to the dashboard overview. A
 /// deliberately smaller/local mirror of `spools::model::SpoolStatus` (which
@@ -51,8 +44,8 @@ impl SpoolStockRow {
     }
 
     /// A row is low-stock ("soon-empty") when its ratio is at or below
-    /// `LOW_STOCK_RATIO` and it still has weight remaining.
-    pub fn is_low_stock(&self) -> bool {
-        self.remaining_weight.value() > 0.0 && self.remaining_ratio() <= LOW_STOCK_RATIO
+    /// the configured threshold and it still has weight remaining.
+    pub fn is_low_stock(&self, threshold: LowStockThreshold) -> bool {
+        self.remaining_weight.value() > 0.0 && self.remaining_ratio() <= threshold.ratio()
     }
 }

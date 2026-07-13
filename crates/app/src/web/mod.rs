@@ -10,6 +10,7 @@ pub mod locations;
 pub mod manufacturers;
 pub mod materials;
 pub mod router;
+pub mod settings;
 pub mod spools;
 pub mod state;
 pub mod templates;

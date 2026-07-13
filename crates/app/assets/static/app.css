@@ -427,6 +427,55 @@ a {
   display: none;
 }
 
+/* Settings (10) */
+.settings-panel {
+  max-width: 680px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+
+.settings-intro,
+.setting-help {
+  color: var(--muted);
+}
+
+.setting-card {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+
+.setting-card label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 7px;
+}
+
+.percentage-input {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+}
+
+.percentage-input input {
+  width: 96px;
+}
+
+.setting-help {
+  font-size: 12px;
+  max-width: 560px;
+}
+
+.setting-success {
+  display: inline-block;
+  color: var(--ok);
+  font-size: 13px;
+  margin: 0 0 0 10px;
+}
+
 /* Colour chip (transverse component): circle, always ringed so white/black
    read on either theme; background = the spool's real hex (set inline). */
 .colour-swatch {

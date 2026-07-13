@@ -204,7 +204,7 @@ async fn overview_from_rows_matches_stock_value_for_all_stock_scope() {
     );
     assert!(!rows.iter().any(|r| r.spool_id == s3.id.as_str()));
 
-    let overview = DashboardOverview::from_rows(rows);
+    let overview = DashboardOverview::from_rows(rows, domain::shared::LowStockThreshold::default());
     assert_eq!(overview.stock_value, expected);
     assert_eq!(overview.total_count, 2);
     assert_eq!(overview.active_count, 2);

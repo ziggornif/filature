@@ -146,7 +146,15 @@ fn render(st: &AppState, locale: &str, theme_attr: &str, overview: DashboardOver
 async fn index(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let locale = resolve_locale(&headers, &st);
     let theme = resolve_theme(&headers);
-    match st.dashboard.overview().await {
+    let configuration = match st.instance_configuration.get().await {
+        Ok(configuration) => configuration,
+        Err(e) => return internal_error(e),
+    };
+    match st
+        .dashboard
+        .overview(configuration.low_stock_threshold)
+        .await
+    {
         Ok(overview) => render(&st, &locale, theme.data_attr(), overview),
         Err(e) => internal_error(e),
     }
@@ -312,7 +320,8 @@ mod tests {
 
     #[test]
     fn view_of_empty_overview_is_all_zeros() {
-        let overview = DashboardOverview::from_rows(Vec::new());
+        let overview =
+            DashboardOverview::from_rows(Vec::new(), domain::shared::LowStockThreshold::default());
         let view: DashboardView = overview.into();
         // `Money`'s `Display` always renders to the cent (TD-011), so zero
         // stock shows "0.00", not a raw "0".
@@ -373,6 +382,11 @@ mod tests {
                 locations,
                 manufacturers,
                 dashboard,
+                Arc::new(
+                    domain::instance_configuration::InstanceConfigurationService::new(Arc::new(
+                        domain::instance_configuration::stubs::StubInstanceConfigurationRepository::new(),
+                    )),
+                ),
             )
         }
 
@@ -421,6 +435,36 @@ mod tests {
             assert!(html.contains("/spools/01HSP"));
             assert!(html.contains(r#"id="kpi-alerts""#));
             assert!(!html.contains("dashboard.kpi."));
+        }
+
+        #[tokio::test]
+        async fn get_root_uses_configured_low_stock_threshold() {
+            let row = SpoolStockRow {
+                spool_id: "01HSP".to_string(),
+                material_id: MaterialId::new("m1"),
+                material_name: "PLA".to_string(),
+                colour_hex: "#1A9E4B".to_string(),
+                colour_name: None,
+                status: StockStatus::Open,
+                remaining_weight: Grams::new(200.0).unwrap(),
+                net_weight: Grams::new(1000.0).unwrap(),
+                price_paid: Money::new(2000, 2).unwrap(),
+                location_name: None,
+            };
+            let dashboard: Arc<dyn DashboardUseCases> = Arc::new(DashboardService::new(Arc::new(
+                StubDashboardRepository::with(vec![row]),
+            )));
+            let st = test_state(dashboard);
+            st.instance_configuration
+                .update_low_stock_threshold(domain::shared::LowStockThreshold::new(20).unwrap())
+                .await
+                .unwrap();
+
+            let res = index(State(st), HeaderMap::new()).await;
+            assert_eq!(res.status(), axum::http::StatusCode::OK);
+            let html = body_of(res).await;
+            assert!(html.contains(r#"<div class="kpi-value">1</div>"#));
+            assert!(html.contains("/spools/01HSP"));
         }
     }
 }

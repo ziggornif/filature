@@ -68,6 +68,11 @@ async fn app() -> axum::Router {
         locations,
         manufacturers,
         dashboard,
+        Arc::new(
+            domain::instance_configuration::InstanceConfigurationService::new(Arc::new(
+                domain::instance_configuration::stubs::StubInstanceConfigurationRepository::new(),
+            )),
+        ),
     ));
     let auth_cfg = AuthConfig {
         username: USERNAME.into(),

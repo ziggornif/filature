@@ -2,6 +2,7 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::{Pool, Postgres};
 
 pub mod dashboard;
+pub mod instance_configuration;
 pub mod locations;
 pub mod manufacturers;
 pub mod materials;

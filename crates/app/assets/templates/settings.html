@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{ t(key="nav.settings") }}</h1>
+  <section class="settings-panel" aria-labelledby="stock-settings-title">
+    <h2 id="stock-settings-title">{{ t(key="settings.stock.title") }}</h2>
+    <p class="settings-intro">{{ t(key="settings.stock.description") }}</p>
+    <div id="settings-msg" class="form-error" role="alert" aria-live="polite"></div>
+    {% include "_low_stock_threshold_setting.html" %}
+  </section>
+{% endblock content %}

@@ -52,6 +52,7 @@ and a localized message rather than panicking or 500-ing.
 | `/spools` | POST | form (colour hex/name, diameter, weight, price, location) | `Colour`/`Diameter`/`Grams`/`Money`/`LocationId`; 422 on bad |
 | `/spools/{id}` | GET/PUT | path id + form | as above; FK violation → `UnknownMaterial`/`UnknownLocation` |
 | `/spools/{id}/{remaining,consume,archive,restore,location}` | POST | path id + form | `Grams` parse; lifecycle rules in domain; 422/404 mapped |
+| `/settings`, `/settings/low-stock-threshold` | GET/POST | percentage form value | `LowStockThreshold` value object; values outside 0–100 return a localized 422 |
 
 ## STRIDE analysis
 

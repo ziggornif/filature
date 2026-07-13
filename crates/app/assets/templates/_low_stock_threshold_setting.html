@@ -1,0 +1,24 @@
+<div id="low-stock-threshold-setting" class="setting-card">
+  <form hx-post="/settings/low-stock-threshold"
+        hx-target="#low-stock-threshold-setting"
+        hx-swap="outerHTML"
+        hx-ext="response-targets"
+        hx-target-error="#settings-msg">
+    <label for="low-stock-threshold">{{ t(key="settings.low_stock.label") }}</label>
+    <div class="percentage-input">
+      <input id="low-stock-threshold"
+             name="low_stock_threshold"
+             type="number"
+             min="0"
+             max="100"
+             step="1"
+             required
+             value="{{ low_stock_threshold_pct }}"
+             aria-describedby="low-stock-threshold-help">
+      <span aria-hidden="true">%</span>
+    </div>
+    <p id="low-stock-threshold-help" class="setting-help">{{ t(key="settings.low_stock.help") }}</p>
+    <button type="submit">{{ t(key="settings.save") }}</button>
+    {% if saved %}<p class="setting-success" role="status">{{ t(key="settings.saved") }}</p>{% endif %}
+  </form>
+</div>

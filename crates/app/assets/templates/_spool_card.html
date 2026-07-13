@@ -18,7 +18,7 @@
       <span class="spool-card-remaining">{{ s.remaining_weight }} g</span>
       <span class="spool-card-sub">{{ s.remaining_pct }}% · {{ s.net_weight }} g</span>
     </div>
-    <span class="gauge{% if s.remaining_pct == 0 %} gauge--empty{% elif s.remaining_pct < 10 %} gauge--crit{% elif s.remaining_pct <= 15 %} gauge--low{% endif %}">
+    <span class="gauge{% if s.remaining_pct == 0 %} gauge--empty{% elif s.remaining_pct <= low_stock_threshold_pct and s.remaining_pct < 10 %} gauge--crit{% elif s.remaining_pct <= low_stock_threshold_pct %} gauge--low{% endif %}">
       <span class="gauge-fill" style="width:{{ s.remaining_pct }}%"></span>
     </span>
   </div>
