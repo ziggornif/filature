@@ -278,7 +278,7 @@ mod tests {
         assert!(fr.contains("°C ·"));
         assert!(fr.contains("h</span>"));
 
-        assert!(fr.contains(r#"class="material-name-badge""#));
+        assert!(fr.contains(r#"class="material-name-badge referential-name-badge""#));
         assert!(fr.contains(r#"class="material-sensitivity-pill""#));
         assert!(fr.contains("material-row--low"));
         assert!(fr.contains(r#"hx-put="/materials/01HZID""#));

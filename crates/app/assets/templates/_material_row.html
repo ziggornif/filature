@@ -1,6 +1,6 @@
 <tr id="material-row-{{ m.id }}" class="material-row material-row--{{ m.sensitivity | lower }}">
   <td>
-    <input class="material-name-badge" type="text" name="name" value="{{ m.name }}"
+    <input class="material-name-badge referential-name-badge" type="text" name="name" value="{{ m.name }}"
            hx-put="/materials/{{ m.id }}" hx-target="closest tr" hx-swap="outerHTML"
            hx-trigger="change" hx-include="closest tr" hx-target-error="#materials-msg">
   </td>

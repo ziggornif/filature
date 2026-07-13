@@ -803,9 +803,7 @@ a {
   vertical-align: middle;
 }
 
-.spools-table tbody tr:hover,
-.locations-table tbody tr:hover,
-.manufacturers-table tbody tr:hover {
+.spools-table tbody tr:hover {
   background: var(--hover-bg);
 }
 
@@ -818,18 +816,16 @@ a {
   font-family: var(--mono);
 }
 
-/* Table inputs (materials / locations inline-edit) — borderless until focus */
-.materials-table input,
-.materials-table select,
-.locations-table input {
+/* Referential-table controls — borderless until focus. */
+.referential-table input,
+.referential-table select {
   width: 100%;
   background: var(--surface);
   border-color: transparent;
   padding: 5px 7px;
 }
-.materials-table input:focus,
-.materials-table select:focus,
-.locations-table input:focus {
+.referential-table input:focus,
+.referential-table select:focus {
   background: var(--raised);
   border-color: var(--accent);
 }
@@ -1179,7 +1175,7 @@ a {
 }
 
 /* ============================================================
-   Materials referential
+   Referential tables (materials / locations / manufacturers)
    ============================================================ */
 
 .materials-info {
@@ -1200,18 +1196,18 @@ a {
   color: var(--muted);
 }
 
-.materials-table-scroll {
+.referential-table-scroll {
   border: 1px solid var(--border);
   border-radius: 11px;
   background: var(--raised);
   box-shadow: var(--shadow);
 }
 
-.materials-table thead {
+.referential-table thead {
   background: var(--surface);
 }
 
-.materials-table thead th {
+.referential-table thead th {
   padding-top: 11px;
   padding-bottom: 11px;
 }
@@ -1227,13 +1223,13 @@ a {
   text-align: right;
 }
 
-.materials-table tbody tr:hover {
+.referential-table tbody tr:hover {
   background: var(--hover-bg);
 }
 
-.materials-table input.material-name-badge {
-  width: 104px;
-  border-color: var(--border-strong);
+.referential-name-badge {
+  display: inline-block;
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   background: transparent;
   color: var(--text);
@@ -1241,6 +1237,35 @@ a {
   font-size: 12px;
   font-weight: 600;
   padding: 3px 9px;
+}
+
+.referential-table input.referential-name-badge {
+  border-color: var(--border-strong);
+  background: transparent;
+}
+
+.referential-table input.referential-name-badge:focus {
+  border-color: var(--accent);
+  background: var(--raised);
+}
+
+.materials-table input.referential-name-badge {
+  width: 104px;
+}
+
+.locations-table input.referential-name-badge {
+  min-width: 150px;
+}
+
+.locations-table th:nth-child(3),
+.locations-table th:nth-child(4),
+.locations-table td:nth-child(3),
+.locations-table td:nth-child(4),
+.manufacturers-table th:nth-child(3),
+.manufacturers-table th:nth-child(4),
+.manufacturers-table td:nth-child(3),
+.manufacturers-table td:nth-child(4) {
+  text-align: right;
 }
 
 .material-drying-fields {
@@ -2239,7 +2264,7 @@ a {
     padding: 16px 15px;
   }
 
-  .materials-table-scroll {
+  .referential-table-scroll {
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -2249,6 +2274,11 @@ a {
 
   .materials-table {
     min-width: 760px;
+  }
+
+  .locations-table,
+  .manufacturers-table {
+    min-width: 560px;
   }
 
   .kpi-grid {

@@ -206,4 +206,14 @@ mod tests {
         assert!(html.contains("Fabricant") || html.contains("Pays"));
         assert!(!html.contains("manufacturers."));
     }
+
+    #[test]
+    fn table_uses_the_shared_referential_style_without_breaking_delete() {
+        let html = render("en");
+        assert!(html.contains(r#"class="table-scroll referential-table-scroll""#));
+        assert!(html.contains(r#"class="manufacturers-table referential-table""#));
+        assert!(html.contains(r#"class="referential-name-badge">Prusament</span>"#));
+        assert!(html.contains(r#"hx-delete="/manufacturers/01HZID""#));
+        assert!(html.contains(r##"hx-target-409="#manufacturers-msg""##));
+    }
 }

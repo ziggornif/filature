@@ -2,8 +2,8 @@
 {% block content %}
   <h1>{{ t(key="locations.title") }}</h1>
   <div id="locations-msg" class="form-error" role="alert" aria-live="polite"></div>
-  <div class="table-scroll">
-    <table class="locations-table" hx-ext="response-targets">
+  <div class="table-scroll referential-table-scroll">
+    <table class="locations-table referential-table" hx-ext="response-targets">
     <thead>
       <tr>
         <th>{{ t(key="locations.col.name") }}</th>
