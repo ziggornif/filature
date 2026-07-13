@@ -84,10 +84,9 @@
     </strong></div>
   </section>
 
-  <section class="spool-detail-notice">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-    <span>{{ t(key="spools.detail.storage_unmonitored") }} ({{ spool.location_name | default(value=t(key="spools.location.unassigned")) }}) — {{ t(key="spools.detail.storage_unmonitored_suffix") }}</span>
-  </section>
+  {# Bandeau « rangement non sondé » retiré tant que l'humidité (capteurs SHT31)
+     est différée post-v1. À réactiver avec la feature humidité — les clés i18n
+     spools.detail.storage_unmonitored[_suffix] et .spool-detail-notice sont conservées. #}
 
   <details class="spool-detail-operations">
     <summary>{{ t(key="spools.detail.operations") }}</summary>
