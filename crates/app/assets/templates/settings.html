@@ -1,12 +1,24 @@
 {% extends "base.html" %}
 {% block content %}
   <h1>{{ t(key="nav.settings") }}</h1>
+  <nav class="settings-tabs" hx-boost="true" aria-label="{{ t(key='nav.settings') }}">
+    <a href="/settings"{% if active_tab == "general" %} class="active" aria-current="page"{% endif %}>{{ t(key="settings.tab.general") }}</a>
+    <a href="/settings/manufacturers"{% if active_tab == "manufacturers" %} class="active" aria-current="page"{% endif %}>{{ t(key="settings.tab.manufacturers") }}</a>
+    <a href="/settings/locations"{% if active_tab == "locations" %} class="active" aria-current="page"{% endif %}>{{ t(key="settings.tab.locations") }}</a>
+    <a href="/settings/backup"{% if active_tab == "backup" %} class="active" aria-current="page"{% endif %}>{{ t(key="settings.tab.backup") }}</a>
+  </nav>
+  {% if active_tab == "general" %}
   <section class="settings-panel" aria-labelledby="stock-settings-title">
     <h2 id="stock-settings-title">{{ t(key="settings.stock.title") }}</h2>
     <p class="settings-intro">{{ t(key="settings.stock.description") }}</p>
     <div id="settings-msg" class="form-error" role="alert" aria-live="polite"></div>
     {% include "_low_stock_threshold_setting.html" %}
   </section>
+  {% elif active_tab == "manufacturers" %}
+    {% include "_settings_manufacturers.html" %}
+  {% elif active_tab == "locations" %}
+    {% include "_settings_locations.html" %}
+  {% elif active_tab == "backup" %}
   <section class="settings-panel" aria-labelledby="transfer-settings-title">
     <h2 id="transfer-settings-title">{{ t(key="settings.transfer.title") }}</h2>
     <p class="settings-intro">{{ t(key="settings.transfer.description") }}</p>
@@ -38,4 +50,5 @@
       </div>
     </div>
   </section>
+  {% endif %}
 {% endblock content %}

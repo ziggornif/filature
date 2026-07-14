@@ -1,17 +1,16 @@
-//! The driving (Axum) adapter for the manufacturers slice: an htmx editable
-//! table (`GET /manufacturers`) whose rows are created/deleted in place via
+//! The driving (Axum) adapter for manufacturer htmx mutations. The table is
+//! rendered by the settings shell; rows are created/deleted in place via
 //! row-fragment responses (`POST /manufacturers`, `DELETE
 //! /manufacturers/{id}`) — mirrors `web::locations`, minus edit (a brand is
 //! just a name + country; the operator re-creates rather than renames).
 
-use crate::web::router::{internal_error, resolve_locale, resolve_theme};
+use crate::web::router::{internal_error, resolve_locale};
 use crate::web::state::AppState;
 use axum::{
     Router,
     extract::{Form, Path, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Response},
-    routing::get,
 };
 use domain::manufacturers::{
     Manufacturer, ManufacturerName, NewManufacturer, RepositoryError, country_from,
@@ -94,28 +93,6 @@ fn render_message(st: &AppState, locale: &str, status: StatusCode, message: Stri
     }
 }
 
-async fn list_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    let locale = resolve_locale(&headers, &st);
-    let theme = resolve_theme(&headers);
-    match st.manufacturers.list_with_spool_counts().await {
-        Ok(items) => {
-            let views: Vec<ManufacturerView> = items.into_iter().map(Into::into).collect();
-            let mut ctx = Context::new();
-            ctx.insert("manufacturers", &views);
-            ctx.insert("page", "manufacturers");
-            ctx.insert("nav_spool_count", &st.nav_spool_count().await);
-            match st
-                .renderer
-                .render("manufacturers.html", &locale, theme.data_attr(), ctx)
-            {
-                Ok(html) => Html(html).into_response(),
-                Err(e) => internal_error(e),
-            }
-        }
-        Err(e) => internal_error(e),
-    }
-}
-
 async fn create(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -166,7 +143,10 @@ async fn delete(
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/manufacturers", get(list_page).post(create))
+        .route(
+            "/manufacturers",
+            axum::routing::get(|| async { StatusCode::NOT_FOUND }).post(create),
+        )
         .route("/manufacturers/{id}", axum::routing::delete(delete))
 }
 
@@ -189,7 +169,8 @@ mod tests {
         let r = Renderer::new(Catalog::load("en"));
         let mut ctx = Context::new();
         ctx.insert("manufacturers", &vec![view()]);
-        r.render("manufacturers.html", locale, "", ctx).unwrap()
+        r.render("_settings_manufacturers.html", locale, "", ctx)
+            .unwrap()
     }
 
     #[test]

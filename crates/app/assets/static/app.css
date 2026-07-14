@@ -147,12 +147,24 @@ body {
   display: none;
 }
 
+.sidebar-menu {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
 .sidebar-menu::details-content {
   content-visibility: visible;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
 }
 
 .sidebar nav {
   display: flex;
+  flex: 1;
   flex-direction: column;
 }
 
@@ -218,6 +230,10 @@ body {
 .sidebar nav a.active {
   background: var(--active-bg);
   color: var(--text);
+}
+
+.sidebar nav a[data-sidebar-bottom] {
+  margin-top: auto;
 }
 
 .sidebar-foot {
@@ -595,6 +611,31 @@ a {
   border-radius: 12px;
   padding: 18px;
   box-shadow: var(--shadow);
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-tabs a {
+  flex: 0 0 auto;
+  padding: 0.65rem 0;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.settings-tabs a:hover {
+  color: var(--text);
+}
+
+.settings-tabs a.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
 
 .settings-panel + .settings-panel {
@@ -2212,6 +2253,18 @@ a {
     width: 100%;
   }
 
+  .sidebar-menu {
+    display: block;
+    flex: none;
+    min-height: auto;
+  }
+
+  .sidebar-menu::details-content {
+    display: block;
+    flex: none;
+    min-height: auto;
+  }
+
   .sidebar-menu summary {
     display: flex;
     align-items: center;
@@ -2259,8 +2312,13 @@ a {
   }
 
   .sidebar-menu nav {
+    flex: none;
     flex-direction: column;
     border-top: 1px solid var(--border);
+  }
+
+  .sidebar nav a[data-sidebar-bottom] {
+    margin-top: 0;
   }
 
   .sidebar nav a {

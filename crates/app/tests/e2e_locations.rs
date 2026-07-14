@@ -236,10 +236,14 @@ async fn delete_blocked_then_allowed_after_unassign() {
     assert!(html.contains("1 spool(s) assigned"));
     assert!(!html.contains("<tr"));
 
-    // --- GET /locations: the location is still listed (delete refused).
+    // --- GET settings tab: the location is still listed (delete refused).
     let res = app
         .clone()
-        .oneshot(Request::get("/locations").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::get("/settings/locations")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);
@@ -248,7 +252,7 @@ async fn delete_blocked_then_allowed_after_unassign() {
 
     // --- Unassign the spool, then delete again -> 200, empty body (the
     // htmx row swap removes the `<tr>` client-side), and the row is gone
-    // from a subsequent GET /locations.
+    // from a subsequent GET of the settings tab.
     sqlx::query!(
         "UPDATE spools SET location_id = NULL WHERE id = $1",
         spool.id.as_str()
@@ -272,7 +276,11 @@ async fn delete_blocked_then_allowed_after_unassign() {
 
     let res = app
         .clone()
-        .oneshot(Request::get("/locations").body(Body::empty()).unwrap())
+        .oneshot(
+            Request::get("/settings/locations")
+                .body(Body::empty())
+                .unwrap(),
+        )
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::OK);

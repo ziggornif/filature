@@ -1,16 +1,15 @@
-//! The driving (Axum) adapter for the locations slice: an htmx editable
-//! table (`GET /locations`) whose rows are edited/created/deleted in place
+//! The driving (Axum) adapter for location htmx mutations. The table is
+//! rendered by the settings shell; rows are edited/created/deleted in place
 //! via row-fragment responses (`POST /locations`, `PUT /locations/{id}`,
 //! `DELETE /locations/{id}`) — mirrors `web::materials`.
 
-use crate::web::router::{form_error, internal_error, resolve_locale, resolve_theme};
+use crate::web::router::{form_error, internal_error, resolve_locale};
 use crate::web::state::AppState;
 use axum::{
     Router,
     extract::{Form, Path, State},
     http::{HeaderMap, StatusCode},
     response::{Html, IntoResponse, Response},
-    routing::get,
 };
 use domain::locations::{Location, LocationName, NewLocation, RepositoryError, note_from};
 use domain::shared::{DomainError, LocationId};
@@ -112,28 +111,6 @@ async fn spool_count_for(st: &AppState, id: &LocationId) -> u64 {
         .unwrap_or(0)
 }
 
-async fn list_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
-    let locale = resolve_locale(&headers, &st);
-    let theme = resolve_theme(&headers);
-    match st.locations.list_with_spool_counts().await {
-        Ok(items) => {
-            let views: Vec<LocationView> = items.into_iter().map(Into::into).collect();
-            let mut ctx = Context::new();
-            ctx.insert("locations", &views);
-            ctx.insert("page", "locations");
-            ctx.insert("nav_spool_count", &st.nav_spool_count().await);
-            match st
-                .renderer
-                .render("locations.html", &locale, theme.data_attr(), ctx)
-            {
-                Ok(html) => Html(html).into_response(),
-                Err(e) => internal_error(e),
-            }
-        }
-        Err(e) => internal_error(e),
-    }
-}
-
 async fn create(
     State(st): State<AppState>,
     headers: HeaderMap,
@@ -222,7 +199,10 @@ async fn delete(
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/locations", get(list_page).post(create))
+        .route(
+            "/locations",
+            axum::routing::get(|| async { StatusCode::NOT_FOUND }).post(create),
+        )
         .route("/locations/{id}", axum::routing::put(edit).delete(delete))
 }
 
@@ -245,7 +225,8 @@ mod tests {
         let r = Renderer::new(Catalog::load("en"));
         let mut ctx = Context::new();
         ctx.insert("locations", &vec![view()]);
-        r.render("locations.html", locale, "", ctx).unwrap()
+        r.render("_settings_locations.html", locale, "", ctx)
+            .unwrap()
     }
 
     #[test]

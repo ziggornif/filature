@@ -1,6 +1,8 @@
 //! Driving adapter for the instance-wide settings screen.
 
 use crate::instance_transfer::{decode, encode};
+use crate::web::locations::LocationView;
+use crate::web::manufacturers::ManufacturerView;
 use crate::web::router::{form_error, internal_error, resolve_locale, resolve_theme};
 use crate::web::state::AppState;
 use axum::{
@@ -67,18 +69,15 @@ fn render_setting(st: &AppState, locale: &str, configuration: InstanceConfigurat
     }
 }
 
-async fn page(
-    State(st): State<AppState>,
-    headers: HeaderMap,
-    Query(query): Query<SettingsQuery>,
-) -> Response {
+async fn general_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let locale = resolve_locale(&headers, &st);
     let theme = resolve_theme(&headers);
     match st.instance_configuration.get().await {
         Ok(configuration) => {
             let mut ctx = setting_context(configuration, false);
             ctx.insert("page", "settings");
-            ctx.insert("imported", &(query.imported.as_deref() == Some("1")));
+            ctx.insert("active_tab", "general");
+            ctx.insert("imported", &false);
             ctx.insert("import_error", "");
             ctx.insert("nav_spool_count", &st.nav_spool_count().await);
             match st
@@ -89,6 +88,74 @@ async fn page(
                 Err(e) => internal_error(e),
             }
         }
+        Err(e) => internal_error(e),
+    }
+}
+
+async fn manufacturers_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let theme = resolve_theme(&headers);
+    match st.manufacturers.list_with_spool_counts().await {
+        Ok(items) => {
+            let manufacturers: Vec<ManufacturerView> = items.into_iter().map(Into::into).collect();
+            let mut ctx = Context::new();
+            ctx.insert("page", "settings");
+            ctx.insert("active_tab", "manufacturers");
+            ctx.insert("manufacturers", &manufacturers);
+            ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+            match st
+                .renderer
+                .render("settings.html", &locale, theme.data_attr(), ctx)
+            {
+                Ok(html) => Html(html).into_response(),
+                Err(e) => internal_error(e),
+            }
+        }
+        Err(e) => internal_error(e),
+    }
+}
+
+async fn locations_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let theme = resolve_theme(&headers);
+    match st.locations.list_with_spool_counts().await {
+        Ok(items) => {
+            let locations: Vec<LocationView> = items.into_iter().map(Into::into).collect();
+            let mut ctx = Context::new();
+            ctx.insert("page", "settings");
+            ctx.insert("active_tab", "locations");
+            ctx.insert("locations", &locations);
+            ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+            match st
+                .renderer
+                .render("settings.html", &locale, theme.data_attr(), ctx)
+            {
+                Ok(html) => Html(html).into_response(),
+                Err(e) => internal_error(e),
+            }
+        }
+        Err(e) => internal_error(e),
+    }
+}
+
+async fn backup_page(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<SettingsQuery>,
+) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let theme = resolve_theme(&headers);
+    let mut ctx = Context::new();
+    ctx.insert("page", "settings");
+    ctx.insert("active_tab", "backup");
+    ctx.insert("imported", &(query.imported.as_deref() == Some("1")));
+    ctx.insert("import_error", "");
+    ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+    match st
+        .renderer
+        .render("settings.html", &locale, theme.data_attr(), ctx)
+    {
+        Ok(html) => Html(html).into_response(),
         Err(e) => internal_error(e),
     }
 }
@@ -123,6 +190,7 @@ async fn import_error(st: &AppState, locale: &str, theme_attr: &str, key: &str) 
     };
     let mut context = setting_context(configuration, false);
     context.insert("page", "settings");
+    context.insert("active_tab", "backup");
     context.insert("imported", &false);
     context.insert("import_error", &message);
     context.insert("nav_spool_count", &st.nav_spool_count().await);
@@ -249,7 +317,7 @@ async fn import_instance(
     };
 
     match st.instance_transfer.import(document).await {
-        Ok(()) => Redirect::to("/settings?imported=1").into_response(),
+        Ok(()) => Redirect::to("/settings/backup?imported=1").into_response(),
         Err(TransferError::UnsupportedFormat(_) | TransferError::UnsupportedVersion(_)) => {
             import_error(
                 &st,
@@ -295,7 +363,10 @@ async fn update_low_stock_threshold(
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/settings", get(page))
+        .route("/settings", get(general_page))
+        .route("/settings/manufacturers", get(manufacturers_page))
+        .route("/settings/locations", get(locations_page))
+        .route("/settings/backup", get(backup_page))
         .route(
             "/settings/low-stock-threshold",
             axum::routing::post(update_low_stock_threshold),
@@ -320,6 +391,7 @@ mod tests {
         };
         let mut ctx = setting_context(configuration, saved);
         ctx.insert("page", "settings");
+        ctx.insert("active_tab", "general");
         ctx.insert("imported", &false);
         ctx.insert("import_error", "");
         renderer.render("settings.html", locale, "", ctx).unwrap()
@@ -333,11 +405,12 @@ mod tests {
         assert!(html.contains(r#"min="0""#));
         assert!(html.contains(r#"max="100""#));
         assert!(html.contains(r#"hx-post="/settings/low-stock-threshold""#));
-        assert!(html.contains(r#"href="/settings/export""#));
-        assert!(html.contains(r#"action="/settings/import""#));
-        assert!(html.contains(r#"name="confirm_replace""#));
-        assert!(html.contains(r#"type="checkbox""#));
-        assert!(html.contains("Maximum file size: 1 MiB."));
+        assert!(html.contains(r#"class="settings-tabs" hx-boost="true""#));
+        assert!(html.contains(r#"href="/settings/manufacturers""#));
+        assert!(html.contains(r#"href="/settings/locations""#));
+        assert!(html.contains(r#"href="/settings/backup""#));
+        assert!(!html.contains(r#"href="/manufacturers""#));
+        assert!(!html.contains(r#"href="/locations""#));
         assert!(!html.contains("settings.low_stock."));
         assert!(!html.contains("settings.transfer."));
         assert!(!html.contains("nav.settings"));
@@ -349,7 +422,6 @@ mod tests {
         assert!(html.contains("Paramètres"));
         assert!(html.contains("Seuil de stock bas"));
         assert!(html.contains("Enregistré."));
-        assert!(html.contains("Je comprends que cette opération remplace définitivement"));
         assert!(html.contains(r#"lang="fr""#));
         assert!(!html.contains("settings.low_stock."));
     }
@@ -439,6 +511,39 @@ mod tests {
         async fn body_of(response: Response) -> String {
             let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
             String::from_utf8(bytes.to_vec()).unwrap()
+        }
+
+        #[tokio::test]
+        async fn settings_tabs_are_full_pages_and_legacy_gets_are_not_found() {
+            use axum::{body::Body, http::Request};
+            use tower::ServiceExt;
+
+            let (state, _, _) = test_state();
+            for (path, active_href) in [
+                ("/settings", "/settings"),
+                ("/settings/manufacturers", "/settings/manufacturers"),
+                ("/settings/locations", "/settings/locations"),
+                ("/settings/backup", "/settings/backup"),
+            ] {
+                let response = crate::web::router::router(state.clone())
+                    .oneshot(Request::get(path).body(Body::empty()).unwrap())
+                    .await
+                    .unwrap();
+                assert_eq!(response.status(), StatusCode::OK, "{path}");
+                let html = body_of(response).await;
+                assert!(html.contains(r#"class="settings-tabs" hx-boost="true""#));
+                assert!(html.contains(&format!(
+                    r#"href="{active_href}" class="active" aria-current="page""#
+                )));
+            }
+
+            for path in ["/manufacturers", "/locations"] {
+                let response = crate::web::router::router(state.clone())
+                    .oneshot(Request::get(path).body(Body::empty()).unwrap())
+                    .await
+                    .unwrap();
+                assert_eq!(response.status(), StatusCode::NOT_FOUND, "{path}");
+            }
         }
 
         #[tokio::test]
@@ -617,6 +722,10 @@ mod tests {
                 .unwrap();
 
             assert_eq!(response.status(), StatusCode::SEE_OTHER);
+            assert_eq!(
+                response.headers()[header::LOCATION],
+                "/settings/backup?imported=1"
+            );
             assert_eq!(repository.replace_count(), 1);
         }
 
