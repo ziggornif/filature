@@ -597,6 +597,31 @@ a {
   box-shadow: var(--shadow);
 }
 
+.settings-tabs {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-tabs a {
+  flex: 0 0 auto;
+  padding: 0.65rem 0;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.settings-tabs a:hover {
+  color: var(--text);
+}
+
+.settings-tabs a.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
 .settings-panel + .settings-panel {
   margin-top: 18px;
 }
