@@ -19,7 +19,27 @@ pub struct InstanceSnapshot {
     pub manufacturers: Vec<SnapshotManufacturer>,
     pub locations: Vec<SnapshotLocation>,
     pub spools: Vec<SnapshotSpool>,
+    pub printers: Vec<SnapshotPrinter>,
     pub configuration: SnapshotConfiguration,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnapshotPrinter {
+    pub id: String,
+    pub name: String,
+    pub brand: String,
+    pub model: String,
+    pub module_kind: String,
+    pub module_count: Option<u16>,
+    pub slots: Vec<SnapshotPrinterSlot>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SnapshotPrinterSlot {
+    pub slot_key: String,
+    pub group_label: String,
+    pub position: u16,
+    pub spool_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -214,7 +234,7 @@ impl InstanceSnapshot {
             return invalid("location name must not be blank");
         }
 
-        unique_ids("spool", self.spools.iter().map(|spool| spool.id.as_str()))?;
+        let spool_ids = unique_ids("spool", self.spools.iter().map(|spool| spool.id.as_str()))?;
         for spool in &self.spools {
             if !material_ids.contains(spool.material_id.as_str()) {
                 return invalid("spool references an unknown material");
@@ -251,6 +271,34 @@ impl InstanceSnapshot {
                 .is_some_and(|colour| !valid_colour(colour))
             {
                 return invalid("spool colour_hex is invalid");
+            }
+        }
+
+        unique_ids(
+            "printer",
+            self.printers.iter().map(|printer| printer.id.as_str()),
+        )?;
+        let mut loaded_spool_ids = HashSet::new();
+        for printer in &self.printers {
+            if printer.name.trim().is_empty() {
+                return invalid("printer name must not be blank");
+            }
+            let mut slot_keys = HashSet::new();
+            for slot in &printer.slots {
+                if slot.slot_key.trim().is_empty() {
+                    return invalid("printer slot key must not be blank");
+                }
+                if !slot_keys.insert(slot.slot_key.as_str()) {
+                    return invalid("duplicate printer slot key");
+                }
+                if let Some(spool_id) = slot.spool_id.as_deref() {
+                    if !spool_ids.contains(spool_id) {
+                        return invalid("printer slot references an unknown spool");
+                    }
+                    if !loaded_spool_ids.insert(spool_id) {
+                        return invalid("spool is loaded in more than one printer slot");
+                    }
+                }
             }
         }
         Ok(())
@@ -336,6 +384,7 @@ mod tests {
                     opened_at: None,
                     created_at: "1970-01-01T00:00:00Z".into(),
                 }],
+                printers: vec![],
                 configuration: SnapshotConfiguration {
                     low_stock_threshold: 15,
                 },

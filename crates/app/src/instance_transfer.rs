@@ -5,8 +5,8 @@
 
 use domain::instance_transfer::{
     InstanceDocument, InstanceSnapshot, SnapshotConfiguration, SnapshotDiameter, SnapshotLocation,
-    SnapshotManufacturer, SnapshotMaterial, SnapshotSensitivity, SnapshotSpool,
-    SnapshotSpoolStatus, SnapshotSpoolType,
+    SnapshotManufacturer, SnapshotMaterial, SnapshotPrinter, SnapshotPrinterSlot,
+    SnapshotSensitivity, SnapshotSpool, SnapshotSpoolStatus, SnapshotSpoolType,
 };
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -49,7 +49,30 @@ struct WireSnapshot {
     manufacturers: Vec<WireManufacturer>,
     locations: Vec<WireLocation>,
     spools: Vec<WireSpool>,
+    #[serde(default)]
+    printers: Vec<WirePrinter>,
     configuration: WireConfiguration,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WirePrinter {
+    id: String,
+    name: String,
+    brand: String,
+    model: String,
+    module_kind: String,
+    module_count: Option<u16>,
+    slots: Vec<WirePrinterSlot>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WirePrinterSlot {
+    slot_key: String,
+    group_label: String,
+    position: u16,
+    spool_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -183,10 +206,36 @@ impl TryFrom<&InstanceSnapshot> for WireSnapshot {
                 .iter()
                 .map(WireSpool::try_from)
                 .collect::<Result<_, _>>()?,
+            printers: snapshot.printers.iter().map(WirePrinter::from).collect(),
             configuration: WireConfiguration {
                 low_stock_threshold: snapshot.configuration.low_stock_threshold,
             },
         })
+    }
+}
+
+impl From<&SnapshotPrinter> for WirePrinter {
+    fn from(printer: &SnapshotPrinter) -> Self {
+        Self {
+            id: printer.id.clone(),
+            name: printer.name.clone(),
+            brand: printer.brand.clone(),
+            model: printer.model.clone(),
+            module_kind: printer.module_kind.clone(),
+            module_count: printer.module_count,
+            slots: printer.slots.iter().map(WirePrinterSlot::from).collect(),
+        }
+    }
+}
+
+impl From<&SnapshotPrinterSlot> for WirePrinterSlot {
+    fn from(slot: &SnapshotPrinterSlot) -> Self {
+        Self {
+            slot_key: slot.slot_key.clone(),
+            group_label: slot.group_label.clone(),
+            position: slot.position,
+            spool_id: slot.spool_id.clone(),
+        }
     }
 }
 
@@ -294,10 +343,36 @@ impl TryFrom<WireSnapshot> for InstanceSnapshot {
                 .into_iter()
                 .map(SnapshotSpool::try_from)
                 .collect::<Result<_, _>>()?,
+            printers: snapshot.printers.into_iter().map(Into::into).collect(),
             configuration: SnapshotConfiguration {
                 low_stock_threshold: snapshot.configuration.low_stock_threshold,
             },
         })
+    }
+}
+
+impl From<WirePrinter> for SnapshotPrinter {
+    fn from(printer: WirePrinter) -> Self {
+        Self {
+            id: printer.id,
+            name: printer.name,
+            brand: printer.brand,
+            model: printer.model,
+            module_kind: printer.module_kind,
+            module_count: printer.module_count,
+            slots: printer.slots.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<WirePrinterSlot> for SnapshotPrinterSlot {
+    fn from(slot: WirePrinterSlot) -> Self {
+        Self {
+            slot_key: slot.slot_key,
+            group_label: slot.group_label,
+            position: slot.position,
+            spool_id: slot.spool_id,
+        }
     }
 }
 
@@ -397,6 +472,7 @@ mod tests {
     #[test]
     fn round_trip_preserves_the_document() {
         let document = decode(VALID.as_bytes()).unwrap();
+        assert!(document.content.printers.is_empty());
         assert_eq!(document.content.spools[0].notes, None);
         assert_eq!(document.content.spools[0].purchased_at, None);
         assert_eq!(document.content.spools[0].opened_at, None);
