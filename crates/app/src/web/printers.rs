@@ -8,10 +8,10 @@ use axum::{
     routing::get,
 };
 use domain::printers::{
-    BAMBU_MODELS, Module, NewPrinter, PRUSA_MODELS, Printer, PrinterBrand, PrinterName,
-    RepositoryError,
+    BAMBU_MODELS, LoadableSpool, Module, NewPrinter, PRUSA_MODELS, Printer, PrinterBrand,
+    PrinterName, RepositoryError,
 };
-use domain::shared::PrinterId;
+use domain::shared::{PrinterId, SpoolId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use tera::Context;
@@ -21,6 +21,30 @@ pub struct SlotGroupView {
     pub label_key: String,
     pub count: usize,
     pub multi: bool,
+    pub slots: Vec<SlotView>,
+}
+#[derive(Serialize)]
+pub struct SlotView {
+    pub key: String,
+    pub loaded: Option<LoadedSpoolView>,
+    pub options: Vec<LoadableSpoolView>,
+}
+#[derive(Serialize)]
+pub struct LoadedSpoolView {
+    pub id: String,
+    pub brand: String,
+    pub colour_name: String,
+    pub colour_hex: String,
+    pub material_name: String,
+    pub remaining_pct: u8,
+    pub remaining_weight: f64,
+    pub net_weight: f64,
+    pub status_key: String,
+}
+#[derive(Serialize)]
+pub struct LoadableSpoolView {
+    pub id: String,
+    pub label: String,
 }
 #[derive(Serialize)]
 pub struct PrinterView {
@@ -32,6 +56,71 @@ pub struct PrinterView {
     pub groups: Vec<SlotGroupView>,
     pub slot_summary: String,
 }
+impl PrinterView {
+    async fn build(p: Printer, st: &AppState) -> Result<Self, RepositoryError> {
+        let mut grouped: BTreeMap<String, Vec<SlotView>> = BTreeMap::new();
+        let mut order = Vec::new();
+        for slot in p.slots {
+            if !grouped.contains_key(&slot.group_label) {
+                order.push(slot.group_label.clone());
+            }
+            let current = slot.loaded_spool.as_ref().map(|s| s.id.clone());
+            let options = st
+                .printers
+                .loadable_spools(current)
+                .await?
+                .into_iter()
+                .map(LoadableSpoolView::from)
+                .collect();
+            let loaded = slot.loaded_spool.map(|s| {
+                let remaining_pct = s.remaining_pct();
+                LoadedSpoolView {
+                    id: s.id.as_str().into(),
+                    brand: s.manufacturer_name.unwrap_or_else(|| "—".into()),
+                    colour_name: s.colour_name.unwrap_or_else(|| "—".into()),
+                    colour_hex: s.colour_hex.unwrap_or_else(|| "transparent".into()),
+                    material_name: s.material_name,
+                    remaining_pct,
+                    remaining_weight: s.remaining_weight,
+                    net_weight: s.net_weight,
+                    status_key: format!("spools.status.{}", s.status.to_lowercase()),
+                }
+            });
+            grouped.entry(slot.group_label).or_default().push(SlotView {
+                key: slot.key,
+                loaded,
+                options,
+            });
+        }
+        let groups: Vec<_> = order
+            .into_iter()
+            .map(|label| {
+                let slots = grouped.remove(&label).unwrap_or_default();
+                SlotGroupView {
+                    label_key: format!("printers.group.{label}"),
+                    count: slots.len(),
+                    multi: slots.len() > 1,
+                    slots,
+                }
+            })
+            .collect();
+        let slot_summary = groups
+            .iter()
+            .map(|g| format!("{} ({})", g.label_key, g.slots.len()))
+            .collect::<Vec<_>>()
+            .join(", ");
+        Ok(Self {
+            id: p.id.as_str().into(),
+            name: p.name.as_str().into(),
+            model: p.model,
+            brand: p.brand.as_str().into(),
+            liner: p.brand.liner().into(),
+            groups,
+            slot_summary,
+        })
+    }
+}
+
 impl From<Printer> for PrinterView {
     fn from(p: Printer) -> Self {
         let mut grouped: BTreeMap<String, usize> = BTreeMap::new();
@@ -42,7 +131,7 @@ impl From<Printer> for PrinterView {
             }
             *grouped.entry(slot.group_label.clone()).or_default() += 1;
         }
-        let groups: Vec<_> = order
+        let groups = order
             .into_iter()
             .map(|label| {
                 let count = grouped[&label];
@@ -50,14 +139,10 @@ impl From<Printer> for PrinterView {
                     label_key: format!("printers.group.{label}"),
                     count,
                     multi: count > 1,
+                    slots: Vec::new(),
                 }
             })
             .collect();
-        let slot_summary = groups
-            .iter()
-            .map(|g| format!("{} ({})", g.label_key, g.count))
-            .collect::<Vec<_>>()
-            .join(", ");
         Self {
             id: p.id.as_str().into(),
             name: p.name.as_str().into(),
@@ -65,7 +150,18 @@ impl From<Printer> for PrinterView {
             brand: p.brand.as_str().into(),
             liner: p.brand.liner().into(),
             groups,
-            slot_summary,
+            slot_summary: String::new(),
+        }
+    }
+}
+
+impl From<LoadableSpool> for LoadableSpoolView {
+    fn from(s: LoadableSpool) -> Self {
+        let brand = s.manufacturer_name.unwrap_or_else(|| "—".into());
+        let colour = s.colour_name.unwrap_or_else(|| "—".into());
+        Self {
+            id: s.id.as_str().into(),
+            label: format!("{brand} · {colour} ({})", s.material_name),
         }
     }
 }
@@ -136,11 +232,24 @@ async fn page(State(st): State<AppState>, headers: HeaderMap) -> Response {
     let theme = resolve_theme(&headers);
     match st.printers.list().await {
         Ok(items) => {
-            let views: Vec<PrinterView> = items.into_iter().map(Into::into).collect();
+            let mut views = Vec::with_capacity(items.len());
+            for item in items {
+                match PrinterView::build(item, &st).await {
+                    Ok(view) => views.push(view),
+                    Err(e) => return internal_error(e),
+                }
+            }
+            let loaded_spools_count = views
+                .iter()
+                .flat_map(|p| &p.groups)
+                .flat_map(|g| &g.slots)
+                .filter(|s| s.loaded.is_some())
+                .count();
             let mut ctx = Context::new();
             ctx.insert("page", "printers");
             ctx.insert("printers", &views);
             ctx.insert("printer_count", &views.len());
+            ctx.insert("loaded_spools_count", &loaded_spools_count);
             ctx.insert("nav_spool_count", &st.nav_spool_count().await);
             ctx.insert("nav_printer_count", &views.len());
             match st
@@ -151,6 +260,85 @@ async fn page(State(st): State<AppState>, headers: HeaderMap) -> Response {
                 Err(e) => internal_error(e),
             }
         }
+        Err(e) => internal_error(e),
+    }
+}
+
+async fn loading_fragment(st: &AppState, headers: &HeaderMap) -> Response {
+    let locale = resolve_locale(headers, st);
+    let theme = resolve_theme(headers);
+    let items = match st.printers.list().await {
+        Ok(items) => items,
+        Err(e) => return internal_error(e),
+    };
+    let mut views = Vec::with_capacity(items.len());
+    for item in items {
+        match PrinterView::build(item, st).await {
+            Ok(view) => views.push(view),
+            Err(e) => return internal_error(e),
+        }
+    }
+    let loaded_spools_count = views
+        .iter()
+        .flat_map(|p| &p.groups)
+        .flat_map(|g| &g.slots)
+        .filter(|s| s.loaded.is_some())
+        .count();
+    let mut ctx = Context::new();
+    ctx.insert("printers", &views);
+    ctx.insert("loaded_spools_count", &loaded_spools_count);
+    match st
+        .renderer
+        .render("_printer_loading.html", &locale, theme.data_attr(), ctx)
+    {
+        Ok(h) => Html(h).into_response(),
+        Err(e) => internal_error(e),
+    }
+}
+
+#[derive(Deserialize)]
+struct SlotForm {
+    #[serde(default)]
+    spool_id: String,
+}
+
+async fn set_slot(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path((printer_id, slot_key)): Path<(String, String)>,
+    Form(form): Form<SlotForm>,
+) -> Response {
+    let printer_id = PrinterId::new(printer_id);
+    let result = if form.spool_id.is_empty() {
+        st.printers.unload_slot(printer_id, slot_key).await
+    } else {
+        st.printers
+            .load_slot(printer_id, slot_key, SpoolId::new(form.spool_id))
+            .await
+    };
+    match result {
+        Ok(()) => loading_fragment(&st, &headers).await,
+        Err(
+            RepositoryError::NotFound(_)
+            | RepositoryError::SlotNotFound { .. }
+            | RepositoryError::UnknownSpool(_),
+        ) => StatusCode::NOT_FOUND.into_response(),
+        Err(RepositoryError::Domain(_)) => (
+            StatusCode::CONFLICT,
+            Html(st.renderer.t(
+                &resolve_locale(&headers, &st),
+                "printers.error.spool_not_loadable",
+            )),
+        )
+            .into_response(),
+        Err(RepositoryError::AlreadyLoaded(_)) => (
+            StatusCode::CONFLICT,
+            Html(st.renderer.t(
+                &resolve_locale(&headers, &st),
+                "printers.error.already_loaded",
+            )),
+        )
+            .into_response(),
         Err(e) => internal_error(e),
     }
 }
@@ -290,4 +478,8 @@ pub fn routes() -> Router<AppState> {
         .route("/printers/new", get(form_page))
         .route("/printers/{id}/edit", get(edit_page))
         .route("/printers/{id}", axum::routing::post(update).delete(delete))
+        .route(
+            "/printers/{printer_id}/slots/{slot_key}",
+            axum::routing::post(set_slot),
+        )
 }

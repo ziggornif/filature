@@ -82,3 +82,13 @@ No illustrations/imagery (the only "visual" is data colour). No drag-and-drop.
 At most one simple modal. No custom charting beyond the 24h humidity sparkline
 (deferred with humidity). No design work on the deferred humidity screen beyond
 what the handoff already specifies.
+# Cross-slice orchestration: spool auto-unload
+
+When a web operation makes a spool Empty (remaining weight reaches zero) or
+Archived, the app-crate handler calls `PrintersUseCases::unload_spool` after
+the successful spool mutation. This is an intentional edge-orchestration seam:
+the `spools` and `printers` domain slices remain independent, while the
+driving adapter coordinates the two use cases. A database trigger was rejected
+because it would hide this behaviour and make it harder to test. If more
+cross-slice reactions accumulate, a domain-event/outbox design should replace
+this explicit seam.

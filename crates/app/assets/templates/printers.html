@@ -1,20 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 <header class="printers-header">
-  <div><h1>{{ t(key="printers.title") }}</h1><p>{{ printer_count }} {{ t(key="printers.count") }}</p></div>
+  <div><h1>{{ t(key="printers.title") }}</h1></div>
   <a class="button" href="/printers/new">+ {{ t(key="printers.add") }}</a>
 </header>
-<div class="printer-grid">
-{% for p in printers %}
-  <article class="printer-card" style="--printer-liner:{{ p.liner }}">
-    <header><div><h2>{{ p.name }}</h2><p>{{ p.model }}</p></div><a class="printer-edit" href="/printers/{{ p.id }}/edit" title="{{ t(key='printers.edit') }}">✎</a></header>
-    {% for g in p.groups %}
-      <section class="slot-group{% if g.multi %} multi{% else %} single{% endif %}">
-        {% if g.multi %}<h3>{{ t(key=g.label_key) }}</h3><div class="slot-tiles">{% for i in range(end=g.count) %}<div class="empty-slot">{{ t(key="printers.slot.empty") }}</div>{% endfor %}</div>
-        {% else %}<div class="empty-slot empty-slot-wide"><span class="slot-circle"></span><span>{{ t(key=g.label_key) }} — {{ t(key="printers.slot.empty") }}</span></div>{% endif %}
-      </section>
-    {% endfor %}
-  </article>
-{% endfor %}
-</div>
+{% include "_printer_loading.html" %}
 {% endblock content %}

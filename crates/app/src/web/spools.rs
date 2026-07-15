@@ -1085,7 +1085,14 @@ async fn finish_op(
     result: Result<Spool, RepositoryError>,
 ) -> Response {
     match result {
-        Ok(_) => render_card_for(st, locale, id, StatusCode::OK, None).await,
+        Ok(spool) => {
+            if matches!(spool.status, SpoolStatus::Empty | SpoolStatus::Archived)
+                && let Err(e) = st.printers.unload_spool(id.clone()).await
+            {
+                return internal_error(e);
+            }
+            render_card_for(st, locale, id, StatusCode::OK, None).await
+        }
         Err(RepositoryError::NotFound(_)) => not_found(st, locale),
         Err(RepositoryError::Domain(e)) => {
             let key = op_error_key(&e);
@@ -1468,11 +1475,18 @@ async fn update(
         // htmx's `HX-Redirect` header triggers a full client-side navigation
         // (`window.location`) rather than swapping this response into the
         // form's target — success leaves the edit form for the spool detail.
-        Ok(_) => Response::builder()
-            .status(StatusCode::OK)
-            .header("HX-Redirect", format!("/spools/{id}"))
-            .body(Body::empty())
-            .unwrap(),
+        Ok(updated) => {
+            if updated.status == SpoolStatus::Empty
+                && let Err(e) = st.printers.unload_spool(updated.id).await
+            {
+                return internal_error(e);
+            }
+            Response::builder()
+                .status(StatusCode::OK)
+                .header("HX-Redirect", format!("/spools/{id}"))
+                .body(Body::empty())
+                .unwrap()
+        }
         Err(RepositoryError::UnknownMaterial(_)) => {
             render_edit_form(
                 &st,
@@ -2259,6 +2273,66 @@ mod tests {
         use domain::spools::{SpoolRepository, SpoolsService, SpoolsUseCases};
         use sqlx::PgPool;
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        struct NoopPrinters(Arc<AtomicUsize>);
+
+        #[async_trait::async_trait]
+        impl domain::printers::PrintersUseCases for NoopPrinters {
+            async fn list(
+                &self,
+            ) -> Result<Vec<domain::printers::Printer>, domain::printers::RepositoryError>
+            {
+                Ok(vec![])
+            }
+            async fn add(
+                &self,
+                _: domain::printers::NewPrinter,
+            ) -> Result<domain::printers::Printer, domain::printers::RepositoryError> {
+                unreachable!()
+            }
+            async fn edit(
+                &self,
+                _: domain::printers::Printer,
+            ) -> Result<domain::printers::Printer, domain::printers::RepositoryError> {
+                unreachable!()
+            }
+            async fn delete(
+                &self,
+                _: domain::shared::PrinterId,
+            ) -> Result<(), domain::printers::RepositoryError> {
+                Ok(())
+            }
+            async fn load_slot(
+                &self,
+                _: domain::shared::PrinterId,
+                _: String,
+                _: SpoolId,
+            ) -> Result<(), domain::printers::RepositoryError> {
+                Ok(())
+            }
+            async fn unload_slot(
+                &self,
+                _: domain::shared::PrinterId,
+                _: String,
+            ) -> Result<(), domain::printers::RepositoryError> {
+                Ok(())
+            }
+            async fn unload_spool(
+                &self,
+                _: SpoolId,
+            ) -> Result<(), domain::printers::RepositoryError> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            }
+            async fn loadable_spools(
+                &self,
+                _: Option<SpoolId>,
+            ) -> Result<Vec<domain::printers::LoadableSpool>, domain::printers::RepositoryError>
+            {
+                Ok(vec![])
+            }
+        }
 
         fn sample_new_material() -> NewMaterial {
             NewMaterial {
@@ -2313,8 +2387,7 @@ mod tests {
                     default_locale: "en".into(),
                 },
             };
-            (
-                AppState::new(
+            let mut state = AppState::new(
                     db,
                     &cfg,
                     materials,
@@ -2334,9 +2407,9 @@ mod tests {
                             domain::instance_transfer::stubs::StubInstanceTransferRepository::default(),
                         ),
                     )),
-                ),
-                seeded.id.as_str().to_string(),
-            )
+                );
+            state.printers = Arc::new(NoopPrinters(Arc::new(AtomicUsize::new(0))));
+            (state, seeded.id.as_str().to_string())
         }
 
         async fn body_of(res: Response) -> String {
@@ -2802,6 +2875,35 @@ mod tests {
             assert!(html.contains(&remaining_edit)); // inline weight control shown again
             assert!(html.contains(&consume_post));
             assert!(!html.contains(&restore_post));
+        }
+
+        #[tokio::test]
+        async fn empty_and_archive_handlers_orchestrate_printer_unload() {
+            let (mut st, material_id) = test_state().await;
+            let unloads = Arc::new(AtomicUsize::new(0));
+            st.printers = Arc::new(NoopPrinters(unloads.clone()));
+
+            let first = st.spools.add(valid_new_spool(&material_id)).await.unwrap();
+            let response = set_remaining(
+                State(st.clone()),
+                HeaderMap::new(),
+                Path(first.id.as_str().to_string()),
+                Form(RemainingForm {
+                    remaining: "0".into(),
+                }),
+            )
+            .await;
+            assert_eq!(response.status(), StatusCode::OK);
+
+            let second = st.spools.add(valid_new_spool(&material_id)).await.unwrap();
+            let response = archive(
+                State(st),
+                HeaderMap::new(),
+                Path(second.id.as_str().to_string()),
+            )
+            .await;
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(unloads.load(Ordering::SeqCst), 2);
         }
 
         #[tokio::test]

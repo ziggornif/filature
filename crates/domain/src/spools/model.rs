@@ -1,3 +1,4 @@
+pub use crate::shared::SpoolId;
 use crate::shared::{DomainError, Grams, LocationId, ManufacturerId, MaterialId, Money};
 use std::f64::consts::PI;
 use time::Date;
@@ -165,20 +166,6 @@ impl SpoolStatus {
             "Archived" => Ok(SpoolStatus::Archived),
             other => Err(DomainError::UnknownSpoolStatus(other.to_string())),
         }
-    }
-}
-
-/// Opaque identifier for a `Spool`, mirroring `MaterialId`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SpoolId(pub String);
-
-impl SpoolId {
-    pub fn new(s: impl Into<String>) -> Self {
-        Self(s.into())
-    }
-
-    pub fn as_str(&self) -> &str {
-        &self.0
     }
 }
 
