@@ -2,6 +2,7 @@ use crate::shared::{DomainError, PrinterId, SpoolId};
 
 pub const BAMBU_MODELS: &[&str] = &["P1S", "P1P", "X1C", "X1E", "A1", "A1 mini"];
 pub const PRUSA_MODELS: &[&str] = &["MK4S", "MK4", "MINI+", "CORE One", "CORE One L", "XL"];
+pub const XL_HEAD_COUNTS: &[u8] = &[1, 2, 5];
 pub const INDX_SLOT_COUNTS: &[u8] = &[4, 8];
 pub const OTHER_SLOT_COUNTS: &[u8] = &[2, 3, 4, 5, 6, 8];
 
@@ -66,7 +67,9 @@ impl Module {
     pub fn validate(brand: PrinterBrand, model: &str, module: Self) -> Result<Self, DomainError> {
         let valid = match (&brand, model, &module) {
             (PrinterBrand::BambuLab, _, Module::None | Module::Ams) => true,
-            (PrinterBrand::Prusa, "XL", Module::ToolChanger { heads }) => (1..=5).contains(heads),
+            (PrinterBrand::Prusa, "XL", Module::ToolChanger { heads }) => {
+                XL_HEAD_COUNTS.contains(heads)
+            }
             (PrinterBrand::Prusa, "CORE One" | "CORE One L", Module::Indx { slots }) => {
                 INDX_SLOT_COUNTS.contains(slots)
             }
@@ -279,7 +282,7 @@ mod tests {
     }
     #[test]
     fn prusa_xl_all_head_counts() {
-        for n in 1..=5 {
+        for n in [1, 2, 5] {
             assert_eq!(
                 derive_slots(PrinterBrand::Prusa, "XL", &Module::ToolChanger { heads: n })
                     .unwrap()
@@ -287,7 +290,7 @@ mod tests {
                 n as usize
             );
         }
-        for n in [0, 6] {
+        for n in [3, 4, 0, 6] {
             assert!(
                 derive_slots(PrinterBrand::Prusa, "XL", &Module::ToolChanger { heads: n }).is_err()
             );
