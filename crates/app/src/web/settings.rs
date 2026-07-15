@@ -3,6 +3,7 @@
 use crate::instance_transfer::{decode, encode};
 use crate::web::locations::LocationView;
 use crate::web::manufacturers::ManufacturerView;
+use crate::web::printers::PrinterView;
 use crate::web::router::{form_error, internal_error, resolve_locale, resolve_theme};
 use crate::web::state::AppState;
 use axum::{
@@ -126,6 +127,30 @@ async fn locations_page(State(st): State<AppState>, headers: HeaderMap) -> Respo
             ctx.insert("active_tab", "locations");
             ctx.insert("locations", &locations);
             ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+            match st
+                .renderer
+                .render("settings.html", &locale, theme.data_attr(), ctx)
+            {
+                Ok(html) => Html(html).into_response(),
+                Err(e) => internal_error(e),
+            }
+        }
+        Err(e) => internal_error(e),
+    }
+}
+
+async fn printers_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
+    let locale = resolve_locale(&headers, &st);
+    let theme = resolve_theme(&headers);
+    match st.printers.list().await {
+        Ok(items) => {
+            let printers: Vec<PrinterView> = items.into_iter().map(Into::into).collect();
+            let mut ctx = Context::new();
+            ctx.insert("page", "settings");
+            ctx.insert("active_tab", "printers");
+            ctx.insert("printers", &printers);
+            ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+            ctx.insert("nav_printer_count", &printers.len());
             match st
                 .renderer
                 .render("settings.html", &locale, theme.data_attr(), ctx)
@@ -366,6 +391,7 @@ pub fn routes() -> Router<AppState> {
         .route("/settings", get(general_page))
         .route("/settings/manufacturers", get(manufacturers_page))
         .route("/settings/locations", get(locations_page))
+        .route("/settings/printers", get(printers_page))
         .route("/settings/backup", get(backup_page))
         .route(
             "/settings/low-stock-threshold",

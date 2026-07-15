@@ -97,6 +97,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .merge(crate::web::dashboard::routes())
         .merge(crate::web::materials::routes())
+        .merge(crate::web::printers::routes())
         .merge(crate::web::locations::routes())
         .merge(crate::web::manufacturers::routes())
         .merge(crate::web::spools::routes())
