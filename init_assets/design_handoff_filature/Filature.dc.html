@@ -1433,7 +1433,7 @@ class Component extends DCLogic {
       onToggleAms:()=>this.updatePrinterForm({ams:!pfState.ams}),
       isPrusaXL: pfState.brand==='prusa' && pfState.model==='XL',
       headCount: pfState.headCount,
-      headCountOptions:[1,2,3,4,5].map(n=>({v:n,label:n+' tête'+(n>1?'s':'')})),
+      headCountOptions:[1,2,5].map(n=>({v:n,label:n+' tête'+(n>1?'s':'')})),
       onHeadCount:(e)=>this.updatePrinterForm({headCount:Number(e.target.value)}),
       isPrusaOther: pfState.brand==='prusa' && pfState.model!=='XL',
       module: pfState.module, moduleOptions,
