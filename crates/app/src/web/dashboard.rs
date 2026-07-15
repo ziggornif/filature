@@ -130,6 +130,7 @@ fn render(
     overview: DashboardOverview,
     low_stock_threshold_pct: u8,
     nav_spool_count: u64,
+    nav_printer_count: usize,
 ) -> Response {
     let view: DashboardView = overview.into();
     let mut ctx = Context::new();
@@ -143,6 +144,7 @@ fn render(
     ctx.insert("soon_empty", &view.soon_empty);
     ctx.insert("low_stock_threshold_pct", &low_stock_threshold_pct);
     ctx.insert("nav_spool_count", &nav_spool_count);
+    ctx.insert("nav_printer_count", &nav_printer_count);
     // Read by `base.html` to mark the "Tableau de bord" nav item active.
     ctx.insert("page", "dashboard");
     match st
@@ -165,6 +167,7 @@ async fn index(State(st): State<AppState>, headers: HeaderMap) -> Response {
     match st.dashboard.overview(threshold).await {
         Ok(overview) => {
             let nav_spool_count = st.nav_spool_count().await;
+            let nav_printer_count = st.nav_printer_count().await;
             render(
                 &st,
                 &locale,
@@ -172,6 +175,7 @@ async fn index(State(st): State<AppState>, headers: HeaderMap) -> Response {
                 overview,
                 threshold.percent(),
                 nav_spool_count,
+                nav_printer_count,
             )
         }
         Err(e) => internal_error(e),
@@ -223,6 +227,7 @@ mod tests {
         ctx.insert("soon_empty", &vec![soon_empty_row()]);
         ctx.insert("low_stock_threshold_pct", &20u8);
         ctx.insert("nav_spool_count", &18u64);
+        ctx.insert("nav_printer_count", &3usize);
         ctx.insert("page", "dashboard");
         ctx
     }

@@ -108,6 +108,7 @@ async fn list_page(State(st): State<AppState>, headers: HeaderMap) -> Response {
             ctx.insert("materials", &views);
             ctx.insert("page", "materials");
             ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+            ctx.insert("nav_printer_count", &st.nav_printer_count().await);
             match st
                 .renderer
                 .render("materials.html", &locale, theme.data_attr(), ctx)

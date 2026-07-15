@@ -413,6 +413,7 @@ async fn list_page(
             ctx.insert("low_stock_threshold_pct", &low_stock_threshold_pct);
             ctx.insert("page", "spools");
             ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+            ctx.insert("nav_printer_count", &st.nav_printer_count().await);
             match st
                 .renderer
                 .render("spools.html", &locale, theme.data_attr(), ctx)
@@ -768,6 +769,7 @@ async fn render_form(
     );
     if full_page {
         ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+        ctx.insert("nav_printer_count", &st.nav_printer_count().await);
     }
     let template = if full_page {
         "spools_new.html"
@@ -799,6 +801,7 @@ async fn render_condition(
     ctx.insert("edit_mode", &false);
     if full_page {
         ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+        ctx.insert("nav_printer_count", &st.nav_printer_count().await);
     }
     let template = if full_page {
         "spools_new.html"
@@ -958,6 +961,7 @@ async fn detail_page(
     ctx.insert("editing_remaining", &false);
     ctx.insert("is_fragment", &false);
     ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+    ctx.insert("nav_printer_count", &st.nav_printer_count().await);
     // The page includes `_spool_detail_card.html`, which always references
     // `error_key` (to show/hide its op-error line) — insert `None` here so
     // that include doesn't hit an undefined variable on a fresh page load.
@@ -1269,6 +1273,7 @@ async fn render_edit_form(
     );
     if opts.full_page {
         ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+        ctx.insert("nav_printer_count", &st.nav_printer_count().await);
     }
     let template = if opts.full_page {
         "spools_edit.html"
