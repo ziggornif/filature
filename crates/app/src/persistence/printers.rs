@@ -1,10 +1,10 @@
 use crate::persistence::Db;
 use async_trait::async_trait;
 use domain::printers::{
-    Module, NewPrinter, Printer, PrinterBrand, PrinterName, PrinterRepository, RepositoryError,
-    Slot, derive_slots,
+    LoadableSpool, LoadedSpool, Module, NewPrinter, Printer, PrinterBrand, PrinterName,
+    PrinterRepository, RepositoryError, Slot, derive_slots,
 };
-use domain::shared::PrinterId;
+use domain::shared::{PrinterId, SpoolId};
 use sqlx::Row;
 use std::collections::HashMap;
 use ulid::Ulid;
@@ -19,6 +19,31 @@ impl SqlxPrinterRepository {
 }
 fn backend(e: sqlx::Error) -> RepositoryError {
     RepositoryError::Backend(e.to_string())
+}
+
+fn slot_write_error(
+    e: sqlx::Error,
+    printer_id: &PrinterId,
+    spool_id: Option<&SpoolId>,
+) -> RepositoryError {
+    if let sqlx::Error::Database(db) = &e
+        && let Some(constraint) = db.constraint()
+    {
+        if constraint == "printer_slots_spool_id_fkey" {
+            return RepositoryError::UnknownSpool(
+                spool_id.cloned().unwrap_or_else(|| SpoolId::new("")),
+            );
+        }
+        if constraint == "printer_slots_printer_id_fkey" {
+            return RepositoryError::NotFound(printer_id.clone());
+        }
+        if constraint == "printer_slots_spool_id_unique" {
+            return RepositoryError::AlreadyLoaded(
+                spool_id.cloned().unwrap_or_else(|| SpoolId::new("")),
+            );
+        }
+    }
+    backend(e)
 }
 
 #[async_trait]
@@ -38,7 +63,14 @@ impl PrinterRepository for SqlxPrinterRepository {
             let module = Module::from_storage(row.get("module_kind"), row.get("module_count"))?;
             Module::validate(brand, &model, module.clone())?;
             let slot_rows = sqlx::query(
-                "SELECT group_label,slot_key,position FROM printer_slots WHERE printer_id=$1",
+                r#"SELECT ps.group_label,ps.slot_key,ps.position,ps.spool_id,
+                          s.colour_hex,s.colour_name,s.remaining_weight,s.net_weight,s.status,
+                          m.name AS material_name,mf.name AS manufacturer_name
+                   FROM printer_slots ps
+                   LEFT JOIN spools s ON s.id=ps.spool_id
+                   LEFT JOIN materials m ON m.id=s.material_id
+                   LEFT JOIN manufacturers mf ON mf.id=s.manufacturer_id
+                   WHERE ps.printer_id=$1"#,
             )
             .bind(&id)
             .fetch_all(&self.pool)
@@ -51,6 +83,18 @@ impl PrinterRepository for SqlxPrinterRepository {
                         group_label: r.get("group_label"),
                         key: r.get("slot_key"),
                         position: r.get::<i32, _>("position") as u16,
+                        loaded_spool: r.get::<Option<String>, _>("spool_id").map(|spool_id| {
+                            LoadedSpool {
+                                id: SpoolId::new(spool_id),
+                                manufacturer_name: r.get("manufacturer_name"),
+                                colour_hex: r.get("colour_hex"),
+                                colour_name: r.get("colour_name"),
+                                material_name: r.get("material_name"),
+                                remaining_weight: r.get("remaining_weight"),
+                                net_weight: r.get("net_weight"),
+                                status: r.get("status"),
+                            }
+                        }),
                     };
                     (slot.key.clone(), slot)
                 })
@@ -130,5 +174,109 @@ impl PrinterRepository for SqlxPrinterRepository {
             return Err(RepositoryError::NotFound(id.clone()));
         }
         Ok(())
+    }
+
+    async fn spool_is_loadable(&self, id: &SpoolId) -> Result<Option<bool>, RepositoryError> {
+        let status: Option<String> = sqlx::query_scalar("SELECT status FROM spools WHERE id=$1")
+            .bind(id.as_str())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(backend)?;
+        Ok(status.map(|s| matches!(s.as_str(), "Sealed" | "Open")))
+    }
+
+    async fn set_slot_spool(
+        &self,
+        printer_id: &PrinterId,
+        slot_key: &str,
+        spool_id: Option<&SpoolId>,
+    ) -> Result<(), RepositoryError> {
+        let mut tx = self.pool.begin().await.map_err(backend)?;
+        if let Some(id) = spool_id {
+            let status: Option<String> =
+                sqlx::query_scalar("SELECT status FROM spools WHERE id=$1 FOR UPDATE")
+                    .bind(id.as_str())
+                    .fetch_optional(&mut *tx)
+                    .await
+                    .map_err(backend)?;
+            match status.as_deref() {
+                None => return Err(RepositoryError::UnknownSpool(id.clone())),
+                Some("Sealed" | "Open") => {}
+                Some(_) => {
+                    return Err(RepositoryError::Domain(
+                        domain::shared::DomainError::SpoolNotLoadable,
+                    ));
+                }
+            }
+            sqlx::query("UPDATE printer_slots SET spool_id=NULL WHERE spool_id=$1")
+                .bind(id.as_str())
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| slot_write_error(e, printer_id, spool_id))?;
+        }
+        let result =
+            sqlx::query("UPDATE printer_slots SET spool_id=$3 WHERE printer_id=$1 AND slot_key=$2")
+                .bind(printer_id.as_str())
+                .bind(slot_key)
+                .bind(spool_id.map(SpoolId::as_str))
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| slot_write_error(e, printer_id, spool_id))?;
+        if result.rows_affected() == 0 {
+            let exists: bool =
+                sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM printers WHERE id=$1)")
+                    .bind(printer_id.as_str())
+                    .fetch_one(&mut *tx)
+                    .await
+                    .map_err(backend)?;
+            return if exists {
+                Err(RepositoryError::SlotNotFound {
+                    printer_id: printer_id.clone(),
+                    slot_key: slot_key.to_string(),
+                })
+            } else {
+                Err(RepositoryError::NotFound(printer_id.clone()))
+            };
+        }
+        tx.commit().await.map_err(backend)
+    }
+
+    async fn clear_spool(&self, spool_id: &SpoolId) -> Result<(), RepositoryError> {
+        sqlx::query("UPDATE printer_slots SET spool_id=NULL WHERE spool_id=$1")
+            .bind(spool_id.as_str())
+            .execute(&self.pool)
+            .await
+            .map_err(backend)?;
+        Ok(())
+    }
+
+    async fn loadable_spools(
+        &self,
+        current: Option<&SpoolId>,
+    ) -> Result<Vec<LoadableSpool>, RepositoryError> {
+        let rows = sqlx::query(
+            r#"SELECT s.id,mf.name AS manufacturer_name,s.colour_name,
+                      m.name AS material_name
+               FROM spools s
+               JOIN materials m ON m.id=s.material_id
+               LEFT JOIN manufacturers mf ON mf.id=s.manufacturer_id
+               LEFT JOIN printer_slots ps ON ps.spool_id=s.id
+               WHERE s.status IN ('Sealed','Open')
+                 AND (ps.spool_id IS NULL OR s.id=$1)
+               ORDER BY mf.name NULLS LAST,s.colour_name NULLS LAST,m.name,s.id"#,
+        )
+        .bind(current.map(SpoolId::as_str))
+        .fetch_all(&self.pool)
+        .await
+        .map_err(backend)?;
+        Ok(rows
+            .into_iter()
+            .map(|r| LoadableSpool {
+                id: SpoolId::new(r.get::<String, _>("id")),
+                manufacturer_name: r.get("manufacturer_name"),
+                colour_name: r.get("colour_name"),
+                material_name: r.get("material_name"),
+            })
+            .collect())
     }
 }

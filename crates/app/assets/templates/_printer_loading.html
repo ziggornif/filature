@@ -1,0 +1,48 @@
+<div id="printer-loading-content">
+<p class="printers-loaded-count">{{ loaded_spools_count }} {{ t(key="printers.loaded_count") }}</p>
+<div class="printer-grid">
+{% for p in printers %}
+  <article class="printer-card" style="--printer-liner:{{ p.liner }}">
+    <header><div><h2>{{ p.name }}</h2><p>{{ p.model }}</p></div><a class="printer-edit" href="/printers/{{ p.id }}/edit" title="{{ t(key='printers.edit') }}">✎</a></header>
+    {% for g in p.groups %}
+      <section class="slot-group{% if g.multi %} multi{% else %} single{% endif %}">
+        {% if g.multi %}<h3>{{ t(key=g.label_key) }}</h3><div class="slot-tiles">{% endif %}
+        {% for s in g.slots %}
+          {% if s.loaded %}
+          <div class="loaded-slot{% if not g.multi %} loaded-slot-wide{% endif %}">
+            <a class="loaded-slot-link" href="/spools/{{ s.loaded.id }}">
+              <span class="loaded-chip" style="background:{{ s.loaded.colour_hex }}"></span>
+              <span class="loaded-copy"><strong>{{ s.loaded.brand }} · {{ s.loaded.colour_name }}</strong><small>{{ s.loaded.material_name }} · {{ t(key=s.loaded.status_key) }}</small></span>
+              <span class="loaded-pct">{{ s.loaded.remaining_pct }} %</span>
+              <span class="loaded-gauge"><i style="width:{{ s.loaded.remaining_pct }}%"></i></span>
+              {% if not g.multi %}<small class="loaded-weight">{{ s.loaded.remaining_weight }} g / {{ s.loaded.net_weight }} g</small>{% endif %}
+            </a>
+            <form class="slot-unload" hx-post="/printers/{{ p.id }}/slots/{{ s.key }}" hx-target="#printer-loading-content" hx-swap="outerHTML">
+              <input type="hidden" name="spool_id" value="">
+              <button type="submit" title="{{ t(key='printers.slot.unload') }}">✕</button>
+            </form>
+          </div>
+          {% else %}
+          <div class="empty-slot{% if not g.multi %} empty-slot-wide{% endif %}">
+            {% if not g.multi %}<span class="slot-circle"></span>{% endif %}
+            <div class="empty-slot-content">
+              <span>{% if not g.multi %}{{ t(key=g.label_key) }} — {% endif %}{{ t(key="printers.slot.empty") }}</span>
+              <form>
+                <select name="spool_id" aria-label="{{ t(key='printers.slot.load') }}"
+                        hx-post="/printers/{{ p.id }}/slots/{{ s.key }}"
+                        hx-target="#printer-loading-content" hx-swap="outerHTML">
+                  <option value="">{{ t(key="printers.slot.none") }}</option>
+                  {% for option in s.options %}<option value="{{ option.id }}">{{ option.label }}</option>{% endfor %}
+                </select>
+              </form>
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+        {% if g.multi %}</div>{% endif %}
+      </section>
+    {% endfor %}
+  </article>
+{% endfor %}
+</div>
+</div>
