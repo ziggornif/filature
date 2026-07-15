@@ -32,7 +32,9 @@ async fn exported_snapshot_round_trips_and_failed_replace_rolls_back() {
               800, 19.5000, 'Sealed', 'loc-1', 'maker-1', NULL,
               NULL, NULL, '2026-07-14T12:00:00Z');
            INSERT INTO printers (id, name, brand, model, module_kind, module_count)
-             VALUES ('printer-1', 'Workshop', 'other', 'Palette', 'multi_colour', 3);
+             VALUES
+               ('printer-1', 'Workshop', 'other', 'Palette', 'multi_colour', 3),
+               ('printer-2', 'Core', 'prusa', 'CORE One', 'indx', 8);
            INSERT INTO printer_slots
              (id, printer_id, group_label, slot_key, position, spool_id)
            VALUES
@@ -55,7 +57,14 @@ async fn exported_snapshot_round_trips_and_failed_replace_rolls_back() {
         original.spools[0].opened_at.unwrap().to_string(),
         "2026-07-12"
     );
-    assert_eq!(original.printers.len(), 1);
+    assert_eq!(original.printers.len(), 2);
+    let indx = original
+        .printers
+        .iter()
+        .find(|printer| printer.id == "printer-2")
+        .unwrap();
+    assert_eq!(indx.module_kind, "indx");
+    assert_eq!(indx.module_count, Some(8));
     assert_eq!(original.printers[0].slots.len(), 3);
     assert_eq!(
         original.printers[0].slots[0].spool_id.as_deref(),
