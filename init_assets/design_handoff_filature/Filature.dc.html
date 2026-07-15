@@ -73,20 +73,20 @@
   @media (max-width:760px){ :root{ --sidebar-w:60px; --nav-label:none; --side-extra:none; --pad-x:15px; --kpi-cols:repeat(2,1fr); --dash-cols:1fr; --dry-cols:1fr; --detail-cols:1fr; --form-cols:1fr; --etat-cols:1fr; } }
   @keyframes swapflash{0%{background:var(--active-bg)}100%{background:transparent}}
 </style>
+<meta name="design_doc_mode" content="canvas">
 </helmet>
-<div style="display:flex;height:100vh;width:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.4;overflow:hidden">
-
+<div style="display:flex;height:100vh;overflow:hidden">
   <aside style="width:var(--sidebar-w);flex:none;display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--border);overflow:hidden">
     <div style="padding:20px 18px 16px;display:flex;align-items:center;gap:10px">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="flex:none">
-        <circle cx="12" cy="12" r="9" stroke="var(--text)" stroke-width="1.6"/>
-        <circle cx="12" cy="12" r="3.1" stroke="var(--text)" stroke-width="1.6"/>
-        <path d="M12 3v3.9M12 17.1V21M3 12h3.9M17.1 12H21" stroke="var(--muted)" stroke-width="1.4" stroke-linecap="round"/>
+        <circle cx="12" cy="12" r="9" stroke="var(--border-strong)" stroke-width="1.1" stroke-dasharray="2.2 2.2"/>
+        <circle cx="12" cy="12" r="6.2" stroke="var(--muted)" stroke-width="1.3"/>
+        <circle cx="12" cy="12" r="2" fill="var(--accent)"/>
       </svg>
       <div style="font-family:var(--mono);font-weight:600;font-size:15px;letter-spacing:.16em;color:var(--text);display:var(--nav-label);white-space:nowrap">FILATURE</div>
     </div>
 
-    <nav style="display:flex;flex-direction:column;gap:2px;padding:8px 10px">
+    <nav style="display:flex;flex-direction:column;gap:2px;padding:8px 10px;flex:1;min-height:0">
       <button onClick="{{ goDashboard }}" style="display:flex;align-items:center;gap:11px;width:100%;padding:9px 11px;border:none;border-radius:7px;cursor:pointer;font-family:var(--sans);font-size:13.5px;font-weight:500;text-align:left;color:{{ navDashFg }};background:{{ navDashBg }}">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
         <span style="display:var(--nav-label)">Tableau de bord</span>
@@ -96,6 +96,11 @@
         <span style="display:var(--nav-label)">Bobines</span>
         <span style="margin-left:auto;display:var(--nav-label);font-family:var(--mono);font-size:11px;color:var(--faint)">{{ bobCount }}</span>
       </button>
+      <button onClick="{{ goPrinters }}" style="display:flex;align-items:center;gap:11px;width:100%;padding:9px 11px;border:none;border-radius:7px;cursor:pointer;font-family:var(--sans);font-size:13.5px;font-weight:500;text-align:left;color:{{ navPrnFg }};background:{{ navPrnBg }}">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4v14M19 4v14"/><path d="M4 4h16"/><rect x="10" y="4" width="4" height="3.4" rx="0.6"/><path d="M12 7.4v3.6"/><rect x="6.5" y="12.2" width="11" height="2.4" rx="0.6"/><path d="M4 18h16"/></svg>
+        <span style="display:var(--nav-label)">Imprimantes 3D</span>
+        <span style="margin-left:auto;display:var(--nav-label);font-family:var(--mono);font-size:11px;color:var(--faint)">{{ printerCount }}</span>
+      </button>
       <button onClick="{{ goHumid }}" style="display:flex;align-items:center;gap:11px;width:100%;padding:9px 11px;border:none;border-radius:7px;cursor:pointer;font-family:var(--sans);font-size:13.5px;font-weight:500;text-align:left;color:{{ navHumFg }};background:{{ navHumBg }}">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 6.5 6 10.5A6 6 0 0 1 6 13.5C6 9.5 12 3 12 3Z"/></svg>
         <span style="display:var(--nav-label)">Humidité</span>
@@ -104,6 +109,11 @@
       <button onClick="{{ goMateriaux }}" style="display:flex;align-items:center;gap:11px;width:100%;padding:9px 11px;border:none;border-radius:7px;cursor:pointer;font-family:var(--sans);font-size:13.5px;font-weight:500;text-align:left;color:{{ navMatFg }};background:{{ navMatBg }}">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/><circle cx="9" cy="7" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="8" cy="17" r="1.6" fill="currentColor" stroke="none"/></svg>
         <span style="display:var(--nav-label)">Matériaux</span>
+      </button>
+      <div style="flex:1"></div>
+      <button onClick="{{ goParametres }}" style="display:flex;align-items:center;gap:11px;width:100%;padding:9px 11px;border:none;border-radius:7px;cursor:pointer;font-family:var(--sans);font-size:13.5px;font-weight:500;text-align:left;color:{{ navParaFg }};background:{{ navParaBg }}">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+        <span style="display:var(--nav-label)">Paramètres</span>
       </button>
     </nav>
 
@@ -455,6 +465,352 @@
     </div>
     </sc-if>
 
+    <!-- ============ PARAMÈTRES ============ -->
+    <sc-if value="{{ isParametres }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;height:100%;min-height:0">
+      <header style="padding:22px var(--pad-x) 0;flex:none">
+        <h1 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">Paramètres</h1>
+        <div style="display:flex;gap:4px;margin-top:16px;border-bottom:1px solid var(--border)">
+          <button onClick="{{ goTabGeneral }}" style="padding:9px 14px;border:none;border-bottom:2px solid {{ tabGeneralLine }};background:none;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:{{ tabGeneralWeight }};color:{{ tabGeneralFg }};margin-bottom:-1px">Général</button>
+          <button onClick="{{ goTabFabricants }}" style="padding:9px 14px;border:none;border-bottom:2px solid {{ tabFabricantsLine }};background:none;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:{{ tabFabricantsWeight }};color:{{ tabFabricantsFg }};margin-bottom:-1px">Fabricants</button>
+          <button onClick="{{ goTabEmplacements }}" style="padding:9px 14px;border:none;border-bottom:2px solid {{ tabEmplacementsLine }};background:none;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:{{ tabEmplacementsWeight }};color:{{ tabEmplacementsFg }};margin-bottom:-1px">Emplacements</button>
+          <button onClick="{{ goTabImprimantes }}" style="padding:9px 14px;border:none;border-bottom:2px solid {{ tabImprimantesLine }};background:none;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:{{ tabImprimantesWeight }};color:{{ tabImprimantesFg }};margin-bottom:-1px">Imprimantes</button>
+          <button onClick="{{ goTabSauvegarde }}" style="padding:9px 14px;border:none;border-bottom:2px solid {{ tabSauvegardeLine }};background:none;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:{{ tabSauvegardeWeight }};color:{{ tabSauvegardeFg }};margin-bottom:-1px">Sauvegarde</button>
+        </div>
+      </header>
+
+      <div style="flex:1;overflow-y:auto;padding:22px var(--pad-x) 32px">
+
+        <sc-if value="{{ isTabGeneral }}" hint-placeholder-val="{{ true }}">
+        <div style="max-width:520px;background:var(--raised);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);padding:20px 22px">
+          <div style="font-size:14.5px;font-weight:600">Stock</div>
+          <div style="margin-top:5px;font-size:12.5px;color:var(--muted)">Configurez les alertes de stock pour cette instance Filature.</div>
+          <div style="border-top:1px solid var(--border);margin:14px 0 16px"></div>
+          <label style="display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:8px">Seuil de stock bas</label>
+          <div style="display:flex;align-items:center;gap:9px">
+            <input type="number" value="{{ lowStockDraft }}" onInput="{{ onLowStockInput }}" style="width:90px;padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font-family:var(--sans);font-size:14px;outline:none" style-focus="border-color:var(--accent)">
+            <span style="font-size:14px;color:var(--muted)">%</span>
+          </div>
+          <div style="margin-top:10px;font-size:12px;line-height:1.55;color:var(--muted)">Une bobine non vide apparaît « bientôt vide » lorsque son pourcentage restant est inférieur ou égal à cette valeur.</div>
+          <button onClick="{{ saveLowStock }}" style="margin-top:16px;padding:10px 18px;border:none;border-radius:8px;cursor:pointer;background:var(--text);color:var(--bg);font-family:var(--sans);font-size:13.5px;font-weight:600" style-hover="opacity:.88">Enregistrer</button>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isTabFabricants }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:640px;background:var(--raised);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);overflow:hidden">
+          <div style="padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <div style="font-size:14.5px;font-weight:600">Fabricants</div>
+              <div style="margin-top:4px;font-size:12.5px;color:var(--muted)">{{ manufacturerCount }} fabricant(s) référencé(s) dans les bobines</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <input value="{{ newManufacturer }}" onInput="{{ onNewManufacturerInput }}" placeholder="Nom du fabricant" style="padding:8px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font-family:var(--sans);font-size:13px;outline:none;width:170px" style-focus="border-color:var(--accent)">
+              <button onClick="{{ addManufacturer }}" style="padding:8px 14px;border:none;border-radius:8px;cursor:pointer;background:var(--text);color:var(--bg);font-family:var(--sans);font-size:13px;font-weight:600" style-hover="opacity:.88">+ Ajouter</button>
+            </div>
+          </div>
+          <sc-for list="{{ manufacturerRows }}" as="m" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 20px;border-top:1px solid var(--border)">
+              <div style="font-size:13.5px;font-weight:500">{{ m.name }}</div>
+              <div style="display:flex;align-items:center;gap:16px">
+                <span style="font-family:var(--mono);font-size:11.5px;color:var(--faint)">{{ m.count }} bobine(s)</span>
+                <button onClick="{{ m.onRemove }}" style="background:none;border:none;cursor:pointer;color:var(--faint);padding:4px;border-radius:6px" style-hover="color:var(--danger);background:var(--danger-bg)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 6"/></svg>
+                </button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isTabEmplacements }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:640px;background:var(--raised);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);overflow:hidden">
+          <div style="padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <div style="font-size:14.5px;font-weight:600">Emplacements</div>
+              <div style="margin-top:4px;font-size:12.5px;color:var(--muted)">{{ locationCount }} emplacement(s) de rangement</div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <input value="{{ newLocation }}" onInput="{{ onNewLocationInput }}" placeholder="Nom de l'emplacement" style="padding:8px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font-family:var(--sans);font-size:13px;outline:none;width:170px" style-focus="border-color:var(--accent)">
+              <button onClick="{{ addLocation }}" style="padding:8px 14px;border:none;border-radius:8px;cursor:pointer;background:var(--text);color:var(--bg);font-family:var(--sans);font-size:13px;font-weight:600" style-hover="opacity:.88">+ Ajouter</button>
+            </div>
+          </div>
+          <sc-for list="{{ locationRows }}" as="l" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 20px;border-top:1px solid var(--border)">
+              <div style="font-size:13.5px;font-weight:500">{{ l.name }}</div>
+              <div style="display:flex;align-items:center;gap:16px">
+                <span style="font-family:var(--mono);font-size:11.5px;color:var(--faint)">{{ l.count }} bobine(s)</span>
+                <button onClick="{{ l.onRemove }}" style="background:none;border:none;cursor:pointer;color:var(--faint);padding:4px;border-radius:6px" style-hover="color:var(--danger);background:var(--danger-bg)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 6"/></svg>
+                </button>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isTabImprimantes }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:640px;background:var(--raised);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);overflow:hidden">
+          <div style="padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <div style="font-size:14.5px;font-weight:600">Imprimantes</div>
+              <div style="margin-top:4px;font-size:12.5px;color:var(--muted)">{{ printerCount }} imprimante(s) enregistrée(s)</div>
+            </div>
+            <button onClick="{{ openPrinterForm }}" style="padding:8px 14px;border:none;border-radius:8px;cursor:pointer;background:var(--text);color:var(--bg);font-family:var(--sans);font-size:13px;font-weight:600" style-hover="opacity:.88">+ Ajouter</button>
+          </div>
+          <sc-for list="{{ printerRows }}" as="pr" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 20px;border-top:1px solid var(--border)">
+              <div>
+                <div style="font-size:13.5px;font-weight:500">{{ pr.name }}</div>
+                <div style="margin-top:2px;font-family:var(--mono);font-size:11px;color:var(--faint)">{{ pr.model }} · {{ pr.slotSummary }}</div>
+              </div>
+              <button onClick="{{ pr.onRemove }}" style="background:none;border:none;cursor:pointer;color:var(--faint);padding:4px;border-radius:6px" style-hover="color:var(--danger);background:var(--danger-bg)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1L6 6"/></svg>
+              </button>
+            </div>
+          </sc-for>
+        </div>
+        </sc-if>
+
+        <sc-if value="{{ isTabSauvegarde }}" hint-placeholder-val="{{ false }}">
+        <div style="max-width:900px;background:var(--raised);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);padding:20px 22px">
+          <div style="font-size:14.5px;font-weight:600">Sauvegarde de l'instance</div>
+          <div style="margin-top:5px;font-size:12.5px;color:var(--muted)">Exportez toutes les données de l'instance ou remplacez-les depuis une sauvegarde Filature.</div>
+          <div style="border-top:1px solid var(--border);margin:14px 0 18px"></div>
+          <div style="display:flex;gap:32px;flex-wrap:wrap">
+            <div style="flex:1;min-width:240px">
+              <div style="font-size:13.5px;font-weight:600">Exporter</div>
+              <div style="margin-top:6px;font-size:12px;line-height:1.55;color:var(--muted)">Téléchargez les bobines, matériaux, fabricants, rangements et paramètres de l'instance dans un JSON versionné.</div>
+              <button onClick="{{ exportInstance }}" style="margin-top:14px;padding:9px 16px;border:1px solid var(--border-strong);border-radius:8px;cursor:pointer;background:var(--raised);color:var(--text);font-family:var(--sans);font-size:13px;font-weight:600" style-hover="background:var(--hover-bg)">Exporter l'instance</button>
+            </div>
+            <div style="flex:1;min-width:240px">
+              <div style="font-size:13.5px;font-weight:600">Importer</div>
+              <div style="margin-top:6px;font-size:12px;line-height:1.55;color:var(--muted)">L'import remplace toutes les données actuelles de l'instance. Il ne fusionne aucun enregistrement.</div>
+              <label style="display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin:12px 0 6px">Sauvegarde JSON Filature</label>
+              <input type="file" accept="application/json" onChange="{{ onImportFile }}" style="width:100%;padding:8px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font-family:var(--sans);font-size:12.5px">
+              <div style="margin-top:8px;font-size:11.5px;color:var(--faint)">Taille maximale du fichier : 1 Mio.</div>
+              <label style="display:flex;align-items:flex-start;gap:9px;margin-top:14px;font-size:12.5px;color:var(--text);cursor:pointer">
+                <input type="checkbox" checked="{{ importConfirmed }}" onChange="{{ onImportConfirmToggle }}" style="margin-top:2px">
+                Je comprends que cette opération remplace définitivement toutes les données actuelles.
+              </label>
+              <button onClick="{{ doImport }}" disabled="{{ importDisabled }}" style="margin-top:14px;padding:9px 16px;border:none;border-radius:8px;cursor:pointer;background:var(--danger);color:#fff;font-family:var(--sans);font-size:13px;font-weight:600;opacity:{{ importOpacity }}">Remplacer l'instance</button>
+              <sc-if value="{{ importError }}" hint-placeholder-val="{{ false }}"><div style="margin-top:10px;font-size:12px;color:var(--danger)">{{ importError }}</div></sc-if>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ============ IMPRIMANTES 3D ============ -->
+    <sc-if value="{{ isPrinters }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;height:100%;min-height:0">
+      <header style="display:flex;align-items:flex-end;justify-content:space-between;padding:22px var(--pad-x) 16px;border-bottom:1px solid var(--border);flex:none;flex-wrap:wrap;gap:12px">
+        <div>
+          <h1 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">Imprimantes 3D</h1>
+          <div style="margin-top:3px;font-size:12.5px;color:var(--muted)">{{ printerCount }} imprimantes · {{ loadedSpoolsCount }} bobines chargées</div>
+        </div>
+        <button onClick="{{ openPrinterForm }}" style="display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:8px;border:none;cursor:pointer;background:var(--accent);color:var(--accent-fg);font-family:var(--sans);font-size:13px;font-weight:500" style-hover="opacity:.9">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Ajouter une imprimante
+        </button>
+      </header>
+      <div style="flex:1;overflow-y:auto;padding:22px var(--pad-x) 40px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">
+          <sc-for list="{{ printerCards }}" as="p" hint-placeholder-count="2">
+            <div style="background:var(--raised);border:1px solid var(--border);border-top:3px solid {{ p.liner }};border-radius:12px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px">
+              <div style="display:flex;align-items:center;gap:11px">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4v14M19 4v14"/><path d="M4 4h16"/><rect x="10" y="4" width="4" height="3.4" rx="0.6"/><path d="M12 7.4v3.6"/><rect x="6.5" y="12.2" width="11" height="2.4" rx="0.6"/><path d="M4 18h16"/></svg>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:15px;font-weight:600">{{ p.name }}</div>
+                  <div style="font-family:var(--mono);font-size:11.5px;color:var(--faint)">{{ p.model }}</div>
+                </div>
+                <button onClick="{{ p.onEdit }}" title="Modifier l'imprimante" style="width:28px;height:28px;flex:none;border:none;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0" style-hover="background:var(--hover-bg);color:var(--text)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                </button>
+              </div>
+              <sc-for list="{{ p.groups }}" as="g" hint-placeholder-count="2">
+                <div>
+                  <sc-if value="{{ g.multi }}" hint-placeholder-val="{{ true }}">
+                  <div style="font-family:var(--mono);font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);margin-bottom:7px">{{ g.label }}</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:9px">
+                    <sc-for list="{{ g.slots }}" as="s" hint-placeholder-count="4">
+                      <sc-if value="{{ s.filled }}" hint-placeholder-val="{{ false }}">
+                        <div onClick="{{ s.onOpen }}" style="position:relative;width:158px;padding:10px 11px;border:1px solid var(--border);border-radius:9px;cursor:pointer;background:var(--surface);display:flex;flex-direction:column;gap:7px" style-hover="border-color:var(--border-strong);background:var(--hover-bg)">
+                          <button onClick="{{ s.onUnassign }}" title="Retirer" style="position:absolute;top:6px;right:6px;width:17px;height:17px;border:none;border-radius:5px;background:transparent;color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0" style-hover="background:var(--danger-bg);color:var(--danger)">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                          </button>
+                          <div style="display:flex;align-items:center;gap:8px;padding-right:14px">
+                            <span style="width:19px;height:19px;border-radius:50%;flex:none;border:1px solid var(--border-strong);background:{{ s.chipBg }}"></span>
+                            <div style="min-width:0;flex:1">
+                              <div style="font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.brand }}</div>
+                              <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.color }}</div>
+                            </div>
+                          </div>
+                          <div style="display:flex;align-items:center;justify-content:space-between">
+                            <span style="font-family:var(--mono);font-size:10.5px;color:var(--faint)">{{ s.matLabel }}</span>
+                            <span style="font-family:var(--mono);font-size:11px;font-weight:500;color:{{ s.gaugeTextVar }}">{{ s.pctLabel }}</span>
+                          </div>
+                          <div style="height:5px;border-radius:3px;background:var(--active-bg);overflow:hidden">
+                            <div style="height:100%;width:{{ s.pctLabel }};background:{{ s.gaugeVar }};border-radius:3px"></div>
+                          </div>
+                        </div>
+                      </sc-if>
+                      <sc-if value="{{ s.empty }}" hint-placeholder-val="{{ true }}">
+                        <div style="width:158px;padding:10px 11px;border:1px dashed var(--border-strong);border-radius:9px;background:var(--surface);display:flex;flex-direction:column;gap:7px;justify-content:center">
+                          <div style="font-size:11px;color:var(--faint);text-align:center">Emplacement vide</div>
+                          <select value="{{ s.selectValue }}" onChange="{{ s.onAssign }}" style="width:100%;padding:6px 20px 6px 8px;border:1px solid var(--border);border-radius:6px;background:var(--raised);color:var(--text);font-family:var(--sans);font-size:11px">
+                            <sc-for list="{{ s.options }}" as="o" hint-placeholder-count="3"><option value="{{ o.v }}">{{ o.label }}</option></sc-for>
+                          </select>
+                        </div>
+                      </sc-if>
+                    </sc-for>
+                  </div>
+                  </sc-if>
+                  <sc-if value="{{ g.single }}" hint-placeholder-val="{{ false }}">
+                  <sc-for list="{{ g.slots }}" as="s" hint-placeholder-count="1">
+                    <sc-if value="{{ s.filled }}" hint-placeholder-val="{{ false }}">
+                      <div onClick="{{ s.onOpen }}" style="position:relative;display:flex;align-items:center;gap:13px;padding:13px 14px;border:1px solid var(--border);border-radius:10px;cursor:pointer;background:var(--surface)" style-hover="border-color:var(--border-strong);background:var(--hover-bg)">
+                        <span style="width:36px;height:36px;border-radius:50%;flex:none;border:1px solid var(--border-strong);background:{{ s.chipBg }}"></span>
+                        <div style="flex:1;min-width:0;padding-right:16px">
+                          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+                            <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.brand }} · {{ s.color }}</div>
+                            <span style="font-family:var(--mono);font-size:11.5px;font-weight:500;color:{{ s.gaugeTextVar }};flex:none">{{ s.pctLabel }}</span>
+                          </div>
+                          <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                            <span style="font-family:var(--mono);font-size:10.5px;color:var(--faint)">{{ s.matLabel }}</span>
+                            <span style="width:5px;height:5px;border-radius:50%;background:{{ s.statusDot }};flex:none"></span>
+                            <span style="font-size:11px;color:{{ s.statusColor }}">{{ s.statusLabel }}</span>
+                          </div>
+                          <div style="height:5px;border-radius:3px;background:var(--active-bg);overflow:hidden;margin-top:9px">
+                            <div style="height:100%;width:{{ s.pctLabel }};background:{{ s.gaugeVar }};border-radius:3px"></div>
+                          </div>
+                          <div style="margin-top:4px;font-family:var(--mono);font-size:10.5px;color:var(--faint)">{{ s.remainingLabel }} {{ s.netLabel }}</div>
+                        </div>
+                        <button onClick="{{ s.onUnassign }}" title="Retirer" style="position:absolute;top:8px;right:8px;width:18px;height:18px;border:none;border-radius:5px;background:transparent;color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0" style-hover="background:var(--danger-bg);color:var(--danger)">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                        </button>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ s.empty }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:flex;align-items:center;gap:13px;padding:13px 14px;border:1px dashed var(--border-strong);border-radius:10px;background:var(--surface)">
+                        <span style="width:36px;height:36px;border-radius:50%;flex:none;border:1px dashed var(--border-strong)"></span>
+                        <div style="flex:1;min-width:0">
+                          <div style="font-size:12px;color:var(--faint);margin-bottom:6px">{{ g.label }} — emplacement vide</div>
+                          <select value="{{ s.selectValue }}" onChange="{{ s.onAssign }}" style="width:100%;padding:7px 20px 7px 9px;border:1px solid var(--border);border-radius:6px;background:var(--raised);color:var(--text);font-family:var(--sans);font-size:11.5px">
+                            <sc-for list="{{ s.options }}" as="o" hint-placeholder-count="3"><option value="{{ o.v }}">{{ o.label }}</option></sc-for>
+                          </select>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </sc-for>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ============ FORMULAIRE — NOUVELLE IMPRIMANTE ============ -->
+    <sc-if value="{{ isPrinterForm }}" hint-placeholder-val="{{ false }}">
+    <div style="display:flex;flex-direction:column;height:100%;min-height:0">
+      <header style="padding:22px var(--pad-x) 6px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <h1 style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.01em">{{ pf.formTitle }}</h1>
+          <div style="margin-top:3px;font-size:12.5px;color:var(--muted)">{{ pf.formSubtitle }}</div>
+        </div>
+        <button onClick="{{ pf.onCancel }}" style="padding:8px 15px;border-radius:8px;border:1px solid var(--border-strong);cursor:pointer;background:var(--raised);color:var(--muted);font-family:var(--sans);font-size:13px;font-weight:500" style-hover="background:var(--hover-bg);color:var(--text)">Annuler</button>
+      </header>
+      <div style="flex:1;overflow-y:auto;padding:20px var(--pad-x) 40px;display:flex">
+        <div style="max-width:520px;margin:auto;width:100%;background:var(--raised);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);padding:20px 22px;display:flex;flex-direction:column;gap:16px">
+          <div>
+            <label style="display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:8px">Nom</label>
+            <input value="{{ pf.name }}" onInput="{{ pf.onName }}" placeholder="ex. P1S Atelier" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font-family:var(--sans);font-size:13px"/>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div>
+              <label style="display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:8px">Marque</label>
+              <select value="{{ pf.brand }}" onChange="{{ pf.onBrand }}" style="width:100%;padding:9px 24px 9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font-family:var(--sans);font-size:13px">
+                <sc-for list="{{ pf.brandOptions }}" as="o" hint-placeholder-count="3"><option value="{{ o.v }}">{{ o.label }}</option></sc-for>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:8px">Modèle</label>
+              <sc-if value="{{ pf.modelIsFree }}" hint-placeholder-val="{{ false }}">
+                <input value="{{ pf.model }}" onInput="{{ pf.onModelText }}" placeholder="ex. Ender 3 V3" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font-family:var(--sans);font-size:13px"/>
+              </sc-if>
+              <sc-if value="{{ pf.modelIsSelect }}" hint-placeholder-val="{{ true }}">
+                <select value="{{ pf.model }}" onChange="{{ pf.onModelSelect }}" style="width:100%;padding:9px 24px 9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font-family:var(--sans);font-size:13px">
+                  <sc-for list="{{ pf.modelOptions }}" as="o" hint-placeholder-count="4"><option value="{{ o.v }}">{{ o.label }}</option></sc-for>
+                </select>
+              </sc-if>
+            </div>
+          </div>
+          <div style="border-top:1px solid var(--border);margin-top:2px"></div>
+
+          <sc-if value="{{ pf.isBambu }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div>
+                <div style="font-size:13px;font-weight:500">Module AMS</div>
+                <div style="margin-top:2px;font-size:11.5px;color:var(--muted)">Ajoute 4 emplacements de bobines, en plus de la bobine externe</div>
+              </div>
+              <button onClick="{{ pf.onToggleAms }}" style="width:38px;height:22px;border-radius:11px;border:none;cursor:pointer;background:{{ pf.amsBg }};position:relative;flex:none" aria-label="AMS">
+                <span style="position:absolute;top:2px;left:{{ pf.amsKnobLeft }};width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s"></span>
+              </button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ pf.isPrusaXL }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <label style="display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:8px">Nombre de têtes (tool changer)</label>
+              <select value="{{ pf.headCount }}" onChange="{{ pf.onHeadCount }}" style="width:100%;padding:9px 24px 9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font-family:var(--sans);font-size:13px">
+                <sc-for list="{{ pf.headCountOptions }}" as="o" hint-placeholder-count="5"><option value="{{ o.v }}">{{ o.label }}</option></sc-for>
+              </select>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ pf.isPrusaOther }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <label style="display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:8px">Module</label>
+              <select value="{{ pf.module }}" onChange="{{ pf.onModule }}" style="width:100%;padding:9px 24px 9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font-family:var(--sans);font-size:13px">
+                <sc-for list="{{ pf.moduleOptions }}" as="o" hint-placeholder-count="3"><option value="{{ o.v }}">{{ o.label }}</option></sc-for>
+              </select>
+              <div style="margin-top:6px;font-size:11.5px;color:var(--muted)">{{ pf.moduleHint }}</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ pf.isOtherBrand }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+              <div>
+                <div style="font-size:13px;font-weight:500">Module multicolore</div>
+                <div style="margin-top:2px;font-size:11.5px;color:var(--muted)">Unité multi-bobines (type AMS/MMU tierce)</div>
+              </div>
+              <button onClick="{{ pf.onToggleOtherMulti }}" style="width:38px;height:22px;border-radius:11px;border:none;cursor:pointer;background:{{ pf.otherMultiBg }};position:relative;flex:none" aria-label="Module multicolore">
+                <span style="position:absolute;top:2px;left:{{ pf.otherMultiKnobLeft }};width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s"></span>
+              </button>
+            </div>
+            <sc-if value="{{ pf.otherMulti }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <label style="display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:8px">Nombre de bobines</label>
+                <select value="{{ pf.otherCount }}" onChange="{{ pf.onOtherCount }}" style="width:100%;padding:9px 24px 9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font-family:var(--sans);font-size:13px">
+                  <sc-for list="{{ pf.otherCountOptions }}" as="o" hint-placeholder-count="6"><option value="{{ o.v }}">{{ o.label }}</option></sc-for>
+                </select>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <button onClick="{{ pf.onSave }}" style="margin-top:4px;padding:10px 15px;border-radius:8px;border:none;cursor:pointer;background:var(--accent);color:var(--accent-fg);font-family:var(--sans);font-size:13.5px;font-weight:600" style-hover="opacity:.92">{{ pf.saveLabel }}</button>
+          <sc-if value="{{ pf.isEditing }}" hint-placeholder-val="{{ false }}">
+            <button onClick="{{ pf.onDelete }}" style="padding:9px 15px;border-radius:8px;border:1px solid var(--border);cursor:pointer;background:transparent;color:var(--danger);font-family:var(--sans);font-size:13px;font-weight:500" style-hover="background:var(--danger-bg)">Supprimer l'imprimante</button>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
     <!-- ============ DÉTAIL BOBINE ============ -->
     <sc-if value="{{ isDetail }}" hint-placeholder-val="{{ false }}">
     <div style="display:flex;flex-direction:column;height:100%;min-height:0">
@@ -696,6 +1052,7 @@
                 <div style="display:flex;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:2px">
                   <button onClick="{{ form.setDiam175 }}" style="flex:1;padding:7px 0;border:none;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:12px;font-weight:500;color:{{ form.diam175Fg }};background:{{ form.diam175Bg }}">1.75</button>
                   <button onClick="{{ form.setDiam285 }}" style="flex:1;padding:7px 0;border:none;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:12px;font-weight:500;color:{{ form.diam285Fg }};background:{{ form.diam285Bg }}">2.85</button>
+                  <button onClick="{{ form.setDiam300 }}" style="flex:1;padding:7px 0;border:none;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:12px;font-weight:500;color:{{ form.diam300Fg }};background:{{ form.diam300Bg }}">3.0</button>
                 </div>
               </div>
               <div>
@@ -794,8 +1151,35 @@ class Component extends DCLogic {
       { name:'PA612-CF15', density:1.13, dryTemp:80, dryTime:8,  sens:'High',   nozzle:290, bed:55 },
       { name:'PA6-GF25',   density:1.19, dryTemp:90, dryTime:12, sens:'High',   nozzle:285, bed:55 },
     ],
+    printers: [
+      { id:'pr1', name:'P1S Atelier', model:'Bambu Lab P1S', brand:'bambu', groups:[
+        { label:'Bobine externe', slots:[{key:'ext', bobineId:'b7'}] },
+        { label:'AMS', slots:[{key:'ams-0',bobineId:'b5'},{key:'ams-1',bobineId:'b6'},{key:'ams-2',bobineId:null},{key:'ams-3',bobineId:'b18'}] },
+      ]},
+      { id:'pr2', name:'Core One', model:'Prusa CORE One', brand:'prusa', groups:[
+        { label:'Bobine', slots:[{key:'int', bobineId:'b11'}] },
+      ]},
+      { id:'pr3', name:'X1C Bureau', model:'Bambu Lab X1 Carbon', brand:'bambu', groups:[
+        { label:'Bobine externe', slots:[{key:'ext', bobineId:null}] },
+        { label:'AMS', slots:[{key:'ams-0',bobineId:'b1'},{key:'ams-1',bobineId:'b2'},{key:'ams-2',bobineId:'b3'},{key:'ams-3',bobineId:'b4'}] },
+      ]},
+      { id:'pr4', name:'X-Max Atelier', model:'Qidi X-Max 3', brand:'autre', groups:[
+        { label:'Bobine', slots:[{key:'int', bobineId:null}] },
+      ]},
+    ],
     detailId: null,
     form: null,
+    printerForm: null,
+    settingsTab: 'general',
+    lowStockPct: null,
+    lowStockDraft: '15',
+    manufacturers: ['Sunlu','Bambu Lab','Qidi','Prusament','Polymaker'],
+    locations: ['Étagère A','Étagère B','Drybox 1','Drybox 2','Drybox 3'],
+    newManufacturer: '',
+    newLocation: '',
+    importConfirmed: false,
+    importFileData: null,
+    importError: '',
   };
 
   supplierMap = { 'Sunlu':'Amazon', 'Bambu Lab':'Bambu Store EU', 'Qidi':'Qidi Official', 'Prusament':'Prusa Research', 'Polymaker':'Polymaker EU' };
@@ -833,6 +1217,7 @@ class Component extends DCLogic {
       if (t) this.applyTheme(t); else this.applyAccent();
     } catch(e){ this.applyAccent(); }
     if (this.props.defaultView) this.setState({ bobinesView: this.props.defaultView });
+    this.setState({ lowStockDraft: String(this.state.lowStockPct ?? this.props.lowStockPct ?? 15) });
   }
 
   applyAccent(){
@@ -847,7 +1232,7 @@ class Component extends DCLogic {
     this.applyAccent();
   }
 
-  lowFrac(){ return (this.props.lowStockPct ?? 15) / 100; }
+  lowFrac(){ return (this.state.lowStockPct ?? this.props.lowStockPct ?? 15) / 100; }
 
   statusFR(s){ return { sealed:'Scellée', open:'Ouverte', empty:'Vide', archived:'Archivée' }[s] || s; }
 
@@ -860,6 +1245,91 @@ class Component extends DCLogic {
     if (hex === 'transparent')
       return { bg:'repeating-linear-gradient(45deg,var(--border-strong) 0 2px,transparent 2px 5px)', liner:'#9aa0a6' };
     return { bg:hex, liner:hex };
+  }
+
+  assignSlot(printerId, slotKey, bobineId){
+    this.setState(st => ({
+      printers: st.printers.map(p => p.id!==printerId ? p : {
+        ...p,
+        groups: p.groups.map(g => ({ ...g, slots: g.slots.map(s => s.key!==slotKey ? s : { ...s, bobineId: bobineId || null }) })),
+      }),
+    }));
+  }
+  unassignSlot(printerId, slotKey){ this.assignSlot(printerId, slotKey, null); }
+
+  defaultPrinterForm(from){
+    return { name:'', brand:'bambu', model:'P1S', ams:true, module:'aucun', headCount:2, otherMulti:false, otherCount:4, from: from||'imprimantes', editingId:null };
+  }
+  openPrinterForm(from){ this.setState({ screen:'printer-form', printerForm:this.defaultPrinterForm(from) }); }
+  formFromPrinter(p){
+    const base = { name:p.name, brand:p.brand||'autre', model:'', ams:true, module:'aucun', headCount:2, otherMulti:false, otherCount:4, from:'imprimantes', editingId:p.id };
+    const groups = p.groups;
+    if (base.brand === 'bambu') {
+      base.model = (p.model||'').replace(/^Bambu Lab\s*/,'') || 'P1S';
+      base.ams = groups.some(g=>g.label==='AMS');
+      return base;
+    }
+    if (base.brand === 'prusa') {
+      base.model = (p.model||'').replace(/^Prusa\s*/,'') || 'MK4S';
+      const headsGroup = groups.find(g=>g.label==='Têtes');
+      if (headsGroup) { base.model='XL'; base.headCount = headsGroup.slots.length; }
+      else if (groups.some(g=>g.label==='MMU')) base.module='mmu';
+      else if (groups.some(g=>g.label==='INDX')) base.module='indx';
+      return base;
+    }
+    base.model = p.model || '';
+    const multiGroup = groups.find(g=>g.label==='Module multicolore');
+    if (multiGroup) { base.otherMulti = true; base.otherCount = multiGroup.slots.length; }
+    return base;
+  }
+  openPrinterEdit(id){
+    const p = this.state.printers.find(x=>x.id===id); if(!p) return;
+    this.setState({ screen:'printer-form', printerForm:this.formFromPrinter(p) });
+  }
+  deletePrinter(id, from){
+    this.setState(st => ({ printers: st.printers.filter(p=>p.id!==id), screen:from||'imprimantes', printerForm:null }));
+  }
+  mergeGroups(oldGroups, newGroups){
+    const oldMap = {};
+    oldGroups.forEach(g => g.slots.forEach(s => { oldMap[s.key] = s.bobineId; }));
+    return newGroups.map(g => ({ label:g.label, slots: g.slots.map(s => ({ key:s.key, bobineId: oldMap.hasOwnProperty(s.key) ? oldMap[s.key] : null })) }));
+  }
+  updatePrinterForm(patch){ this.setState(st => ({ printerForm: Object.assign({}, st.printerForm, patch) })); }
+  buildGroupsForPrinter(f){
+    if (f.brand === 'bambu') {
+      const groups = [{ label:'Bobine externe', slots:[{ key:'ext', bobineId:null }] }];
+      if (f.ams) groups.push({ label:'AMS', slots:[0,1,2,3].map(i => ({ key:'ams-'+i, bobineId:null })) });
+      return groups;
+    }
+    if (f.brand === 'prusa') {
+      if (f.model === 'XL') {
+        const n = Number(f.headCount) || 2;
+        return [{ label:'Têtes', slots: Array.from({length:n}, (_,i) => ({ key:'head-'+i, bobineId:null })) }];
+      }
+      if (f.module === 'mmu') return [{ label:'MMU', slots:[0,1,2,3,4].map(i => ({ key:'mmu-'+i, bobineId:null })) }];
+      if (f.module === 'indx') return [{ label:'INDX', slots:[0,1,2,3,4].map(i => ({ key:'indx-'+i, bobineId:null })) }];
+      return [{ label:'Bobine', slots:[{ key:'main', bobineId:null }] }];
+    }
+    if (f.otherMulti) {
+      const n = Number(f.otherCount) || 4;
+      return [{ label:'Module multicolore', slots: Array.from({length:n}, (_,i) => ({ key:'multi-'+i, bobineId:null })) }];
+    }
+    return [{ label:'Bobine', slots:[{ key:'main', bobineId:null }] }];
+  }
+  savePrinter(){
+    const f = this.state.printerForm; if (!f || !f.name.trim()) return;
+    const brandLabel = f.brand==='bambu' ? 'Bambu Lab' : f.brand==='prusa' ? 'Prusa' : 'Autre';
+    const model = (brandLabel==='Autre' ? (f.model.trim()||'Autre') : brandLabel+' '+f.model);
+    const newGroups = this.buildGroupsForPrinter(f);
+    if (f.editingId) {
+      this.setState(st => ({
+        printers: st.printers.map(p => p.id===f.editingId ? Object.assign({}, p, { name:f.name.trim(), model, brand:f.brand, groups:this.mergeGroups(p.groups, newGroups) }) : p),
+        screen:f.from||'imprimantes', printerForm:null
+      }));
+      return;
+    }
+    const printer = { id:'pr'+Date.now(), name:f.name.trim(), model, brand:f.brand, groups:newGroups };
+    this.setState(st => ({ printers: st.printers.concat([printer]), screen:f.from||'imprimantes', printerForm:null }));
   }
 
   computeBobines(){
@@ -901,9 +1371,104 @@ class Component extends DCLogic {
     const all = this.computeBobines();
     const low = this.lowFrac();
 
+    const bobineById = {}; all.forEach(b => bobineById[b.id] = b);
+    const usedIds = new Set();
+    this.state.printers.forEach(p => p.groups.forEach(g => g.slots.forEach(s => { if (s.bobineId) usedIds.add(s.bobineId); })));
+    const brandLiner = p => p.brand==='bambu' ? '#3a9d5c' : p.brand==='prusa' ? '#e8720c' : '#6a63d1';
+    const printerCards = this.state.printers.map(p => ({
+      id:p.id, name:p.name, model:p.model, liner:brandLiner(p),
+      onEdit:()=>this.openPrinterEdit(p.id),
+      groups: p.groups.map(g => {
+        const slots = g.slots.map(s => {
+          const b = s.bobineId ? bobineById[s.bobineId] : null;
+          const options = [{v:'', label:'— vide —'}].concat(
+            all.filter(x => x.status!=='empty' && (!usedIds.has(x.id) || x.id===s.bobineId))
+              .map(x => ({ v:x.id, label:x.brand+' · '+x.color+' ('+x.matLabel+')' }))
+          );
+          return {
+            key:p.id+'-'+s.key, filled:!!b, empty:!b,
+            brand: b ? b.brand : '', color: b ? b.color : '', matLabel: b ? b.matLabel : '',
+            pctLabel: b ? b.pctLabel : '0 %', chipBg: b ? b.chipBg : 'transparent',
+            gaugeVar: b ? b.gaugeVar : 'var(--border-strong)', gaugeTextVar: b ? b.gaugeTextVar : 'var(--faint)',
+            remainingLabel: b ? b.remainingLabel : '', netLabel: b ? b.netLabel : '',
+            statusLabel: b ? b.statusLabel : '', statusColor: b ? b.statusColor : 'var(--faint)', statusDot: b ? b.statusDot : 'var(--border-strong)',
+            onOpen: b ? () => this.setState({ screen:'detail', detailId:b.id }) : null,
+            onUnassign: (e) => { if (e && e.stopPropagation) e.stopPropagation(); this.unassignSlot(p.id, s.key); },
+            selectValue: s.bobineId || '',
+            onAssign: (e) => this.assignSlot(p.id, s.key, e.target.value),
+            options,
+          };
+        });
+        return { label:g.label, slots, single: slots.length===1, multi: slots.length>1 };
+      }),
+    }));
+    const loadedSpoolsCount = usedIds.size;
+
+    const pfState = this.state.printerForm || this.defaultPrinterForm();
+    const BAMBU_MODELS = ['P1S','P1P','X1C','X1E','A1','A1 mini'];
+    const PRUSA_MODELS = ['MK4S','MK4','MINI+','CORE One','CORE One L','XL'];
+    const isPrusaCoreOne = pfState.brand==='prusa' && (pfState.model==='CORE One' || pfState.model==='CORE One L');
+    const moduleOptions = [{v:'aucun',label:'Aucun (bobine unique)'},{v:'mmu',label:'MMU (multi-matériau)'}];
+    if (isPrusaCoreOne) moduleOptions.push({v:'indx',label:'INDX'});
+    const pf = {
+      name: pfState.name, onName:(e)=>this.updatePrinterForm({name:e.target.value}),
+      brand: pfState.brand,
+      brandOptions:[{v:'bambu',label:'Bambu Lab'},{v:'prusa',label:'Prusa'},{v:'autre',label:'Autre'}],
+      onBrand:(e)=>{
+        const brand = e.target.value;
+        const model = brand==='bambu' ? 'P1S' : brand==='prusa' ? 'MK4S' : '';
+        this.updatePrinterForm({ brand, model, module:'aucun', ams:true, otherMulti:false });
+      },
+      model: pfState.model,
+      modelIsFree: pfState.brand==='autre', modelIsSelect: pfState.brand!=='autre',
+      onModelText:(e)=>this.updatePrinterForm({model:e.target.value}),
+      modelOptions: (pfState.brand==='bambu'?BAMBU_MODELS:PRUSA_MODELS).map(m=>({v:m,label:m})),
+      onModelSelect:(e)=>{
+        const model = e.target.value;
+        const stillCoreOne = model==='CORE One' || model==='CORE One L';
+        this.updatePrinterForm({ model, module: stillCoreOne ? pfState.module : (pfState.module==='indx'?'aucun':pfState.module) });
+      },
+      isBambu: pfState.brand==='bambu',
+      amsBg: pfState.ams ? 'var(--accent)' : 'var(--border-strong)', amsKnobLeft: pfState.ams?'18px':'2px',
+      onToggleAms:()=>this.updatePrinterForm({ams:!pfState.ams}),
+      isPrusaXL: pfState.brand==='prusa' && pfState.model==='XL',
+      headCount: pfState.headCount,
+      headCountOptions:[1,2,3,4,5].map(n=>({v:n,label:n+' tête'+(n>1?'s':'')})),
+      onHeadCount:(e)=>this.updatePrinterForm({headCount:Number(e.target.value)}),
+      isPrusaOther: pfState.brand==='prusa' && pfState.model!=='XL',
+      module: pfState.module, moduleOptions,
+      moduleHint: pfState.module==='mmu' ? '5 emplacements de filament.' : pfState.module==='indx' ? '5 emplacements de filament (unité INDX).' : 'Une seule bobine, chargée directement dans la machine.',
+      onModule:(e)=>this.updatePrinterForm({module:e.target.value}),
+      isOtherBrand: pfState.brand==='autre',
+      otherMulti: pfState.otherMulti,
+      otherMultiBg: pfState.otherMulti ? 'var(--accent)' : 'var(--border-strong)', otherMultiKnobLeft: pfState.otherMulti?'18px':'2px',
+      onToggleOtherMulti:()=>this.updatePrinterForm({otherMulti:!pfState.otherMulti}),
+      otherCount: pfState.otherCount,
+      otherCountOptions:[2,3,4,5,6,8].map(n=>({v:n,label:n+' bobines'})),
+      onOtherCount:(e)=>this.updatePrinterForm({otherCount:Number(e.target.value)}),
+      onSave:()=>this.savePrinter(),
+      onCancel:()=>this.setState({screen:pfState.from||'imprimantes', printerForm:null}),
+      isEditing: !!pfState.editingId,
+      saveLabel: pfState.editingId ? 'Enregistrer' : "Ajouter l'imprimante",
+      formTitle: pfState.editingId ? 'Modifier l\u2019imprimante' : 'Nouvelle imprimante',
+      formSubtitle: pfState.editingId ? 'Modifiez la machine et ses modules de bobines' : 'Renseignez la machine et son (ses) module(s) de bobines',
+      onDelete: pfState.editingId ? ()=>this.deletePrinter(pfState.editingId, pfState.from) : null,
+    };
+
     // nav helpers
     const navBg = (k)=> S===k ? 'var(--active-bg)' : 'transparent';
     const navFg = (k)=> S===k ? 'var(--text)' : 'var(--muted)';
+    const settingsTabFg = (k)=> this.state.settingsTab===k ? 'var(--text)' : 'var(--muted)';
+    const settingsTabLine = (k)=> this.state.settingsTab===k ? 'var(--accent)' : 'transparent';
+    const settingsTabWeight = (k)=> this.state.settingsTab===k ? 600 : 500;
+    const manufacturerRows = this.state.manufacturers.map((name,i)=>({
+      name, count: this.state.bobines.filter(b=>b.brand===name).length,
+      onRemove:()=>this.removeManufacturer(i),
+    }));
+    const locationRows = this.state.locations.map((name,i)=>({
+      name, count: this.state.bobines.filter(b=>b.storage===name).length,
+      onRemove:()=>this.removeLocation(i),
+    }));
 
     // KPIs
     const active = this.state.bobines.filter(b=>b.status!=='empty'&&b.status!=='archived');
@@ -1055,7 +1620,8 @@ class Component extends DCLogic {
         })),
         diam175Bg: f.diameter==='1.75'?'var(--accent)':'transparent', diam175Fg: f.diameter==='1.75'?'var(--accent-fg)':'var(--muted)',
         diam285Bg: f.diameter==='2.85'?'var(--accent)':'transparent', diam285Fg: f.diameter==='2.85'?'var(--accent-fg)':'var(--muted)',
-        setDiam175: ()=>this.updateForm({diameter:'1.75'}), setDiam285: ()=>this.updateForm({diameter:'2.85'}),
+        diam300Bg: f.diameter==='3.0'?'var(--accent)':'transparent', diam300Fg: f.diameter==='3.0'?'var(--accent-fg)':'var(--muted)',
+        setDiam175: ()=>this.updateForm({diameter:'1.75'}), setDiam285: ()=>this.updateForm({diameter:'2.85'}), setDiam300: ()=>this.updateForm({diameter:'3.0'}),
         netPresetOptions: [...this.netPresets().map(v=>({v:String(v), label: (v===1000?v+' g (défaut)':v+' g')})), {v:'custom', label:'Autre…'}],
         isCustomNet: f.netPreset==='custom',
         onNetPreset:(e)=>this.updateForm({netPreset:e.target.value}),
@@ -1091,12 +1657,19 @@ class Component extends DCLogic {
     return {
       // nav / screen
       isDashboard:S==='dashboard', isBobines:S==='bobines', isHumid:S==='humidite', isMateriaux:S==='materiaux',
+      isPrinters:S==='imprimantes', goPrinters:()=>this.setState({screen:'imprimantes'}),
+      navPrnBg:navBg('imprimantes'), navPrnFg:navFg('imprimantes'),
+      printerCount:this.state.printers.length, loadedSpoolsCount, printerCards,
+      isPrinterForm:S==='printer-form', openPrinterForm:()=>this.openPrinterForm(S==='parametres'?'parametres':'imprimantes'), pf,
       goDashboard:()=>this.setState({screen:'dashboard'}), goBobines:()=>this.setState({screen:'bobines'}),
       goHumid:()=>this.setState({screen:'humidite'}), goMateriaux:()=>this.setState({screen:'materiaux'}),
       navDashBg:navBg('dashboard'), navDashFg:navFg('dashboard'),
       navBobBg:(S==='bobines'||S==='detail'||S==='form')?'var(--active-bg)':'transparent', navBobFg:(S==='bobines'||S==='detail'||S==='form')?'var(--text)':'var(--muted)',
       navHumBg:navBg('humidite'), navHumFg:navFg('humidite'),
       navMatBg:navBg('materiaux'), navMatFg:navFg('materiaux'),
+      navParaBg:navBg('parametres'), navParaFg:navFg('parametres'),
+      goParametres:()=>this.setState({screen:'parametres'}),
+      isParametres:S==='parametres',
       bobCount:this.state.bobines.length, hasHumidAlert:humidAlert,
       // theme
       thAutoBg:this.state.theme==='auto'?'var(--raised)':'transparent', thAutoFg:this.state.theme==='auto'?'var(--text)':'var(--faint)',
@@ -1135,6 +1708,40 @@ class Component extends DCLogic {
       form:formVals, materialsRows,
       openFormAdd:()=>this.openFormAdd(),
       backToBobines:()=>this.setState({ screen:'bobines' }),
+      // paramètres
+      isTabGeneral: this.state.settingsTab==='general', isTabFabricants: this.state.settingsTab==='fabricants',
+      isTabEmplacements: this.state.settingsTab==='emplacements', isTabSauvegarde: this.state.settingsTab==='sauvegarde',
+      isTabImprimantes: this.state.settingsTab==='imprimantes',
+      goTabGeneral:()=>this.setState({settingsTab:'general'}), goTabFabricants:()=>this.setState({settingsTab:'fabricants'}),
+      goTabEmplacements:()=>this.setState({settingsTab:'emplacements'}), goTabSauvegarde:()=>this.setState({settingsTab:'sauvegarde'}),
+      goTabImprimantes:()=>this.setState({settingsTab:'imprimantes'}),
+      tabGeneralFg: settingsTabFg('general'), tabGeneralLine: settingsTabLine('general'), tabGeneralWeight: settingsTabWeight('general'),
+      tabFabricantsFg: settingsTabFg('fabricants'), tabFabricantsLine: settingsTabLine('fabricants'), tabFabricantsWeight: settingsTabWeight('fabricants'),
+      tabEmplacementsFg: settingsTabFg('emplacements'), tabEmplacementsLine: settingsTabLine('emplacements'), tabEmplacementsWeight: settingsTabWeight('emplacements'),
+      tabSauvegardeFg: settingsTabFg('sauvegarde'), tabSauvegardeLine: settingsTabLine('sauvegarde'), tabSauvegardeWeight: settingsTabWeight('sauvegarde'),
+      tabImprimantesFg: settingsTabFg('imprimantes'), tabImprimantesLine: settingsTabLine('imprimantes'), tabImprimantesWeight: settingsTabWeight('imprimantes'),
+      printerRows: this.state.printers.map(p => ({
+        name:p.name, model:p.model,
+        slotSummary: p.groups.map(g => g.label+' ('+g.slots.length+')').join(', '),
+        onRemove: ()=>this.setState(st => ({ printers: st.printers.filter(x=>x.id!==p.id) })),
+      })),
+      lowStockDraft: this.state.lowStockDraft,
+      onLowStockInput:(e)=>this.setState({lowStockDraft:e.target.value}),
+      saveLowStock:()=>{ let v=parseInt(this.state.lowStockDraft,10); if(isNaN(v)||v<0) v=0; if(v>100) v=100; this.setState({lowStockPct:v, lowStockDraft:String(v)}); },
+      newManufacturer:this.state.newManufacturer, onNewManufacturerInput:(e)=>this.setState({newManufacturer:e.target.value}),
+      addManufacturer:()=>this.addManufacturer(),
+      manufacturerRows, manufacturerCount:manufacturerRows.length,
+      newLocation:this.state.newLocation, onNewLocationInput:(e)=>this.setState({newLocation:e.target.value}),
+      addLocation:()=>this.addLocation(),
+      locationRows, locationCount:locationRows.length,
+      exportInstance:()=>this.exportInstance(),
+      onImportFile:(e)=>this.onImportFile(e),
+      importConfirmed:this.state.importConfirmed,
+      onImportConfirmToggle:(e)=>this.setState({importConfirmed:e.target.checked}),
+      importDisabled: !(this.state.importConfirmed && this.state.importFileData),
+      importOpacity: (this.state.importConfirmed && this.state.importFileData) ? 1 : .5,
+      doImport:()=>this.doImport(),
+      importError:this.state.importError,
     };
   }
 
@@ -1221,6 +1828,53 @@ class Component extends DCLogic {
   }
   archive(id){ this.setState({ bobines:this.state.bobines.map(b=> b.id===id ? Object.assign({}, b, {status:'archived'}) : b), screen:'bobines', detailId:null }); }
   updateMaterial(i,key,val){ this.setState({ materials: this.state.materials.map((m,idx)=> idx===i ? Object.assign({}, m, {[key]: (key==='sens'?val:(val===''?'':Number(val)))}) : m) }); }
+
+  addManufacturer(){
+    const name = this.state.newManufacturer.trim(); if(!name) return;
+    if (this.state.manufacturers.includes(name)) { this.setState({newManufacturer:''}); return; }
+    this.setState({ manufacturers:[...this.state.manufacturers, name], newManufacturer:'' });
+  }
+  removeManufacturer(i){ this.setState({ manufacturers: this.state.manufacturers.filter((_,idx)=>idx!==i) }); }
+  addLocation(){
+    const name = this.state.newLocation.trim(); if(!name) return;
+    if (this.state.locations.includes(name)) { this.setState({newLocation:''}); return; }
+    this.setState({ locations:[...this.state.locations, name], newLocation:'' });
+  }
+  removeLocation(i){ this.setState({ locations: this.state.locations.filter((_,idx)=>idx!==i) }); }
+
+  exportInstance(){
+    const payload = {
+      version: 1, exportedAt: new Date().toISOString(),
+      bobines: this.state.bobines, materials: this.state.materials,
+      manufacturers: this.state.manufacturers, locations: this.state.locations,
+      settings: { lowStockPct: this.state.lowStockPct ?? this.props.lowStockPct ?? 15 },
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'filature-export.json'; a.click();
+    URL.revokeObjectURL(url);
+  }
+  onImportFile(e){
+    const file = e.target.files && e.target.files[0]; if(!file) { this.setState({importFileData:null}); return; }
+    if (file.size > 1024*1024) { this.setState({importError:'Fichier trop volumineux (max 1 Mio).', importFileData:null}); return; }
+    const reader = new FileReader();
+    reader.onload = () => { this.setState({ importFileData:reader.result, importError:'' }); };
+    reader.onerror = () => { this.setState({ importError:'Lecture du fichier impossible.', importFileData:null }); };
+    reader.readAsText(file);
+  }
+  doImport(){
+    if (!this.state.importFileData || !this.state.importConfirmed) return;
+    try {
+      const data = JSON.parse(this.state.importFileData);
+      this.setState({
+        bobines: data.bobines || [], materials: data.materials || this.state.materials,
+        manufacturers: data.manufacturers || [], locations: data.locations || [],
+        lowStockPct: (data.settings && data.settings.lowStockPct) ?? this.state.lowStockPct,
+        importFileData:null, importConfirmed:false, importError:'',
+      });
+    } catch(e){ this.setState({ importError:'JSON invalide — import annulé.' }); }
+  }
 }
 </script>
 </body>
