@@ -40,6 +40,21 @@ not a second canonical name. See [ADR-0001](adr/0001-language-and-i18n.md).
 | **Spool Type** | Type de bobine | The physical form of stock. **Complete** is filament supplied on a holder; **Recharge** is a refill supplied without one. |
 | **Sensitivity** | Sensibilité | A Material's susceptibility to humidity. One of **Low**, **Medium**, **High**. Determines the humidity threshold at which stored Spools of that Material are considered at risk. Stored now; only consumed by the deferred Humidity feature. |
 
+## Printers & filament loading
+
+Introduced by the Printers feature (slices `15a`/`15b`). Source of truth for the
+UI: `init_assets/design_handoff_filature/Filature.dc.html` (Imprimantes 3D page,
+printer form, Settings › Imprimantes tab).
+
+| Term (canonical) | FR label | Definition |
+|---|---|---|
+| **Printer** | Imprimante | A physical 3D printer owned by the operator. Has a Printer Brand, a Printer Model, an optional Filament Module, and one or more Slots. Spools are loaded into its Slots. User-managed (add / edit / delete). |
+| **Printer Brand** | Marque | A fixed enumeration deciding a Printer's available Module options and its card accent colour: **Bambu Lab** (green liner), **Prusa** (orange liner), **Other** (neutral/violet liner). Distinct from Manufacturer — a Manufacturer is a *filament* brand, a Printer Brand is a *machine* brand. |
+| **Printer Model** | Modèle | The specific machine model. Curated (fixed list) per Brand for Bambu Lab (P1S, P1P, X1C, X1E, A1, A1 mini) and Prusa (MK4S, MK4, MINI+, CORE One, CORE One L, XL); free text for Other. Stored as plain text. |
+| **Filament Module** | Module | A multi-spool feeding unit that adds Slots to a Printer. Kinds, by Brand: **AMS** (Bambu — 4 Slots, alongside one external Slot), **MMU** (Prusa — 5 Slots), **INDX** (Prusa CORE One / CORE One L only — 5 Slots), **Tool Changer** (Prusa XL — N tool-head Slots, 1–5; XL is always multi-material), **Multi-colour unit** (Other — N Slots, chosen count 2–8). A single-spool Printer has no Module and exactly one Slot. |
+| **Slot** | Emplacement de bobine | A single filament position on a Printer or its Module, holding at most one loaded Spool at a time; may be empty. Has a stable key within its Printer so assignments survive an edit that keeps the layout. (Not to be confused with the Settings › Emplacements tab, which manages storage Locations.) |
+| **Loaded Spool / Loading** | Bobine chargée / Charger | The assignment of a Spool to a Slot. A Spool is loaded into **at most one Slot across all Printers** — two Printers can never share a Spool, nor two Slots of one Printer (exclusivity). Loading is independent of the Spool's Location and Status. Only **Sealed** or **Open** Spools can be loaded; a Spool that becomes **Empty** or **Archived** is automatically unloaded. |
+
 ## Deferred terms (Humidity feature — post-v1, no sensors yet)
 
 Recorded so the language is stable when the feature is picked up; **not modelled
