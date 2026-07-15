@@ -56,6 +56,20 @@ impl PrinterId {
     }
 }
 
+/// Opaque identifier for a filament spool. Shared by the spools and printers
+/// slices so loading can be modelled without either slice importing the other.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SpoolId(pub String);
+
+impl SpoolId {
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Opaque identifier for a `Manufacturer`. Lives in the shared kernel
 /// (rather than the `manufacturers` slice) because the `spools` slice
 /// references a manufacturer by id — a cross-slice import of a sibling
@@ -113,6 +127,8 @@ pub enum DomainError {
     BlankLocationName,
     #[error("printer name must not be blank")]
     BlankPrinterName,
+    #[error("spool cannot be loaded unless it is sealed or open")]
+    SpoolNotLoadable,
     #[error("invalid printer configuration: {0}")]
     InvalidPrinterConfiguration(String),
     #[error("location has {count} spools and cannot be deleted")]

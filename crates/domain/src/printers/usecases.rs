@@ -1,5 +1,6 @@
+use crate::printers::LoadableSpool;
 use crate::printers::{NewPrinter, Printer, PrinterRepository, PrintersUseCases, RepositoryError};
-use crate::shared::PrinterId;
+use crate::shared::{DomainError, PrinterId, SpoolId};
 use async_trait::async_trait;
 use std::sync::Arc;
 
@@ -26,5 +27,37 @@ impl PrintersUseCases for PrintersService {
     }
     async fn delete(&self, id: PrinterId) -> Result<(), RepositoryError> {
         self.repo.delete(&id).await
+    }
+    async fn load_slot(
+        &self,
+        printer_id: PrinterId,
+        slot_key: String,
+        spool_id: SpoolId,
+    ) -> Result<(), RepositoryError> {
+        match self.repo.spool_is_loadable(&spool_id).await? {
+            None => Err(RepositoryError::UnknownSpool(spool_id)),
+            Some(false) => Err(RepositoryError::Domain(DomainError::SpoolNotLoadable)),
+            Some(true) => {
+                self.repo
+                    .set_slot_spool(&printer_id, &slot_key, Some(&spool_id))
+                    .await
+            }
+        }
+    }
+    async fn unload_slot(
+        &self,
+        printer_id: PrinterId,
+        slot_key: String,
+    ) -> Result<(), RepositoryError> {
+        self.repo.set_slot_spool(&printer_id, &slot_key, None).await
+    }
+    async fn unload_spool(&self, spool_id: SpoolId) -> Result<(), RepositoryError> {
+        self.repo.clear_spool(&spool_id).await
+    }
+    async fn loadable_spools(
+        &self,
+        current: Option<SpoolId>,
+    ) -> Result<Vec<LoadableSpool>, RepositoryError> {
+        self.repo.loadable_spools(current.as_ref()).await
     }
 }

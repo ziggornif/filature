@@ -1,4 +1,4 @@
-use crate::shared::{DomainError, PrinterId};
+use crate::shared::{DomainError, PrinterId, SpoolId};
 
 pub const BAMBU_MODELS: &[&str] = &["P1S", "P1P", "X1C", "X1E", "A1", "A1 mini"];
 pub const PRUSA_MODELS: &[&str] = &["MK4S", "MK4", "MINI+", "CORE One", "CORE One L", "XL"];
@@ -123,13 +123,42 @@ impl Module {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Slot {
     pub key: String,
     pub group_label: String,
     pub position: u16,
+    pub loaded_spool: Option<LoadedSpool>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LoadedSpool {
+    pub id: SpoolId,
+    pub manufacturer_name: Option<String>,
+    pub colour_hex: Option<String>,
+    pub colour_name: Option<String>,
+    pub material_name: String,
+    pub remaining_weight: f64,
+    pub net_weight: f64,
+    pub status: String,
+}
+
+impl LoadedSpool {
+    pub fn remaining_pct(&self) -> u8 {
+        ((self.remaining_weight / self.net_weight) * 100.0)
+            .round()
+            .clamp(0.0, 100.0) as u8
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LoadableSpool {
+    pub id: SpoolId,
+    pub manufacturer_name: Option<String>,
+    pub colour_name: Option<String>,
+    pub material_name: String,
+}
+#[derive(Debug, Clone, PartialEq)]
 pub struct Printer {
     pub id: PrinterId,
     pub name: PrinterName,
@@ -156,6 +185,7 @@ fn slots(label: &str, prefix: &str, count: u8) -> Vec<Slot> {
             },
             group_label: label.to_string(),
             position: u16::from(i),
+            loaded_spool: None,
         })
         .collect()
 }
