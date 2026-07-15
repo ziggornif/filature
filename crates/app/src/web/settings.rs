@@ -81,6 +81,7 @@ async fn general_page(State(st): State<AppState>, headers: HeaderMap) -> Respons
             ctx.insert("imported", &false);
             ctx.insert("import_error", "");
             ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+            ctx.insert("nav_printer_count", &st.nav_printer_count().await);
             match st
                 .renderer
                 .render("settings.html", &locale, theme.data_attr(), ctx)
@@ -104,6 +105,7 @@ async fn manufacturers_page(State(st): State<AppState>, headers: HeaderMap) -> R
             ctx.insert("active_tab", "manufacturers");
             ctx.insert("manufacturers", &manufacturers);
             ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+            ctx.insert("nav_printer_count", &st.nav_printer_count().await);
             match st
                 .renderer
                 .render("settings.html", &locale, theme.data_attr(), ctx)
@@ -127,6 +129,7 @@ async fn locations_page(State(st): State<AppState>, headers: HeaderMap) -> Respo
             ctx.insert("active_tab", "locations");
             ctx.insert("locations", &locations);
             ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+            ctx.insert("nav_printer_count", &st.nav_printer_count().await);
             match st
                 .renderer
                 .render("settings.html", &locale, theme.data_attr(), ctx)
@@ -176,6 +179,7 @@ async fn backup_page(
     ctx.insert("imported", &(query.imported.as_deref() == Some("1")));
     ctx.insert("import_error", "");
     ctx.insert("nav_spool_count", &st.nav_spool_count().await);
+    ctx.insert("nav_printer_count", &st.nav_printer_count().await);
     match st
         .renderer
         .render("settings.html", &locale, theme.data_attr(), ctx)
@@ -219,6 +223,7 @@ async fn import_error(st: &AppState, locale: &str, theme_attr: &str, key: &str) 
     context.insert("imported", &false);
     context.insert("import_error", &message);
     context.insert("nav_spool_count", &st.nav_spool_count().await);
+    context.insert("nav_printer_count", &st.nav_printer_count().await);
     match st
         .renderer
         .render("settings.html", locale, theme_attr, context)
