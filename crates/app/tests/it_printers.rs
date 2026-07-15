@@ -136,11 +136,12 @@ async fn loading_moves_atomically_guards_status_and_unloads() {
     // database reused across all `it_printers` tests, run in parallel) means a
     // global `spool_id IS NOT NULL` count would race with slots loaded by other
     // tests. Asserting on our two spool ids keeps the check isolated.
-    let count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM printer_slots WHERE spool_id IN ('loadable','empty')")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM printer_slots WHERE spool_id IN ('loadable','empty')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(count, 0);
 }
 
