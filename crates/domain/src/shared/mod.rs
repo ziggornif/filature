@@ -42,6 +42,20 @@ impl LocationId {
     }
 }
 
+/// Opaque identifier for a printer. Shared because printer slots and the
+/// spool-loading slice reference it without importing the printers slice.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PrinterId(String);
+
+impl PrinterId {
+    pub fn new(s: impl Into<String>) -> Self {
+        Self(s.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Opaque identifier for a `Manufacturer`. Lives in the shared kernel
 /// (rather than the `manufacturers` slice) because the `spools` slice
 /// references a manufacturer by id — a cross-slice import of a sibling
@@ -97,6 +111,10 @@ pub enum DomainError {
     SpoolNotArchived,
     #[error("location name must not be blank")]
     BlankLocationName,
+    #[error("printer name must not be blank")]
+    BlankPrinterName,
+    #[error("invalid printer configuration: {0}")]
+    InvalidPrinterConfiguration(String),
     #[error("location has {count} spools and cannot be deleted")]
     LocationInUse { count: u64 },
     #[error("manufacturer name must not be blank")]

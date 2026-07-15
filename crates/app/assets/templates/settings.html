@@ -5,6 +5,7 @@
     <a href="/settings"{% if active_tab == "general" %} class="active" aria-current="page"{% endif %}>{{ t(key="settings.tab.general") }}</a>
     <a href="/settings/manufacturers"{% if active_tab == "manufacturers" %} class="active" aria-current="page"{% endif %}>{{ t(key="settings.tab.manufacturers") }}</a>
     <a href="/settings/locations"{% if active_tab == "locations" %} class="active" aria-current="page"{% endif %}>{{ t(key="settings.tab.locations") }}</a>
+    <a href="/settings/printers"{% if active_tab == "printers" %} class="active" aria-current="page"{% endif %}>{{ t(key="settings.tab.printers") }}</a>
     <a href="/settings/backup"{% if active_tab == "backup" %} class="active" aria-current="page"{% endif %}>{{ t(key="settings.tab.backup") }}</a>
   </nav>
   {% if active_tab == "general" %}
@@ -18,6 +19,8 @@
     {% include "_settings_manufacturers.html" %}
   {% elif active_tab == "locations" %}
     {% include "_settings_locations.html" %}
+  {% elif active_tab == "printers" %}
+    {% include "_settings_printers.html" %}
   {% elif active_tab == "backup" %}
   <section class="settings-panel" aria-labelledby="transfer-settings-title">
     <h2 id="transfer-settings-title">{{ t(key="settings.transfer.title") }}</h2>

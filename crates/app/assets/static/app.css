@@ -29,6 +29,15 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
+.printers-header { display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:22px }
+.printers-header h1 { margin:0 }.printers-header p { margin:3px 0 0;color:var(--muted) }
+.printer-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px }
+.printer-card { background:var(--raised);border:1px solid var(--border);border-top:3px solid var(--printer-liner);border-radius:12px;padding:18px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px }
+.printer-card>header { display:flex;align-items:center;justify-content:space-between }.printer-card h2 { margin:0;font-size:15px }.printer-card header p { margin:2px 0 0;font:11.5px var(--mono);color:var(--faint) }.printer-edit { color:var(--muted);font-size:20px;text-decoration:none }
+.slot-group h3 { margin:0 0 7px;font:10px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--faint) }.slot-tiles { display:flex;flex-wrap:wrap;gap:9px }.empty-slot { width:158px;min-height:56px;padding:10px 11px;border:1px dashed var(--border-strong);border-radius:9px;background:var(--surface);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--faint);text-align:center }.empty-slot-wide { width:100%;justify-content:flex-start;gap:13px;padding:13px 14px }.slot-circle { width:36px;height:36px;border-radius:50%;border:1px dashed var(--border-strong);flex:none }
+.printer-form { max-width:520px;margin:auto;background:var(--raised);border:1px solid var(--border);border-radius:11px;box-shadow:var(--shadow);padding:22px;display:flex;flex-direction:column;gap:16px }.printer-form label { display:flex;flex-direction:column;gap:8px;font:10.5px var(--mono);text-transform:uppercase;color:var(--faint) }.printer-form input,.printer-form select { padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);color:var(--text);font:13px var(--sans) }.printer-form-row { display:grid;grid-template-columns:1fr 1fr;gap:14px }#module-controls { display:flex;gap:14px }#module-controls label { flex:1 }
+.printer-settings>header { display:flex;align-items:center;justify-content:space-between }.printer-settings-row { display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-top:1px solid var(--border) }.printer-settings-row a { color:var(--text);text-decoration:none;display:flex;flex-direction:column;gap:2px }.printer-settings-row small { font:11px var(--mono);color:var(--faint) }
+
 @media (prefers-color-scheme: light) {
   :root {
     --bg: #ece8e1;

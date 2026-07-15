@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+{% set editing = printer is defined and printer != null %}
+<header class="printers-header"><div><h1>{% if editing %}{{ t(key="printers.form.edit_title") }}{% else %}{{ t(key="printers.form.add_title") }}{% endif %}</h1><p>{{ t(key="printers.form.subtitle") }}</p></div><a class="button button-secondary" href="{% if from == 'settings' %}/settings/printers{% else %}/printers{% endif %}">{{ t(key="common.cancel") }}</a></header>
+<form class="printer-form" method="post" action="{% if editing %}/printers/{{ printer.id }}{% else %}/printers{% endif %}" id="printer-form">
+  <input type="hidden" name="from" value="{{ from }}">
+  <label>{{ t(key="printers.form.name") }}<input name="name" required value="{% if editing %}{{ printer.name }}{% endif %}" placeholder="{{ t(key='printers.form.name_placeholder') }}"></label>
+  <div class="printer-form-row">
+    <label>{{ t(key="printers.form.brand") }}<select name="brand" id="printer-brand"><option value="bambu">Bambu Lab</option><option value="prusa">Prusa</option><option value="other">{{ t(key="printers.brand.other") }}</option></select></label>
+    <label>{{ t(key="printers.form.model") }}<select id="printer-model-select"></select><input id="printer-model-free" placeholder="{{ t(key='printers.form.model_placeholder') }}"><input type="hidden" name="model" id="printer-model"></label>
+  </div>
+  <div id="module-controls">
+    <label id="module-select-wrap">{{ t(key="printers.form.module") }}<select name="module" id="printer-module"></select></label>
+    <label id="module-count-wrap">{{ t(key="printers.form.count") }}<select name="module_count" id="printer-module-count"></select></label>
+  </div>
+  <button class="button" type="submit">{{ t(key="common.save") }}</button>
+  {% if editing %}<button class="button button-danger" type="button" hx-delete="/printers/{{ printer.id }}" hx-confirm="{{ t(key='printers.delete.confirm') }}" hx-on::after-request="if(event.detail.successful) location.href='{% if from == 'settings' %}/settings/printers{% else %}/printers{% endif %}'">{{ t(key="printers.delete") }}</button>{% endif %}
+</form>
+<script>
+(() => {
+ const initial={brand:'{% if editing %}{{ printer.brand }}{% else %}bambu{% endif %}',model:'{% if editing %}{{ printer.model }}{% else %}P1S{% endif %}',module:'{% if editing %}{{ printer.module }}{% else %}ams{% endif %}',count:{% if editing and printer.module_count %}{{ printer.module_count }}{% else %}4{% endif %}};
+ const models={bambu:['P1S','P1P','X1C','X1E','A1','A1 mini'],prusa:['MK4S','MK4','MINI+','CORE One','CORE One L','XL']};
+ const brand=document.querySelector('#printer-brand'), select=document.querySelector('#printer-model-select'), free=document.querySelector('#printer-model-free'), hidden=document.querySelector('#printer-model'), module=document.querySelector('#printer-module'), count=document.querySelector('#printer-module-count'), countWrap=document.querySelector('#module-count-wrap');
+ brand.value=initial.brand;
+ function option(v,label){const o=document.createElement('option');o.value=v;o.textContent=label;return o}
+ function render(keep=true){const b=brand.value; select.hidden=b==='other';free.hidden=b!=='other';select.innerHTML='';if(b!=='other'){models[b].forEach(m=>select.append(option(m,m)));if(keep&&models[b].includes(initial.model))select.value=initial.model;}else free.value=keep?initial.model:''; syncModel(); module.innerHTML=''; count.innerHTML='';countWrap.hidden=true;
+   if(b==='bambu'){module.append(option('ams','{{ t(key="printers.module.ams") }}'));module.append(option('none','{{ t(key="printers.module.none") }}'));}
+   else if(b==='prusa'&&select.value==='XL'){module.append(option('tool_changer','{{ t(key="printers.module.tool_changer") }}'));for(let n=1;n<=5;n++)count.append(option(n,n));countWrap.hidden=false;}
+   else if(b==='prusa'){module.append(option('none','{{ t(key="printers.module.none") }}'));module.append(option('mmu','MMU'));if(select.value==='CORE One'||select.value==='CORE One L')module.append(option('indx','INDX'));}
+   else {module.append(option('none','{{ t(key="printers.module.none") }}'));module.append(option('multi_colour','{{ t(key="printers.module.multi_colour") }}'));[2,3,4,5,6,8].forEach(n=>count.append(option(n,n)));}
+   if(keep&&[...module.options].some(o=>o.value===initial.module))module.value=initial.module;if(keep&&[...count.options].some(o=>+o.value===initial.count))count.value=initial.count;toggleCount(); }
+ function syncModel(){hidden.value=brand.value==='other'?free.value:select.value}
+ function toggleCount(){countWrap.hidden=!(module.value==='tool_changer'||module.value==='multi_colour')}
+ brand.addEventListener('change',()=>{initial.model=brand.value==='bambu'?'P1S':brand.value==='prusa'?'MK4S':'';initial.module=brand.value==='bambu'?'ams':'none';render(true)});select.addEventListener('change',()=>{initial.model=select.value;initial.module='none';render(true)});free.addEventListener('input',syncModel);module.addEventListener('change',toggleCount);document.querySelector('#printer-form').addEventListener('submit',syncModel);render(true);
+})();
+</script>
+{% endblock content %}

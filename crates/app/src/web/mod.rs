@@ -9,6 +9,7 @@ pub mod i18n;
 pub mod locations;
 pub mod manufacturers;
 pub mod materials;
+pub mod printers;
 pub mod router;
 pub mod settings;
 pub mod spools;

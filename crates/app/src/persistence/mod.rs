@@ -7,6 +7,7 @@ pub mod instance_transfer;
 pub mod locations;
 pub mod manufacturers;
 pub mod materials;
+pub mod printers;
 pub mod spools;
 
 pub type Db = Pool<Postgres>;
