@@ -45,6 +45,7 @@ mod tests {
             manufacturers: vec![],
             locations: vec![],
             spools: vec![],
+            printers: vec![],
             configuration: SnapshotConfiguration {
                 low_stock_threshold: 15,
             },

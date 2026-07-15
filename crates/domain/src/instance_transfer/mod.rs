@@ -7,8 +7,9 @@ pub mod stubs;
 
 pub use model::{
     FORMAT, InstanceDocument, InstanceSnapshot, SnapshotConfiguration, SnapshotDiameter,
-    SnapshotLocation, SnapshotManufacturer, SnapshotMaterial, SnapshotSensitivity, SnapshotSpool,
-    SnapshotSpoolStatus, SnapshotSpoolType, TransferError, VERSION,
+    SnapshotLocation, SnapshotManufacturer, SnapshotMaterial, SnapshotPrinter, SnapshotPrinterSlot,
+    SnapshotSensitivity, SnapshotSpool, SnapshotSpoolStatus, SnapshotSpoolType, TransferError,
+    VERSION,
 };
 pub use ports::{InstanceTransferRepository, InstanceTransferUseCases};
 pub use usecases::InstanceTransferService;

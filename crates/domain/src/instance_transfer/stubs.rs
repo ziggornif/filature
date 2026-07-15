@@ -27,6 +27,7 @@ impl Default for StubInstanceTransferRepository {
             manufacturers: vec![],
             locations: vec![],
             spools: vec![],
+            printers: vec![],
             configuration: super::SnapshotConfiguration {
                 low_stock_threshold: 15,
             },

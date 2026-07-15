@@ -4,10 +4,11 @@ use crate::persistence::Db;
 use async_trait::async_trait;
 use domain::instance_transfer::{
     InstanceSnapshot, InstanceTransferRepository, SnapshotConfiguration, SnapshotDiameter,
-    SnapshotLocation, SnapshotManufacturer, SnapshotMaterial, SnapshotSensitivity, SnapshotSpool,
-    SnapshotSpoolStatus, SnapshotSpoolType, TransferError,
+    SnapshotLocation, SnapshotManufacturer, SnapshotMaterial, SnapshotPrinter, SnapshotPrinterSlot,
+    SnapshotSensitivity, SnapshotSpool, SnapshotSpoolStatus, SnapshotSpoolType, TransferError,
 };
 use rust_decimal::Decimal;
+use std::collections::HashMap;
 use time::format_description::well_known::Rfc3339;
 use time::{Date, OffsetDateTime};
 
@@ -73,6 +74,25 @@ struct SpoolRow {
     purchased_at: Option<Date>,
     opened_at: Option<Date>,
     created_at: OffsetDateTime,
+}
+
+#[derive(sqlx::FromRow)]
+struct PrinterRow {
+    id: String,
+    name: String,
+    brand: String,
+    model: String,
+    module_kind: String,
+    module_count: Option<i32>,
+}
+
+#[derive(sqlx::FromRow)]
+struct PrinterSlotRow {
+    printer_id: String,
+    slot_key: String,
+    group_label: String,
+    position: i32,
+    spool_id: Option<String>,
 }
 
 fn u16_field(field: &str, value: i32) -> Result<u16, TransferError> {
@@ -202,6 +222,52 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
         })
         .collect::<Result<Vec<_>, TransferError>>()?;
 
+        let mut printers = sqlx::query_as::<_, PrinterRow>(
+            "SELECT id, name, brand, model, module_kind, module_count FROM printers ORDER BY id",
+        )
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(backend)?
+        .into_iter()
+        .map(|row| {
+            Ok(SnapshotPrinter {
+                id: row.id,
+                name: row.name,
+                brand: row.brand,
+                model: row.model,
+                module_kind: row.module_kind,
+                module_count: row
+                    .module_count
+                    .map(|count| u16_field("module_count", count))
+                    .transpose()?,
+                slots: vec![],
+            })
+        })
+        .collect::<Result<Vec<_>, TransferError>>()?;
+        let printer_indices: HashMap<String, usize> = printers
+            .iter()
+            .enumerate()
+            .map(|(index, printer)| (printer.id.clone(), index))
+            .collect();
+        for row in sqlx::query_as::<_, PrinterSlotRow>(
+            r#"SELECT printer_id, slot_key, group_label, position, spool_id
+               FROM printer_slots ORDER BY printer_id, position, slot_key"#,
+        )
+        .fetch_all(&mut *transaction)
+        .await
+        .map_err(backend)?
+        {
+            let index = printer_indices
+                .get(&row.printer_id)
+                .ok_or_else(|| invalid_value("printer_id", &row.printer_id))?;
+            printers[*index].slots.push(SnapshotPrinterSlot {
+                slot_key: row.slot_key,
+                group_label: row.group_label,
+                position: u16_field("position", row.position)?,
+                spool_id: row.spool_id,
+            });
+        }
+
         let threshold = sqlx::query_scalar::<_, i16>(
             "SELECT low_stock_threshold FROM instance_configuration WHERE singleton = TRUE",
         )
@@ -218,6 +284,7 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
             manufacturers,
             locations,
             spools,
+            printers,
             configuration: SnapshotConfiguration {
                 low_stock_threshold,
             },
@@ -236,6 +303,14 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
 
         // Dependants first, then referentials. Nothing is committed until all
         // inserts and constraints have succeeded.
+        sqlx::query("DELETE FROM printer_slots")
+            .execute(&mut *transaction)
+            .await
+            .map_err(backend)?;
+        sqlx::query("DELETE FROM printers")
+            .execute(&mut *transaction)
+            .await
+            .map_err(backend)?;
         sqlx::query("DELETE FROM spools")
             .execute(&mut *transaction)
             .await
@@ -323,6 +398,39 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
             .execute(&mut *transaction)
             .await
             .map_err(backend)?;
+        }
+
+        for printer in snapshot.printers {
+            sqlx::query(
+                r#"INSERT INTO printers (id, name, brand, model, module_kind, module_count)
+                   VALUES ($1, $2, $3, $4, $5, $6)"#,
+            )
+            .bind(&printer.id)
+            .bind(printer.name)
+            .bind(printer.brand)
+            .bind(printer.model)
+            .bind(printer.module_kind)
+            .bind(printer.module_count.map(i32::from))
+            .execute(&mut *transaction)
+            .await
+            .map_err(backend)?;
+
+            for slot in printer.slots {
+                sqlx::query(
+                    r#"INSERT INTO printer_slots
+                       (id, printer_id, group_label, slot_key, position, spool_id)
+                       VALUES ($1, $2, $3, $4, $5, $6)"#,
+                )
+                .bind(ulid::Ulid::new().to_string())
+                .bind(&printer.id)
+                .bind(slot.group_label)
+                .bind(slot.slot_key)
+                .bind(i32::from(slot.position))
+                .bind(slot.spool_id)
+                .execute(&mut *transaction)
+                .await
+                .map_err(backend)?;
+            }
         }
 
         sqlx::query(
