@@ -26,11 +26,11 @@
  function render(keep=true){const b=brand.value; select.hidden=b==='other';free.hidden=b!=='other';select.innerHTML='';if(b!=='other'){models[b].forEach(m=>select.append(option(m,m)));if(keep&&models[b].includes(initial.model))select.value=initial.model;}else free.value=keep?initial.model:''; syncModel(); module.innerHTML=''; count.innerHTML='';countWrap.hidden=true;
    if(b==='bambu'){module.append(option('ams','{{ t(key="printers.module.ams") }}'));module.append(option('none','{{ t(key="printers.module.none") }}'));}
    else if(b==='prusa'&&select.value==='XL'){module.append(option('tool_changer','{{ t(key="printers.module.tool_changer") }}'));for(let n=1;n<=5;n++)count.append(option(n,n));countWrap.hidden=false;}
-   else if(b==='prusa'){module.append(option('none','{{ t(key="printers.module.none") }}'));module.append(option('mmu','MMU'));if(select.value==='CORE One'||select.value==='CORE One L')module.append(option('indx','INDX'));}
+   else if(b==='prusa'){module.append(option('none','{{ t(key="printers.module.none") }}'));module.append(option('mmu','MMU'));if(select.value==='CORE One'||select.value==='CORE One L'){module.append(option('indx','INDX'));[4,8].forEach(n=>count.append(option(n,n)));}}
    else {module.append(option('none','{{ t(key="printers.module.none") }}'));module.append(option('multi_colour','{{ t(key="printers.module.multi_colour") }}'));[2,3,4,5,6,8].forEach(n=>count.append(option(n,n)));}
    if(keep&&[...module.options].some(o=>o.value===initial.module))module.value=initial.module;if(keep&&[...count.options].some(o=>+o.value===initial.count))count.value=initial.count;toggleCount(); }
  function syncModel(){hidden.value=brand.value==='other'?free.value:select.value}
- function toggleCount(){countWrap.hidden=!(module.value==='tool_changer'||module.value==='multi_colour')}
+ function toggleCount(){countWrap.hidden=!(module.value==='tool_changer'||module.value==='multi_colour'||module.value==='indx')}
  brand.addEventListener('change',()=>{initial.model=brand.value==='bambu'?'P1S':brand.value==='prusa'?'MK4S':'';initial.module=brand.value==='bambu'?'ams':'none';render(true)});select.addEventListener('change',()=>{initial.model=select.value;initial.module='none';render(true)});free.addEventListener('input',syncModel);module.addEventListener('change',toggleCount);document.querySelector('#printer-form').addEventListener('submit',syncModel);render(true);
 })();
 </script>

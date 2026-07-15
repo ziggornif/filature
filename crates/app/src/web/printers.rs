@@ -206,7 +206,9 @@ impl PrinterForm {
             "none" => Module::None,
             "ams" => Module::Ams,
             "mmu" => Module::Mmu,
-            "indx" => Module::Indx,
+            "indx" => Module::Indx {
+                slots: self.module_count.unwrap_or(4),
+            },
             "tool_changer" => Module::ToolChanger {
                 heads: self.module_count.unwrap_or(2),
             },

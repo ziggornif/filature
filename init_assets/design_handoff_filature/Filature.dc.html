@@ -1307,7 +1307,7 @@ class Component extends DCLogic {
         return [{ label:'Têtes', slots: Array.from({length:n}, (_,i) => ({ key:'head-'+i, bobineId:null })) }];
       }
       if (f.module === 'mmu') return [{ label:'MMU', slots:[0,1,2,3,4].map(i => ({ key:'mmu-'+i, bobineId:null })) }];
-      if (f.module === 'indx') return [{ label:'INDX', slots:[0,1,2,3,4].map(i => ({ key:'indx-'+i, bobineId:null })) }];
+      if (f.module === 'indx') { const n = Number(f.indxCount) || 4; return [{ label:'INDX', slots: Array.from({length:n}, (_,i) => ({ key:'indx-'+i, bobineId:null })) }]; }
       return [{ label:'Bobine', slots:[{ key:'main', bobineId:null }] }];
     }
     if (f.otherMulti) {
@@ -1437,7 +1437,7 @@ class Component extends DCLogic {
       onHeadCount:(e)=>this.updatePrinterForm({headCount:Number(e.target.value)}),
       isPrusaOther: pfState.brand==='prusa' && pfState.model!=='XL',
       module: pfState.module, moduleOptions,
-      moduleHint: pfState.module==='mmu' ? '5 emplacements de filament.' : pfState.module==='indx' ? '5 emplacements de filament (unité INDX).' : 'Une seule bobine, chargée directement dans la machine.',
+      moduleHint: pfState.module==='mmu' ? '5 emplacements de filament.' : pfState.module==='indx' ? '4 ou 8 emplacements de filament (unité INDX).' : 'Une seule bobine, chargée directement dans la machine.',
       onModule:(e)=>this.updatePrinterForm({module:e.target.value}),
       isOtherBrand: pfState.brand==='autre',
       otherMulti: pfState.otherMulti,

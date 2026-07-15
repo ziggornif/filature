@@ -2,6 +2,7 @@ use crate::shared::{DomainError, PrinterId, SpoolId};
 
 pub const BAMBU_MODELS: &[&str] = &["P1S", "P1P", "X1C", "X1E", "A1", "A1 mini"];
 pub const PRUSA_MODELS: &[&str] = &["MK4S", "MK4", "MINI+", "CORE One", "CORE One L", "XL"];
+pub const INDX_SLOT_COUNTS: &[u8] = &[4, 8];
 pub const OTHER_SLOT_COUNTS: &[u8] = &[2, 3, 4, 5, 6, 8];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,7 +58,7 @@ pub enum Module {
     None,
     Ams,
     Mmu,
-    Indx,
+    Indx { slots: u8 },
     ToolChanger { heads: u8 },
     MultiColour { slots: u8 },
 }
@@ -66,11 +67,10 @@ impl Module {
         let valid = match (&brand, model, &module) {
             (PrinterBrand::BambuLab, _, Module::None | Module::Ams) => true,
             (PrinterBrand::Prusa, "XL", Module::ToolChanger { heads }) => (1..=5).contains(heads),
-            (
-                PrinterBrand::Prusa,
-                "CORE One" | "CORE One L",
-                Module::None | Module::Mmu | Module::Indx,
-            ) => true,
+            (PrinterBrand::Prusa, "CORE One" | "CORE One L", Module::Indx { slots }) => {
+                INDX_SLOT_COUNTS.contains(slots)
+            }
+            (PrinterBrand::Prusa, "CORE One" | "CORE One L", Module::None | Module::Mmu) => true,
             (PrinterBrand::Prusa, _, Module::None | Module::Mmu) if model != "XL" => true,
             (PrinterBrand::Other, _, Module::None) => true,
             (PrinterBrand::Other, _, Module::MultiColour { slots }) => {
@@ -92,7 +92,7 @@ impl Module {
             Self::None => "none",
             Self::Ams => "ams",
             Self::Mmu => "mmu",
-            Self::Indx => "indx",
+            Self::Indx { .. } => "indx",
             Self::ToolChanger { .. } => "tool_changer",
             Self::MultiColour { .. } => "multi_colour",
         }
@@ -101,6 +101,7 @@ impl Module {
         match self {
             Self::ToolChanger { heads } => Some(*heads),
             Self::MultiColour { slots } => Some(*slots),
+            Self::Indx { slots } => Some(*slots),
             _ => None,
         }
     }
@@ -109,7 +110,9 @@ impl Module {
             "none" => Ok(Self::None),
             "ams" => Ok(Self::Ams),
             "mmu" => Ok(Self::Mmu),
-            "indx" => Ok(Self::Indx),
+            "indx" => Ok(Self::Indx {
+                slots: count.unwrap_or(4) as u8,
+            }),
             "tool_changer" => Ok(Self::ToolChanger {
                 heads: count.unwrap_or_default() as u8,
             }),
@@ -204,7 +207,7 @@ pub fn derive_slots(
         }
         Module::None if brand == PrinterBrand::BambuLab => slots("external", "ext", 1),
         Module::Mmu => slots("mmu", "mmu", 5),
-        Module::Indx => slots("indx", "indx", 5),
+        Module::Indx { slots: count } => slots("indx", "indx", *count),
         Module::ToolChanger { heads } => slots("heads", "head", *heads),
         Module::MultiColour { slots: count } => slots("multi_colour", "multi", *count),
         Module::None => slots("spool", "main", 1),
@@ -251,12 +254,28 @@ mod tests {
             5
         );
         assert_eq!(
-            derive_slots(PrinterBrand::Prusa, "CORE One", &Module::Indx)
+            derive_slots(PrinterBrand::Prusa, "CORE One", &Module::Indx { slots: 4 })
                 .unwrap()
                 .len(),
-            5
+            4
         );
-        assert!(derive_slots(PrinterBrand::Prusa, "MK4S", &Module::Indx).is_err());
+        assert_eq!(
+            derive_slots(
+                PrinterBrand::Prusa,
+                "CORE One L",
+                &Module::Indx { slots: 8 }
+            )
+            .unwrap()
+            .len(),
+            8
+        );
+        for n in [0, 5, 7, 9] {
+            assert!(
+                derive_slots(PrinterBrand::Prusa, "CORE One", &Module::Indx { slots: n }).is_err()
+            );
+        }
+        assert!(derive_slots(PrinterBrand::Prusa, "MK4S", &Module::Indx { slots: 4 }).is_err());
+        assert!(derive_slots(PrinterBrand::Prusa, "XL", &Module::Indx { slots: 8 }).is_err());
     }
     #[test]
     fn prusa_xl_all_head_counts() {
