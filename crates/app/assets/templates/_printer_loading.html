@@ -15,7 +15,7 @@
               <span class="loaded-copy"><strong>{{ s.loaded.brand }} · {{ s.loaded.colour_name }}</strong><small>{{ s.loaded.material_name }} · {{ t(key=s.loaded.status_key) }}</small></span>
               <span class="loaded-pct">{{ s.loaded.remaining_pct }} %</span>
               <span class="loaded-gauge"><i style="width:{{ s.loaded.remaining_pct }}%"></i></span>
-              {% if not g.multi %}<small class="loaded-weight">{{ s.loaded.remaining_weight }} g / {{ s.loaded.net_weight }} g</small>{% endif %}
+              <small class="loaded-weight">{{ s.loaded.remaining_weight }} g<span class="loaded-weight-total"> / {{ s.loaded.net_weight }} g</span></small>
             </a>
             <form class="slot-unload" hx-post="/printers/{{ p.id }}/slots/{{ s.key }}" hx-target="#printer-loading-content" hx-swap="outerHTML">
               <input type="hidden" name="spool_id" value="">
