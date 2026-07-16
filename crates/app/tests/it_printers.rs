@@ -1,7 +1,7 @@
 mod support;
 
 use domain::printers::{
-    Module, NewPrinter, PrinterBrand, PrinterName, PrinterRepository, PrintersService,
+    FeedMode, Module, NewPrinter, PrinterBrand, PrinterName, PrinterRepository, PrintersService,
     PrintersUseCases, RepositoryError,
 };
 use domain::shared::{PrinterId, SpoolId};
@@ -15,6 +15,8 @@ fn sample(name: &str, module: Module) -> NewPrinter {
         model: "P1S".into(),
         heads: 1,
         module,
+        ams_units: 0,
+        feed_modes: vec![FeedMode::Direct],
     }
 }
 
@@ -32,26 +34,61 @@ async fn insert_list_update_preserves_surviving_keys_and_delete_cascades() {
     let url = support::postgres_url().await;
     let pool = connect_and_migrate(&url).await.unwrap();
     let repo = SqlxPrinterRepository::new(pool.clone());
-    let created = repo.insert(sample("Workshop", Module::Ams)).await.unwrap();
+    let mut topology = sample("Workshop", Module::None);
+    topology.ams_units = 2;
+    topology.feed_modes = vec![FeedMode::AmsFed];
+    let created = repo.insert(topology).await.unwrap();
     assert_eq!(created.id.as_str().len(), 26);
-    assert_eq!(created.slots.len(), 5);
-    let external_id: String =
-        sqlx::query_scalar("SELECT id FROM printer_slots WHERE printer_id=$1 AND slot_key='ext'")
-            .bind(created.id.as_str())
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    assert_eq!(created.slots.len(), 8);
+    spool(&pool, "topology-survives", "Open", 700.0).await;
+    spool(&pool, "topology-unloads", "Sealed", 1000.0).await;
+    repo.set_slot_spool(
+        &created.id,
+        "ams0-0",
+        Some(&SpoolId::new("topology-survives")),
+    )
+    .await
+    .unwrap();
+    repo.set_slot_spool(
+        &created.id,
+        "ams1-0",
+        Some(&SpoolId::new("topology-unloads")),
+    )
+    .await
+    .unwrap();
+    let surviving_id: String = sqlx::query_scalar(
+        "SELECT id FROM printer_slots WHERE printer_id=$1 AND slot_key='ams0-0'",
+    )
+    .bind(created.id.as_str())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     let mut edited = created.clone();
-    edited.module = Module::None;
+    edited.ams_units = 1;
     let edited = repo.update(edited).await.unwrap();
-    assert_eq!(edited.slots.len(), 1);
-    let after_id: String =
-        sqlx::query_scalar("SELECT id FROM printer_slots WHERE printer_id=$1 AND slot_key='ext'")
-            .bind(created.id.as_str())
+    assert_eq!(edited.slots.len(), 4);
+    let after_id: String = sqlx::query_scalar(
+        "SELECT id FROM printer_slots WHERE printer_id=$1 AND slot_key='ams0-0'",
+    )
+    .bind(created.id.as_str())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(surviving_id, after_id);
+    let surviving_spool: Option<String> = sqlx::query_scalar(
+        "SELECT spool_id FROM printer_slots WHERE printer_id=$1 AND slot_key='ams0-0'",
+    )
+    .bind(created.id.as_str())
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(surviving_spool.as_deref(), Some("topology-survives"));
+    let removed_spool_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM printer_slots WHERE spool_id='topology-unloads'")
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(external_id, after_id);
+    assert_eq!(removed_spool_count, 0);
     assert_eq!(
         repo.list()
             .await
@@ -84,6 +121,8 @@ async fn unknown_update_and_delete_are_not_found() {
         model: "Ghost".into(),
         heads: 1,
         module: Module::None,
+        ams_units: 0,
+        feed_modes: vec![FeedMode::Direct],
         slots: vec![],
     };
     assert!(matches!(
@@ -108,11 +147,11 @@ async fn loading_moves_atomically_guards_status_and_unloads() {
     let service = PrintersService::new(repo);
 
     service
-        .load_slot(first.id.clone(), "ext".into(), SpoolId::new("loadable"))
+        .load_slot(first.id.clone(), "head-0".into(), SpoolId::new("loadable"))
         .await
         .unwrap();
     service
-        .load_slot(second.id.clone(), "ext".into(), SpoolId::new("loadable"))
+        .load_slot(second.id.clone(), "head-0".into(), SpoolId::new("loadable"))
         .await
         .unwrap();
     let holder: String =
@@ -123,13 +162,16 @@ async fn loading_moves_atomically_guards_status_and_unloads() {
     assert_eq!(holder, second.id.as_str());
     assert!(matches!(
         service
-            .load_slot(first.id.clone(), "ext".into(), SpoolId::new("empty"))
+            .load_slot(first.id.clone(), "head-0".into(), SpoolId::new("empty"))
             .await,
         Err(RepositoryError::Domain(
             domain::shared::DomainError::SpoolNotLoadable
         ))
     ));
-    service.unload_slot(second.id, "ext".into()).await.unwrap();
+    service
+        .unload_slot(second.id, "head-0".into())
+        .await
+        .unwrap();
     service
         .unload_spool(SpoolId::new("loadable"))
         .await
@@ -157,12 +199,12 @@ async fn adapter_enforces_exclusivity_filters_options_joins_card_and_delete_free
     let repo = SqlxPrinterRepository::new(pool.clone());
     let first = repo.insert(sample("First", Module::None)).await.unwrap();
     let second = repo.insert(sample("Second", Module::None)).await.unwrap();
-    repo.set_slot_spool(&first.id, "ext", Some(&SpoolId::new("open")))
+    repo.set_slot_spool(&first.id, "head-0", Some(&SpoolId::new("open")))
         .await
         .unwrap();
 
     let duplicate = sqlx::query(
-        "UPDATE printer_slots SET spool_id='open' WHERE printer_id=$1 AND slot_key='ext'",
+        "UPDATE printer_slots SET spool_id='open' WHERE printer_id=$1 AND slot_key='head-0'",
     )
     .bind(second.id.as_str())
     .execute(&pool)

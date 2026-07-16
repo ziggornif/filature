@@ -1,7 +1,7 @@
 use crate::persistence::Db;
 use async_trait::async_trait;
 use domain::printers::{
-    LoadableSpool, LoadedSpool, Module, NewPrinter, Printer, PrinterBrand, PrinterName,
+    FeedMode, LoadableSpool, LoadedSpool, Module, NewPrinter, Printer, PrinterBrand, PrinterName,
     PrinterRepository, RepositoryError, Slot, derive_slots,
 };
 use domain::shared::{PrinterId, SpoolId};
@@ -16,6 +16,44 @@ impl SqlxPrinterRepository {
     pub fn new(pool: Db) -> Self {
         Self { pool }
     }
+}
+
+async fn topology(
+    pool: &Db,
+    printer_id: &str,
+    heads: u8,
+) -> Result<(u8, Vec<FeedMode>), RepositoryError> {
+    let ams_units =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM printer_ams_units WHERE printer_id=$1")
+            .bind(printer_id)
+            .fetch_one(pool)
+            .await
+            .map_err(backend)?;
+    let modes = sqlx::query_scalar::<_, String>(
+        "SELECT feed_mode FROM printer_head_feed_modes WHERE printer_id=$1 ORDER BY head_index",
+    )
+    .bind(printer_id)
+    .fetch_all(pool)
+    .await
+    .map_err(backend)?
+    .into_iter()
+    .map(|mode| FeedMode::parse(&mode).map_err(RepositoryError::from))
+    .collect::<Result<Vec<_>, _>>()?;
+    if modes.len() != usize::from(heads) {
+        return Err(RepositoryError::Domain(
+            domain::shared::DomainError::InvalidPrinterConfiguration(
+                "stored feed modes do not match heads".into(),
+            ),
+        ));
+    }
+    Ok((
+        u8::try_from(ams_units).map_err(|_| {
+            RepositoryError::Domain(domain::shared::DomainError::InvalidPrinterConfiguration(
+                "invalid AMS unit count".into(),
+            ))
+        })?,
+        modes,
+    ))
 }
 fn backend(e: sqlx::Error) -> RepositoryError {
     RepositoryError::Backend(e.to_string())
@@ -67,6 +105,7 @@ impl PrinterRepository for SqlxPrinterRepository {
             })?;
             let module = Module::from_storage(row.get("module_kind"), row.get("module_count"))?;
             Module::validate(brand, &model, heads, module.clone())?;
+            let (ams_units, feed_modes) = topology(&self.pool, &id, heads).await?;
             let slot_rows = sqlx::query(
                 r#"SELECT ps.group_label,ps.slot_key,ps.position,ps.spool_id,
                           s.colour_hex,s.colour_name,s.remaining_weight,s.net_weight,s.status,
@@ -104,7 +143,7 @@ impl PrinterRepository for SqlxPrinterRepository {
                     (slot.key.clone(), slot)
                 })
                 .collect();
-            let slots = derive_slots(brand, &model, heads, &module)?
+            let slots = derive_slots(brand, &model, heads, &module, ams_units, &feed_modes)?
                 .into_iter()
                 .filter_map(|expected| persisted.get(&expected.key).cloned())
                 .collect();
@@ -115,6 +154,8 @@ impl PrinterRepository for SqlxPrinterRepository {
                 model,
                 heads,
                 module,
+                ams_units,
+                feed_modes,
                 slots,
             });
         }
@@ -122,12 +163,30 @@ impl PrinterRepository for SqlxPrinterRepository {
     }
 
     async fn insert(&self, p: NewPrinter) -> Result<Printer, RepositoryError> {
-        let slots = derive_slots(p.brand, &p.model, p.heads, &p.module)?;
+        let slots = derive_slots(
+            p.brand,
+            &p.model,
+            p.heads,
+            &p.module,
+            p.ams_units,
+            &p.feed_modes,
+        )?;
         let id = PrinterId::new(Ulid::new().to_string());
         let mut tx = self.pool.begin().await.map_err(backend)?;
         sqlx::query("INSERT INTO printers(id,name,brand,model,heads,module_kind,module_count) VALUES($1,$2,$3,$4,$5,$6,$7)")
             .bind(id.as_str()).bind(p.name.as_str()).bind(p.brand.as_str()).bind(&p.model).bind(i32::from(p.heads)).bind(p.module.kind()).bind(p.module.count().map(i32::from))
             .execute(&mut *tx).await.map_err(backend)?;
+        for unit in 0..p.ams_units {
+            sqlx::query("INSERT INTO printer_ams_units(printer_id,unit_index) VALUES($1,$2)")
+                .bind(id.as_str())
+                .bind(i32::from(unit))
+                .execute(&mut *tx)
+                .await
+                .map_err(backend)?;
+        }
+        for (head, mode) in p.feed_modes.iter().enumerate() {
+            sqlx::query("INSERT INTO printer_head_feed_modes(printer_id,head_index,feed_mode) VALUES($1,$2,$3)").bind(id.as_str()).bind(i32::try_from(head).unwrap_or(i32::MAX)).bind(mode.as_str()).execute(&mut *tx).await.map_err(backend)?;
+        }
         for s in &slots {
             sqlx::query("INSERT INTO printer_slots(id,printer_id,group_label,slot_key,position,spool_id) VALUES($1,$2,$3,$4,$5,NULL)")
                 .bind(Ulid::new().to_string()).bind(id.as_str()).bind(&s.group_label).bind(&s.key).bind(i32::from(s.position))
@@ -141,18 +200,48 @@ impl PrinterRepository for SqlxPrinterRepository {
             model: p.model,
             heads: p.heads,
             module: p.module,
+            ams_units: p.ams_units,
+            feed_modes: p.feed_modes,
             slots,
         })
     }
 
     async fn update(&self, mut p: Printer) -> Result<Printer, RepositoryError> {
-        let new_slots = derive_slots(p.brand, &p.model, p.heads, &p.module)?;
+        let new_slots = derive_slots(
+            p.brand,
+            &p.model,
+            p.heads,
+            &p.module,
+            p.ams_units,
+            &p.feed_modes,
+        )?;
         let mut tx = self.pool.begin().await.map_err(backend)?;
         let result = sqlx::query("UPDATE printers SET name=$2,brand=$3,model=$4,heads=$5,module_kind=$6,module_count=$7 WHERE id=$1")
             .bind(p.id.as_str()).bind(p.name.as_str()).bind(p.brand.as_str()).bind(&p.model).bind(i32::from(p.heads)).bind(p.module.kind()).bind(p.module.count().map(i32::from))
             .execute(&mut *tx).await.map_err(backend)?;
         if result.rows_affected() == 0 {
             return Err(RepositoryError::NotFound(p.id));
+        }
+        sqlx::query("DELETE FROM printer_ams_units WHERE printer_id=$1")
+            .bind(p.id.as_str())
+            .execute(&mut *tx)
+            .await
+            .map_err(backend)?;
+        sqlx::query("DELETE FROM printer_head_feed_modes WHERE printer_id=$1")
+            .bind(p.id.as_str())
+            .execute(&mut *tx)
+            .await
+            .map_err(backend)?;
+        for unit in 0..p.ams_units {
+            sqlx::query("INSERT INTO printer_ams_units(printer_id,unit_index) VALUES($1,$2)")
+                .bind(p.id.as_str())
+                .bind(i32::from(unit))
+                .execute(&mut *tx)
+                .await
+                .map_err(backend)?;
+        }
+        for (head, mode) in p.feed_modes.iter().enumerate() {
+            sqlx::query("INSERT INTO printer_head_feed_modes(printer_id,head_index,feed_mode) VALUES($1,$2,$3)").bind(p.id.as_str()).bind(i32::try_from(head).unwrap_or(i32::MAX)).bind(mode.as_str()).execute(&mut *tx).await.map_err(backend)?;
         }
         let keys: Vec<&str> = new_slots.iter().map(|s| s.key.as_str()).collect();
         sqlx::query("DELETE FROM printer_slots WHERE printer_id=$1 AND NOT(slot_key = ANY($2))")

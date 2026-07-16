@@ -24,6 +24,30 @@ pub const PRUSA_MODELS: &[&str] = &[
 pub const XL_HEAD_COUNTS: &[u8] = &[1, 2, 5];
 pub const PRUSA_MULTI_SLOT_COUNTS: &[u8] = &[4, 8];
 pub const OTHER_SLOT_COUNTS: &[u8] = &[2, 3, 4, 5, 6, 8];
+pub const MAX_AMS_UNITS: u8 = 4;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FeedMode {
+    Direct,
+    AmsFed,
+}
+impl FeedMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Direct => "direct",
+            Self::AmsFed => "ams_fed",
+        }
+    }
+    pub fn parse(value: &str) -> Result<Self, DomainError> {
+        match value {
+            "direct" => Ok(Self::Direct),
+            "ams_fed" => Ok(Self::AmsFed),
+            _ => Err(DomainError::InvalidPrinterConfiguration(format!(
+                "unknown feed mode {value}"
+            ))),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrinterName(String);
@@ -76,7 +100,6 @@ impl PrinterBrand {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Module {
     None,
-    Ams,
     Mmu,
     MultiSlot { slots: u8 },
 }
@@ -100,7 +123,7 @@ impl Module {
                 (PrinterBrand::BambuLab, "H2C", Module::None | Module::MultiSlot { slots: 7 }) => {
                     true
                 }
-                (PrinterBrand::BambuLab, _, Module::None | Module::Ams) => true,
+                (PrinterBrand::BambuLab, _, Module::None) => true,
                 (PrinterBrand::Prusa, "XL", Module::None) => true,
                 (
                     PrinterBrand::Prusa,
@@ -132,7 +155,6 @@ impl Module {
     pub fn kind(&self) -> &'static str {
         match self {
             Self::None => "none",
-            Self::Ams => "ams",
             Self::Mmu => "mmu",
             Self::MultiSlot { .. } => "multi_slot",
         }
@@ -146,7 +168,6 @@ impl Module {
     pub fn from_storage(kind: &str, count: Option<i32>) -> Result<Self, DomainError> {
         match kind {
             "none" => Ok(Self::None),
-            "ams" => Ok(Self::Ams),
             "mmu" => Ok(Self::Mmu),
             "multi_slot" | "indx" | "multi_colour" => Ok(Self::MultiSlot {
                 slots: count.unwrap_or_default() as u8,
@@ -201,6 +222,8 @@ pub struct Printer {
     pub model: String,
     pub heads: u8,
     pub module: Module,
+    pub ams_units: u8,
+    pub feed_modes: Vec<FeedMode>,
     pub slots: Vec<Slot>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -210,6 +233,8 @@ pub struct NewPrinter {
     pub model: String,
     pub heads: u8,
     pub module: Module,
+    pub ams_units: u8,
+    pub feed_modes: Vec<FeedMode>,
 }
 
 fn slots(label: &str, prefix: &str, count: u8) -> Vec<Slot> {
@@ -232,18 +257,56 @@ pub fn derive_slots(
     model: &str,
     heads: u8,
     module: &Module,
+    ams_units: u8,
+    feed_modes: &[FeedMode],
 ) -> Result<Vec<Slot>, DomainError> {
     Module::validate(brand, model, heads, module.clone())?;
+    if feed_modes.len() != usize::from(heads)
+        || ams_units > MAX_AMS_UNITS
+        || (!matches!(module, Module::None) && ams_units != 0)
+        || (brand != PrinterBrand::BambuLab
+            && (ams_units != 0 || feed_modes.iter().any(|m| *m != FeedMode::Direct)))
+        || (brand == PrinterBrand::BambuLab
+            && feed_modes.contains(&FeedMode::AmsFed)
+            && ams_units == 0)
+    {
+        return Err(DomainError::InvalidPrinterConfiguration(
+            "invalid AMS topology".into(),
+        ));
+    }
+    if brand == PrinterBrand::BambuLab && matches!(module, Module::None) {
+        let mut out = Vec::new();
+        for (head, mode) in feed_modes.iter().enumerate() {
+            if *mode == FeedMode::Direct {
+                out.push(Slot {
+                    key: format!("head-{head}"),
+                    group_label: "heads".into(),
+                    position: u16::try_from(out.len()).unwrap_or(u16::MAX),
+                    loaded_spool: None,
+                });
+            }
+        }
+        for unit in 0..ams_units {
+            for slot in 0..4_u8 {
+                out.push(Slot {
+                    key: format!("ams{unit}-{slot}"),
+                    group_label: format!("ams_unit_{}", unit + 1),
+                    position: u16::try_from(out.len()).unwrap_or(u16::MAX),
+                    loaded_spool: None,
+                });
+            }
+        }
+        if out.is_empty() {
+            return Err(DomainError::InvalidPrinterConfiguration(
+                "printer topology must have at least one slot".into(),
+            ));
+        }
+        return Ok(out);
+    }
     if heads > 1 {
         return Ok(slots("heads", "head", heads));
     }
     Ok(match module {
-        Module::Ams => {
-            let mut out = slots("external", "ext", 1);
-            out.extend(slots("ams", "ams", 4));
-            out
-        }
-        Module::None if brand == PrinterBrand::BambuLab => slots("external", "ext", 1),
         Module::Mmu => slots("mmu", "mmu", 5),
         Module::MultiSlot { slots: count } => match brand {
             PrinterBrand::Prusa => slots("indx", "indx", *count),
@@ -271,26 +334,80 @@ mod tests {
     #[test]
     fn bambu_single_and_dual_head_models() {
         assert_eq!(
-            keys(&derive_slots(PrinterBrand::BambuLab, "H2S", 1, &Module::None).unwrap()),
-            vec!["ext"]
+            keys(
+                &derive_slots(
+                    PrinterBrand::BambuLab,
+                    "H2S",
+                    1,
+                    &Module::None,
+                    0,
+                    &[FeedMode::Direct]
+                )
+                .unwrap()
+            ),
+            vec!["head-0"]
         );
         assert_eq!(
-            keys(&derive_slots(PrinterBrand::BambuLab, "H2S", 1, &Module::Ams).unwrap()),
-            vec!["ext", "ams-0", "ams-1", "ams-2", "ams-3"]
+            keys(
+                &derive_slots(
+                    PrinterBrand::BambuLab,
+                    "H2S",
+                    1,
+                    &Module::None,
+                    2,
+                    &[FeedMode::AmsFed]
+                )
+                .unwrap()
+            ),
+            vec![
+                "ams0-0", "ams0-1", "ams0-2", "ams0-3", "ams1-0", "ams1-1", "ams1-2", "ams1-3"
+            ]
         );
-        for model in ["X2D", "H2D"] {
-            assert_eq!(
-                keys(&derive_slots(PrinterBrand::BambuLab, model, 2, &Module::None).unwrap()),
-                vec!["head-0", "head-1"]
-            );
-            assert!(derive_slots(PrinterBrand::BambuLab, model, 2, &Module::Ams).is_err());
-        }
+        assert_eq!(
+            keys(
+                &derive_slots(
+                    PrinterBrand::BambuLab,
+                    "H2D",
+                    2,
+                    &Module::None,
+                    1,
+                    &[FeedMode::AmsFed, FeedMode::Direct]
+                )
+                .unwrap()
+            ),
+            vec!["head-1", "ams0-0", "ams0-1", "ams0-2", "ams0-3"]
+        );
+        assert!(
+            derive_slots(
+                PrinterBrand::BambuLab,
+                "H2S",
+                1,
+                &Module::None,
+                0,
+                &[FeedMode::AmsFed]
+            )
+            .is_err()
+        );
+        assert!(derive_slots(PrinterBrand::BambuLab, "P1S", 0, &Module::None, 0, &[]).is_err());
+        assert!(
+            derive_slots(
+                PrinterBrand::BambuLab,
+                "P1S",
+                1,
+                &Module::None,
+                MAX_AMS_UNITS + 1,
+                &[FeedMode::Direct]
+            )
+            .is_err()
+        );
         assert_eq!(
             derive_slots(
                 PrinterBrand::BambuLab,
                 "H2C",
                 1,
-                &Module::MultiSlot { slots: 7 }
+                &Module::MultiSlot { slots: 7 },
+                0,
+                &[FeedMode::Direct]
             )
             .unwrap()
             .len(),
@@ -301,7 +418,9 @@ mod tests {
                 PrinterBrand::BambuLab,
                 "H2C",
                 1,
-                &Module::MultiSlot { slots: 6 }
+                &Module::MultiSlot { slots: 6 },
+                0,
+                &[FeedMode::Direct]
             )
             .is_err()
         );
@@ -309,15 +428,29 @@ mod tests {
     #[test]
     fn prusa_single_mmu_multi_slot() {
         assert_eq!(
-            derive_slots(PrinterBrand::Prusa, "MK4S", 1, &Module::None)
-                .unwrap()
-                .len(),
+            derive_slots(
+                PrinterBrand::Prusa,
+                "MK4S",
+                1,
+                &Module::None,
+                0,
+                &[FeedMode::Direct]
+            )
+            .unwrap()
+            .len(),
             1
         );
         assert_eq!(
-            derive_slots(PrinterBrand::Prusa, "MK4S", 1, &Module::Mmu)
-                .unwrap()
-                .len(),
+            derive_slots(
+                PrinterBrand::Prusa,
+                "MK4S",
+                1,
+                &Module::Mmu,
+                0,
+                &[FeedMode::Direct]
+            )
+            .unwrap()
+            .len(),
             5
         );
         assert_eq!(
@@ -325,7 +458,9 @@ mod tests {
                 PrinterBrand::Prusa,
                 "CORE One+",
                 1,
-                &Module::MultiSlot { slots: 4 }
+                &Module::MultiSlot { slots: 4 },
+                0,
+                &[FeedMode::Direct]
             )
             .unwrap()
             .len(),
@@ -336,7 +471,9 @@ mod tests {
                 PrinterBrand::Prusa,
                 "CORE One L",
                 1,
-                &Module::MultiSlot { slots: 8 }
+                &Module::MultiSlot { slots: 8 },
+                0,
+                &[FeedMode::Direct]
             )
             .unwrap()
             .len(),
@@ -348,7 +485,9 @@ mod tests {
                     PrinterBrand::Prusa,
                     "CORE One+",
                     1,
-                    &Module::MultiSlot { slots: n }
+                    &Module::MultiSlot { slots: n },
+                    0,
+                    &[FeedMode::Direct]
                 )
                 .is_err()
             );
@@ -358,7 +497,9 @@ mod tests {
                 PrinterBrand::Prusa,
                 "MK4S",
                 1,
-                &Module::MultiSlot { slots: 4 }
+                &Module::MultiSlot { slots: 4 },
+                0,
+                &[FeedMode::Direct]
             )
             .is_err()
         );
@@ -367,22 +508,46 @@ mod tests {
     fn prusa_xl_all_head_counts() {
         for n in [1, 2, 5] {
             assert_eq!(
-                derive_slots(PrinterBrand::Prusa, "XL", n, &Module::None)
-                    .unwrap()
-                    .len(),
+                derive_slots(
+                    PrinterBrand::Prusa,
+                    "XL",
+                    n,
+                    &Module::None,
+                    0,
+                    &vec![FeedMode::Direct; n as usize]
+                )
+                .unwrap()
+                .len(),
                 n as usize
             );
         }
         for n in [3, 4, 0, 6] {
-            assert!(derive_slots(PrinterBrand::Prusa, "XL", n, &Module::None).is_err());
+            assert!(
+                derive_slots(
+                    PrinterBrand::Prusa,
+                    "XL",
+                    n,
+                    &Module::None,
+                    0,
+                    &vec![FeedMode::Direct; n as usize]
+                )
+                .is_err()
+            );
         }
     }
     #[test]
     fn other_all_counts() {
         assert_eq!(
-            derive_slots(PrinterBrand::Other, "Ender", 1, &Module::None)
-                .unwrap()
-                .len(),
+            derive_slots(
+                PrinterBrand::Other,
+                "Ender",
+                1,
+                &Module::None,
+                0,
+                &[FeedMode::Direct]
+            )
+            .unwrap()
+            .len(),
             1
         );
         for n in OTHER_SLOT_COUNTS {
@@ -391,7 +556,9 @@ mod tests {
                     PrinterBrand::Other,
                     "Ender",
                     1,
-                    &Module::MultiSlot { slots: *n }
+                    &Module::MultiSlot { slots: *n },
+                    0,
+                    &[FeedMode::Direct]
                 )
                 .unwrap()
                 .len(),
@@ -404,7 +571,9 @@ mod tests {
                     PrinterBrand::Other,
                     "Ender",
                     1,
-                    &Module::MultiSlot { slots: n }
+                    &Module::MultiSlot { slots: n },
+                    0,
+                    &[FeedMode::Direct]
                 )
                 .is_err()
             );

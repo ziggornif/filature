@@ -269,6 +269,10 @@
   "printers.error.already_loaded": "This spool is already loaded.",
   "printers.group.external": "External spool",
   "printers.group.ams": "AMS",
+  "printers.group.ams_unit_1": "AMS 1",
+  "printers.group.ams_unit_2": "AMS 2",
+  "printers.group.ams_unit_3": "AMS 3",
+  "printers.group.ams_unit_4": "AMS 4",
   "printers.group.spool": "Spool",
   "printers.group.mmu": "MMU",
   "printers.group.indx": "INDX",
@@ -277,7 +281,6 @@
   "printers.group.multi_slot": "Multi-material module",
   "printers.brand.other": "Other",
   "printers.module.none": "None (single spool)",
-  "printers.module.ams": "AMS (4 slots)",
   "printers.module.multi_slot": "Multi-Slot module",
   "printers.form.add_title": "New printer",
   "printers.form.edit_title": "Edit printer",
@@ -289,5 +292,10 @@
   "printers.form.model_placeholder": "e.g. Ender 3 V3",
   "printers.form.module": "Filament module",
   "printers.form.heads": "Print heads",
-  "printers.form.count": "Number of slots / heads"
+  "printers.form.count": "Number of slots / heads",
+  "printers.form.ams_units": "AMS units",
+  "printers.form.feed_modes": "Feed mode by print head",
+  "printers.form.head": "Print head",
+  "printers.feed.direct": "Direct spool",
+  "printers.feed.ams_fed": "AMS-fed"
 }

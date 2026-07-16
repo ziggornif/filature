@@ -8,7 +8,7 @@ use axum::{
     routing::get,
 };
 use domain::printers::{
-    BAMBU_MODELS, LoadableSpool, Module, NewPrinter, PRUSA_MODELS, Printer, PrinterBrand,
+    BAMBU_MODELS, FeedMode, LoadableSpool, Module, NewPrinter, PRUSA_MODELS, Printer, PrinterBrand,
     PrinterName, RepositoryError,
 };
 use domain::shared::{PrinterId, SpoolId};
@@ -182,13 +182,26 @@ pub struct PrinterForm {
     #[serde(default)]
     module_count: Option<u8>,
     #[serde(default)]
+    ams_units: u8,
+    #[serde(default)]
+    feed_modes: Vec<String>,
+    #[serde(default)]
     from: String,
 }
 fn default_heads() -> u8 {
     1
 }
+type PrinterDomain = (
+    PrinterName,
+    PrinterBrand,
+    String,
+    u8,
+    Module,
+    u8,
+    Vec<FeedMode>,
+);
 impl PrinterForm {
-    fn domain(&self) -> Result<(PrinterName, PrinterBrand, String, u8, Module), String> {
+    fn domain(&self) -> Result<PrinterDomain, String> {
         let name = PrinterName::new(&self.name).map_err(|e| e.to_string())?;
         let brand = PrinterBrand::parse(&self.brand).map_err(|e| e.to_string())?;
         let model = match brand {
@@ -209,7 +222,6 @@ impl PrinterForm {
         }
         let module = match self.module.as_str() {
             "none" => Module::None,
-            "ams" => Module::Ams,
             "mmu" => Module::Mmu,
             "multi_slot" => Module::MultiSlot {
                 slots: self.module_count.unwrap_or(4),
@@ -218,7 +230,35 @@ impl PrinterForm {
         };
         let module =
             Module::validate(brand, &model, self.heads, module).map_err(|e| e.to_string())?;
-        Ok((name, brand, model, self.heads, module))
+        let feed_modes = if brand == PrinterBrand::BambuLab {
+            if self.feed_modes.len() != usize::from(self.heads) {
+                return Err("invalid feed modes".into());
+            }
+            self.feed_modes
+                .iter()
+                .map(|m| FeedMode::parse(m).map_err(|e| e.to_string()))
+                .collect::<Result<Vec<_>, _>>()?
+        } else {
+            vec![FeedMode::Direct; usize::from(self.heads)]
+        };
+        domain::printers::derive_slots(
+            brand,
+            &model,
+            self.heads,
+            &module,
+            self.ams_units,
+            &feed_modes,
+        )
+        .map_err(|e| e.to_string())?;
+        Ok((
+            name,
+            brand,
+            model,
+            self.heads,
+            module,
+            self.ams_units,
+            feed_modes,
+        ))
     }
     fn destination(&self) -> &'static str {
         if self.from == "settings" {
@@ -413,6 +453,9 @@ struct PrinterFormView {
     heads: u8,
     module: String,
     module_count: Option<u8>,
+    ams_units: u8,
+    feed_modes: Vec<String>,
+    feed_modes_json: String,
 }
 impl From<Printer> for PrinterFormView {
     fn from(p: Printer) -> Self {
@@ -424,12 +467,18 @@ impl From<Printer> for PrinterFormView {
             heads: p.heads,
             module: p.module.kind().into(),
             module_count: p.module.count(),
+            ams_units: p.ams_units,
+            feed_modes: p.feed_modes.iter().map(|m| m.as_str().into()).collect(),
+            feed_modes_json: serde_json::to_string(
+                &p.feed_modes.iter().map(|m| m.as_str()).collect::<Vec<_>>(),
+            )
+            .unwrap_or_else(|_| "[]".into()),
         }
     }
 }
 async fn create(State(st): State<AppState>, Form(f): Form<PrinterForm>) -> Response {
     let dest = f.destination();
-    let (name, brand, model, heads, module) = match f.domain() {
+    let (name, brand, model, heads, module, ams_units, feed_modes) = match f.domain() {
         Ok(v) => v,
         Err(_) => {
             return (
@@ -447,6 +496,8 @@ async fn create(State(st): State<AppState>, Form(f): Form<PrinterForm>) -> Respo
             model,
             heads,
             module,
+            ams_units,
+            feed_modes,
         })
         .await
     {
@@ -460,7 +511,7 @@ async fn update(
     Form(f): Form<PrinterForm>,
 ) -> Response {
     let dest = f.destination();
-    let (name, brand, model, heads, module) = match f.domain() {
+    let (name, brand, model, heads, module, ams_units, feed_modes) = match f.domain() {
         Ok(v) => v,
         Err(_) => return StatusCode::UNPROCESSABLE_ENTITY.into_response(),
     };
@@ -471,6 +522,8 @@ async fn update(
         model,
         heads,
         module,
+        ams_units,
+        feed_modes,
         slots: vec![],
     };
     match st.printers.edit(printer).await {
