@@ -13,6 +13,7 @@ fn sample(name: &str, module: Module) -> NewPrinter {
         name: PrinterName::new(name).unwrap(),
         brand: PrinterBrand::BambuLab,
         model: "P1S".into(),
+        heads: 1,
         module,
     }
 }
@@ -81,6 +82,7 @@ async fn unknown_update_and_delete_are_not_found() {
         name: PrinterName::new("Ghost").unwrap(),
         brand: PrinterBrand::Other,
         model: "Ghost".into(),
+        heads: 1,
         module: Module::None,
         slots: vec![],
     };

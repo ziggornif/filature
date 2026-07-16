@@ -273,12 +273,12 @@
   "printers.group.mmu": "MMU",
   "printers.group.indx": "INDX",
   "printers.group.heads": "Têtes",
-  "printers.group.multi_colour": "Module multicolore",
+  "printers.group.buses": "Bus de buses",
+  "printers.group.multi_slot": "Module multi-matériaux",
   "printers.brand.other": "Autre",
   "printers.module.none": "Aucun (bobine unique)",
   "printers.module.ams": "AMS (4 emplacements)",
-  "printers.module.tool_changer": "Tool changer",
-  "printers.module.multi_colour": "Module multicolore",
+  "printers.module.multi_slot": "Module Multi-Slot",
   "printers.form.add_title": "Nouvelle imprimante",
   "printers.form.edit_title": "Modifier l’imprimante",
   "printers.form.subtitle": "Configurez l’imprimante et ses emplacements de filament.",
@@ -288,5 +288,6 @@
   "printers.form.model": "Modèle",
   "printers.form.model_placeholder": "ex. Ender 3 V3",
   "printers.form.module": "Module filament",
+  "printers.form.heads": "Têtes d’impression",
   "printers.form.count": "Nombre d’emplacements / têtes"
 }

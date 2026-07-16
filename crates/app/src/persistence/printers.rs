@@ -50,7 +50,7 @@ fn slot_write_error(
 impl PrinterRepository for SqlxPrinterRepository {
     async fn list(&self) -> Result<Vec<Printer>, RepositoryError> {
         let rows = sqlx::query(
-            "SELECT id,name,brand,model,module_kind,module_count FROM printers ORDER BY name,id",
+            "SELECT id,name,brand,model,heads,module_kind,module_count FROM printers ORDER BY name,id",
         )
         .fetch_all(&self.pool)
         .await
@@ -60,8 +60,13 @@ impl PrinterRepository for SqlxPrinterRepository {
             let id: String = row.get("id");
             let brand = PrinterBrand::parse(row.get("brand"))?;
             let model: String = row.get("model");
+            let heads = u8::try_from(row.get::<i32, _>("heads")).map_err(|_| {
+                RepositoryError::Domain(domain::shared::DomainError::InvalidPrinterConfiguration(
+                    "invalid stored head count".into(),
+                ))
+            })?;
             let module = Module::from_storage(row.get("module_kind"), row.get("module_count"))?;
-            Module::validate(brand, &model, module.clone())?;
+            Module::validate(brand, &model, heads, module.clone())?;
             let slot_rows = sqlx::query(
                 r#"SELECT ps.group_label,ps.slot_key,ps.position,ps.spool_id,
                           s.colour_hex,s.colour_name,s.remaining_weight,s.net_weight,s.status,
@@ -99,7 +104,7 @@ impl PrinterRepository for SqlxPrinterRepository {
                     (slot.key.clone(), slot)
                 })
                 .collect();
-            let slots = derive_slots(brand, &model, &module)?
+            let slots = derive_slots(brand, &model, heads, &module)?
                 .into_iter()
                 .filter_map(|expected| persisted.get(&expected.key).cloned())
                 .collect();
@@ -108,6 +113,7 @@ impl PrinterRepository for SqlxPrinterRepository {
                 name: PrinterName::new(row.get::<String, _>("name"))?,
                 brand,
                 model,
+                heads,
                 module,
                 slots,
             });
@@ -116,11 +122,11 @@ impl PrinterRepository for SqlxPrinterRepository {
     }
 
     async fn insert(&self, p: NewPrinter) -> Result<Printer, RepositoryError> {
-        let slots = derive_slots(p.brand, &p.model, &p.module)?;
+        let slots = derive_slots(p.brand, &p.model, p.heads, &p.module)?;
         let id = PrinterId::new(Ulid::new().to_string());
         let mut tx = self.pool.begin().await.map_err(backend)?;
-        sqlx::query("INSERT INTO printers(id,name,brand,model,module_kind,module_count) VALUES($1,$2,$3,$4,$5,$6)")
-            .bind(id.as_str()).bind(p.name.as_str()).bind(p.brand.as_str()).bind(&p.model).bind(p.module.kind()).bind(p.module.count().map(i32::from))
+        sqlx::query("INSERT INTO printers(id,name,brand,model,heads,module_kind,module_count) VALUES($1,$2,$3,$4,$5,$6,$7)")
+            .bind(id.as_str()).bind(p.name.as_str()).bind(p.brand.as_str()).bind(&p.model).bind(i32::from(p.heads)).bind(p.module.kind()).bind(p.module.count().map(i32::from))
             .execute(&mut *tx).await.map_err(backend)?;
         for s in &slots {
             sqlx::query("INSERT INTO printer_slots(id,printer_id,group_label,slot_key,position,spool_id) VALUES($1,$2,$3,$4,$5,NULL)")
@@ -133,16 +139,17 @@ impl PrinterRepository for SqlxPrinterRepository {
             name: p.name,
             brand: p.brand,
             model: p.model,
+            heads: p.heads,
             module: p.module,
             slots,
         })
     }
 
     async fn update(&self, mut p: Printer) -> Result<Printer, RepositoryError> {
-        let new_slots = derive_slots(p.brand, &p.model, &p.module)?;
+        let new_slots = derive_slots(p.brand, &p.model, p.heads, &p.module)?;
         let mut tx = self.pool.begin().await.map_err(backend)?;
-        let result = sqlx::query("UPDATE printers SET name=$2,brand=$3,model=$4,module_kind=$5,module_count=$6 WHERE id=$1")
-            .bind(p.id.as_str()).bind(p.name.as_str()).bind(p.brand.as_str()).bind(&p.model).bind(p.module.kind()).bind(p.module.count().map(i32::from))
+        let result = sqlx::query("UPDATE printers SET name=$2,brand=$3,model=$4,heads=$5,module_kind=$6,module_count=$7 WHERE id=$1")
+            .bind(p.id.as_str()).bind(p.name.as_str()).bind(p.brand.as_str()).bind(&p.model).bind(i32::from(p.heads)).bind(p.module.kind()).bind(p.module.count().map(i32::from))
             .execute(&mut *tx).await.map_err(backend)?;
         if result.rows_affected() == 0 {
             return Err(RepositoryError::NotFound(p.id));

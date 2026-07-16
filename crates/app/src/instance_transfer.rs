@@ -61,9 +61,14 @@ struct WirePrinter {
     name: String,
     brand: String,
     model: String,
+    #[serde(default = "default_printer_heads")]
+    heads: u8,
     module_kind: String,
     module_count: Option<u16>,
     slots: Vec<WirePrinterSlot>,
+}
+fn default_printer_heads() -> u8 {
+    1
 }
 
 #[derive(Serialize, Deserialize)]
@@ -221,6 +226,7 @@ impl From<&SnapshotPrinter> for WirePrinter {
             name: printer.name.clone(),
             brand: printer.brand.clone(),
             model: printer.model.clone(),
+            heads: printer.heads,
             module_kind: printer.module_kind.clone(),
             module_count: printer.module_count,
             slots: printer.slots.iter().map(WirePrinterSlot::from).collect(),
@@ -353,13 +359,30 @@ impl TryFrom<WireSnapshot> for InstanceSnapshot {
 
 impl From<WirePrinter> for SnapshotPrinter {
     fn from(printer: WirePrinter) -> Self {
+        let (heads, module_kind, module_count) = match printer.module_kind.as_str() {
+            "tool_changer" => (
+                printer
+                    .module_count
+                    .and_then(|n| u8::try_from(n).ok())
+                    .unwrap_or(1),
+                "none".to_string(),
+                None,
+            ),
+            "indx" | "multi_colour" => (
+                printer.heads,
+                "multi_slot".to_string(),
+                printer.module_count,
+            ),
+            _ => (printer.heads, printer.module_kind, printer.module_count),
+        };
         Self {
             id: printer.id,
             name: printer.name,
             brand: printer.brand,
             model: printer.model,
-            module_kind: printer.module_kind,
-            module_count: printer.module_count,
+            heads,
+            module_kind,
+            module_count,
             slots: printer.slots.into_iter().map(Into::into).collect(),
         }
     }
@@ -489,6 +512,24 @@ mod tests {
         let document = decode(json.as_bytes()).unwrap();
         let decoded_again = decode(&encode(&document).unwrap()).unwrap();
         assert_eq!(decoded_again, document);
+    }
+
+    #[test]
+    fn old_printer_exports_default_heads_and_normalize_modules() {
+        let printers = r#""printers":[
+          {"id":"p1","name":"XL","brand":"prusa","model":"XL","module_kind":"tool_changer","module_count":5,"slots":[]},
+          {"id":"p2","name":"Core","brand":"prusa","model":"CORE One","module_kind":"indx","module_count":8,"slots":[]},
+          {"id":"p3","name":"Other","brand":"other","model":"Custom","module_kind":"multi_colour","module_count":4,"slots":[]}
+        ],"#;
+        let json = VALID.replace("\"configuration\"", &format!("{printers}\"configuration\""));
+        let document = decode(json.as_bytes()).unwrap();
+        assert_eq!(document.content.printers[0].heads, 5);
+        assert_eq!(document.content.printers[0].module_kind, "none");
+        for printer in &document.content.printers[1..] {
+            assert_eq!(printer.heads, 1);
+            assert_eq!(printer.module_kind, "multi_slot");
+        }
+        assert_eq!(decode(&encode(&document).unwrap()).unwrap(), document);
     }
 
     #[test]

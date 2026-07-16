@@ -82,6 +82,7 @@ struct PrinterRow {
     name: String,
     brand: String,
     model: String,
+    heads: i32,
     module_kind: String,
     module_count: Option<i32>,
 }
@@ -223,7 +224,7 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
         .collect::<Result<Vec<_>, TransferError>>()?;
 
         let mut printers = sqlx::query_as::<_, PrinterRow>(
-            "SELECT id, name, brand, model, module_kind, module_count FROM printers ORDER BY id",
+            "SELECT id, name, brand, model, heads, module_kind, module_count FROM printers ORDER BY id",
         )
         .fetch_all(&mut *transaction)
         .await
@@ -235,6 +236,7 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
                 name: row.name,
                 brand: row.brand,
                 model: row.model,
+                heads: u8::try_from(row.heads).map_err(|_| invalid_value("heads", row.heads))?,
                 module_kind: row.module_kind,
                 module_count: row
                     .module_count
@@ -402,13 +404,14 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
 
         for printer in snapshot.printers {
             sqlx::query(
-                r#"INSERT INTO printers (id, name, brand, model, module_kind, module_count)
-                   VALUES ($1, $2, $3, $4, $5, $6)"#,
+                r#"INSERT INTO printers (id, name, brand, model, heads, module_kind, module_count)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
             )
             .bind(&printer.id)
             .bind(printer.name)
             .bind(printer.brand)
             .bind(printer.model)
+            .bind(i32::from(printer.heads))
             .bind(printer.module_kind)
             .bind(printer.module_count.map(i32::from))
             .execute(&mut *transaction)
