@@ -176,14 +176,19 @@ pub struct PrinterForm {
     name: String,
     brand: String,
     model: String,
+    #[serde(default = "default_heads")]
+    heads: u8,
     module: String,
     #[serde(default)]
     module_count: Option<u8>,
     #[serde(default)]
     from: String,
 }
+fn default_heads() -> u8 {
+    1
+}
 impl PrinterForm {
-    fn domain(&self) -> Result<(PrinterName, PrinterBrand, String, Module), String> {
+    fn domain(&self) -> Result<(PrinterName, PrinterBrand, String, u8, Module), String> {
         let name = PrinterName::new(&self.name).map_err(|e| e.to_string())?;
         let brand = PrinterBrand::parse(&self.brand).map_err(|e| e.to_string())?;
         let model = match brand {
@@ -206,19 +211,14 @@ impl PrinterForm {
             "none" => Module::None,
             "ams" => Module::Ams,
             "mmu" => Module::Mmu,
-            "indx" => Module::Indx {
-                slots: self.module_count.unwrap_or(4),
-            },
-            "tool_changer" => Module::ToolChanger {
-                heads: self.module_count.unwrap_or(2),
-            },
-            "multi_colour" => Module::MultiColour {
+            "multi_slot" => Module::MultiSlot {
                 slots: self.module_count.unwrap_or(4),
             },
             _ => return Err("invalid module".into()),
         };
-        let module = Module::validate(brand, &model, module).map_err(|e| e.to_string())?;
-        Ok((name, brand, model, module))
+        let module =
+            Module::validate(brand, &model, self.heads, module).map_err(|e| e.to_string())?;
+        Ok((name, brand, model, self.heads, module))
     }
     fn destination(&self) -> &'static str {
         if self.from == "settings" {
@@ -386,6 +386,14 @@ async fn render_form(
     );
     ctx.insert("bambu_models", &BAMBU_MODELS);
     ctx.insert("prusa_models", &PRUSA_MODELS);
+    ctx.insert(
+        "bambu_models_json",
+        &serde_json::to_string(BAMBU_MODELS).unwrap(),
+    );
+    ctx.insert(
+        "prusa_models_json",
+        &serde_json::to_string(PRUSA_MODELS).unwrap(),
+    );
     ctx.insert("nav_spool_count", &st.nav_spool_count().await);
     ctx.insert("nav_printer_count", &st.nav_printer_count().await);
     match st
@@ -402,6 +410,7 @@ struct PrinterFormView {
     name: String,
     brand: String,
     model: String,
+    heads: u8,
     module: String,
     module_count: Option<u8>,
 }
@@ -412,6 +421,7 @@ impl From<Printer> for PrinterFormView {
             name: p.name.as_str().into(),
             brand: p.brand.as_str().into(),
             model: p.model,
+            heads: p.heads,
             module: p.module.kind().into(),
             module_count: p.module.count(),
         }
@@ -419,7 +429,7 @@ impl From<Printer> for PrinterFormView {
 }
 async fn create(State(st): State<AppState>, Form(f): Form<PrinterForm>) -> Response {
     let dest = f.destination();
-    let (name, brand, model, module) = match f.domain() {
+    let (name, brand, model, heads, module) = match f.domain() {
         Ok(v) => v,
         Err(_) => {
             return (
@@ -435,6 +445,7 @@ async fn create(State(st): State<AppState>, Form(f): Form<PrinterForm>) -> Respo
             name,
             brand,
             model,
+            heads,
             module,
         })
         .await
@@ -449,7 +460,7 @@ async fn update(
     Form(f): Form<PrinterForm>,
 ) -> Response {
     let dest = f.destination();
-    let (name, brand, model, module) = match f.domain() {
+    let (name, brand, model, heads, module) = match f.domain() {
         Ok(v) => v,
         Err(_) => return StatusCode::UNPROCESSABLE_ENTITY.into_response(),
     };
@@ -458,6 +469,7 @@ async fn update(
         name,
         brand,
         model,
+        heads,
         module,
         slots: vec![],
     };

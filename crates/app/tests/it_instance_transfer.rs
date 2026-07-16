@@ -31,10 +31,10 @@ async fn exported_snapshot_round_trips_and_failed_replace_rolls_back() {
              ('spool-2', 'mat-1', 'Complete', '#112233', 'Navy', '1.75', 1000,
               800, 19.5000, 'Sealed', 'loc-1', 'maker-1', NULL,
               NULL, NULL, '2026-07-14T12:00:00Z');
-           INSERT INTO printers (id, name, brand, model, module_kind, module_count)
+           INSERT INTO printers (id, name, brand, model, heads, module_kind, module_count)
              VALUES
-               ('printer-1', 'Workshop', 'other', 'Palette', 'multi_colour', 3),
-               ('printer-2', 'Core', 'prusa', 'CORE One', 'indx', 8);
+               ('printer-1', 'Workshop', 'other', 'Palette', 1, 'multi_slot', 3),
+               ('printer-2', 'Core', 'prusa', 'CORE One+', 1, 'multi_slot', 8);
            INSERT INTO printer_slots
              (id, printer_id, group_label, slot_key, position, spool_id)
            VALUES
@@ -57,24 +57,25 @@ async fn exported_snapshot_round_trips_and_failed_replace_rolls_back() {
         original.spools[0].opened_at.unwrap().to_string(),
         "2026-07-12"
     );
-    assert_eq!(original.printers.len(), 2);
-    let indx = original
+    let multi_slot = original
         .printers
         .iter()
         .find(|printer| printer.id == "printer-2")
         .unwrap();
-    assert_eq!(indx.module_kind, "indx");
-    assert_eq!(indx.module_count, Some(8));
-    assert_eq!(original.printers[0].slots.len(), 3);
-    assert_eq!(
-        original.printers[0].slots[0].spool_id.as_deref(),
-        Some("spool-1")
-    );
-    assert_eq!(original.printers[0].slots[1].spool_id, None);
-    assert_eq!(
-        original.printers[0].slots[2].spool_id.as_deref(),
-        Some("spool-2")
-    );
+    assert_eq!(multi_slot.heads, 1);
+    assert_eq!(multi_slot.module_kind, "multi_slot");
+    assert_eq!(multi_slot.module_count, Some(8));
+    let workshop = original
+        .printers
+        .iter()
+        .find(|printer| printer.id == "printer-1")
+        .unwrap();
+    assert_eq!(workshop.heads, 1);
+    assert_eq!(workshop.module_kind, "multi_slot");
+    assert_eq!(workshop.slots.len(), 3);
+    assert_eq!(workshop.slots[0].spool_id.as_deref(), Some("spool-1"));
+    assert_eq!(workshop.slots[1].spool_id, None);
+    assert_eq!(workshop.slots[2].spool_id.as_deref(), Some("spool-2"));
     sqlx::raw_sql("DELETE FROM printer_slots; DELETE FROM printers; DELETE FROM spools; UPDATE instance_configuration SET low_stock_threshold = 99")
         .execute(&pool)
         .await

@@ -1,9 +1,28 @@
 use crate::shared::{DomainError, PrinterId, SpoolId};
 
-pub const BAMBU_MODELS: &[&str] = &["P1S", "P1P", "X1C", "X1E", "A1", "A1 mini"];
-pub const PRUSA_MODELS: &[&str] = &["MK4S", "MK4", "MINI+", "CORE One", "CORE One L", "XL"];
+pub const BAMBU_MODELS: &[&str] = &[
+    "A1 mini",
+    "A1",
+    "A2L",
+    "P1P",
+    "P1S",
+    "P2S",
+    "X1 Carbon",
+    "X2D",
+    "H2S",
+    "H2D",
+    "H2C",
+];
+pub const PRUSA_MODELS: &[&str] = &[
+    "MINI+",
+    "MK3 / MK3S / MK3S+",
+    "MK4S",
+    "CORE One+",
+    "CORE One L",
+    "XL",
+];
 pub const XL_HEAD_COUNTS: &[u8] = &[1, 2, 5];
-pub const INDX_SLOT_COUNTS: &[u8] = &[4, 8];
+pub const PRUSA_MULTI_SLOT_COUNTS: &[u8] = &[4, 8];
 pub const OTHER_SLOT_COUNTS: &[u8] = &[2, 3, 4, 5, 6, 8];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -59,33 +78,53 @@ pub enum Module {
     None,
     Ams,
     Mmu,
-    Indx { slots: u8 },
-    ToolChanger { heads: u8 },
-    MultiColour { slots: u8 },
+    MultiSlot { slots: u8 },
 }
 impl Module {
-    pub fn validate(brand: PrinterBrand, model: &str, module: Self) -> Result<Self, DomainError> {
-        let valid = match (&brand, model, &module) {
-            (PrinterBrand::BambuLab, _, Module::None | Module::Ams) => true,
-            (PrinterBrand::Prusa, "XL", Module::ToolChanger { heads }) => {
-                XL_HEAD_COUNTS.contains(heads)
-            }
-            (PrinterBrand::Prusa, "CORE One" | "CORE One L", Module::Indx { slots }) => {
-                INDX_SLOT_COUNTS.contains(slots)
-            }
-            (PrinterBrand::Prusa, "CORE One" | "CORE One L", Module::None | Module::Mmu) => true,
-            (PrinterBrand::Prusa, _, Module::None | Module::Mmu) if model != "XL" => true,
-            (PrinterBrand::Other, _, Module::None) => true,
-            (PrinterBrand::Other, _, Module::MultiColour { slots }) => {
-                OTHER_SLOT_COUNTS.contains(slots)
-            }
-            _ => false,
+    pub fn validate(
+        brand: PrinterBrand,
+        model: &str,
+        heads: u8,
+        module: Self,
+    ) -> Result<Self, DomainError> {
+        let valid_heads = match (brand, model) {
+            (PrinterBrand::BambuLab, "X2D" | "H2D") => heads == 2,
+            (PrinterBrand::Prusa, "XL") => XL_HEAD_COUNTS.contains(&heads),
+            _ => heads == 1,
         };
-        if valid {
+        let valid_module = if heads > 1 {
+            matches!(module, Module::None)
+        } else {
+            match (&brand, model, &module) {
+                (PrinterBrand::BambuLab, "X2D" | "H2D", _) => false,
+                (PrinterBrand::BambuLab, "H2C", Module::None | Module::MultiSlot { slots: 7 }) => {
+                    true
+                }
+                (PrinterBrand::BambuLab, _, Module::None | Module::Ams) => true,
+                (PrinterBrand::Prusa, "XL", Module::None) => true,
+                (
+                    PrinterBrand::Prusa,
+                    "CORE One" | "CORE One+" | "CORE One L",
+                    Module::MultiSlot { slots },
+                ) => PRUSA_MULTI_SLOT_COUNTS.contains(slots),
+                (
+                    PrinterBrand::Prusa,
+                    "CORE One" | "CORE One+" | "CORE One L",
+                    Module::None | Module::Mmu,
+                ) => true,
+                (PrinterBrand::Prusa, _, Module::None | Module::Mmu) if model != "XL" => true,
+                (PrinterBrand::Other, _, Module::None) => true,
+                (PrinterBrand::Other, _, Module::MultiSlot { slots }) => {
+                    OTHER_SLOT_COUNTS.contains(slots)
+                }
+                _ => false,
+            }
+        };
+        if valid_heads && valid_module {
             Ok(module)
         } else {
             Err(DomainError::InvalidPrinterConfiguration(format!(
-                "{} / {model} / {module:?}",
+                "{} / {model} / {heads} heads / {module:?}",
                 brand.as_str()
             )))
         }
@@ -95,16 +134,12 @@ impl Module {
             Self::None => "none",
             Self::Ams => "ams",
             Self::Mmu => "mmu",
-            Self::Indx { .. } => "indx",
-            Self::ToolChanger { .. } => "tool_changer",
-            Self::MultiColour { .. } => "multi_colour",
+            Self::MultiSlot { .. } => "multi_slot",
         }
     }
     pub fn count(&self) -> Option<u8> {
         match self {
-            Self::ToolChanger { heads } => Some(*heads),
-            Self::MultiColour { slots } => Some(*slots),
-            Self::Indx { slots } => Some(*slots),
+            Self::MultiSlot { slots } => Some(*slots),
             _ => None,
         }
     }
@@ -113,13 +148,7 @@ impl Module {
             "none" => Ok(Self::None),
             "ams" => Ok(Self::Ams),
             "mmu" => Ok(Self::Mmu),
-            "indx" => Ok(Self::Indx {
-                slots: count.unwrap_or(4) as u8,
-            }),
-            "tool_changer" => Ok(Self::ToolChanger {
-                heads: count.unwrap_or_default() as u8,
-            }),
-            "multi_colour" => Ok(Self::MultiColour {
+            "multi_slot" | "indx" | "multi_colour" => Ok(Self::MultiSlot {
                 slots: count.unwrap_or_default() as u8,
             }),
             _ => Err(DomainError::InvalidPrinterConfiguration(format!(
@@ -170,6 +199,7 @@ pub struct Printer {
     pub name: PrinterName,
     pub brand: PrinterBrand,
     pub model: String,
+    pub heads: u8,
     pub module: Module,
     pub slots: Vec<Slot>,
 }
@@ -178,6 +208,7 @@ pub struct NewPrinter {
     pub name: PrinterName,
     pub brand: PrinterBrand,
     pub model: String,
+    pub heads: u8,
     pub module: Module,
 }
 
@@ -199,9 +230,13 @@ fn slots(label: &str, prefix: &str, count: u8) -> Vec<Slot> {
 pub fn derive_slots(
     brand: PrinterBrand,
     model: &str,
+    heads: u8,
     module: &Module,
 ) -> Result<Vec<Slot>, DomainError> {
-    Module::validate(brand, model, module.clone())?;
+    Module::validate(brand, model, heads, module.clone())?;
+    if heads > 1 {
+        return Ok(slots("heads", "head", heads));
+    }
     Ok(match module {
         Module::Ams => {
             let mut out = slots("external", "ext", 1);
@@ -210,9 +245,11 @@ pub fn derive_slots(
         }
         Module::None if brand == PrinterBrand::BambuLab => slots("external", "ext", 1),
         Module::Mmu => slots("mmu", "mmu", 5),
-        Module::Indx { slots: count } => slots("indx", "indx", *count),
-        Module::ToolChanger { heads } => slots("heads", "head", *heads),
-        Module::MultiColour { slots: count } => slots("multi_colour", "multi", *count),
+        Module::MultiSlot { slots: count } => match brand {
+            PrinterBrand::Prusa => slots("indx", "indx", *count),
+            PrinterBrand::BambuLab => slots("buses", "multi", *count),
+            PrinterBrand::Other => slots("multi_slot", "multi", *count),
+        },
         Module::None => slots("spool", "main", 1),
     })
 }
@@ -232,41 +269,74 @@ mod tests {
         assert_eq!(PrinterName::new(" \n "), Err(DomainError::BlankPrinterName));
     }
     #[test]
-    fn bambu_branches() {
+    fn bambu_single_and_dual_head_models() {
         assert_eq!(
-            keys(&derive_slots(PrinterBrand::BambuLab, "P1S", &Module::None).unwrap()),
+            keys(&derive_slots(PrinterBrand::BambuLab, "H2S", 1, &Module::None).unwrap()),
             vec!["ext"]
         );
         assert_eq!(
-            keys(&derive_slots(PrinterBrand::BambuLab, "P1S", &Module::Ams).unwrap()),
+            keys(&derive_slots(PrinterBrand::BambuLab, "H2S", 1, &Module::Ams).unwrap()),
             vec!["ext", "ams-0", "ams-1", "ams-2", "ams-3"]
+        );
+        for model in ["X2D", "H2D"] {
+            assert_eq!(
+                keys(&derive_slots(PrinterBrand::BambuLab, model, 2, &Module::None).unwrap()),
+                vec!["head-0", "head-1"]
+            );
+            assert!(derive_slots(PrinterBrand::BambuLab, model, 2, &Module::Ams).is_err());
+        }
+        assert_eq!(
+            derive_slots(
+                PrinterBrand::BambuLab,
+                "H2C",
+                1,
+                &Module::MultiSlot { slots: 7 }
+            )
+            .unwrap()
+            .len(),
+            7
+        );
+        assert!(
+            derive_slots(
+                PrinterBrand::BambuLab,
+                "H2C",
+                1,
+                &Module::MultiSlot { slots: 6 }
+            )
+            .is_err()
         );
     }
     #[test]
-    fn prusa_single_mmu_indx() {
+    fn prusa_single_mmu_multi_slot() {
         assert_eq!(
-            derive_slots(PrinterBrand::Prusa, "MK4S", &Module::None)
+            derive_slots(PrinterBrand::Prusa, "MK4S", 1, &Module::None)
                 .unwrap()
                 .len(),
             1
         );
         assert_eq!(
-            derive_slots(PrinterBrand::Prusa, "MK4S", &Module::Mmu)
+            derive_slots(PrinterBrand::Prusa, "MK4S", 1, &Module::Mmu)
                 .unwrap()
                 .len(),
             5
         );
         assert_eq!(
-            derive_slots(PrinterBrand::Prusa, "CORE One", &Module::Indx { slots: 4 })
-                .unwrap()
-                .len(),
+            derive_slots(
+                PrinterBrand::Prusa,
+                "CORE One+",
+                1,
+                &Module::MultiSlot { slots: 4 }
+            )
+            .unwrap()
+            .len(),
             4
         );
         assert_eq!(
             derive_slots(
                 PrinterBrand::Prusa,
                 "CORE One L",
-                &Module::Indx { slots: 8 }
+                1,
+                &Module::MultiSlot { slots: 8 }
             )
             .unwrap()
             .len(),
@@ -274,32 +344,43 @@ mod tests {
         );
         for n in [0, 5, 7, 9] {
             assert!(
-                derive_slots(PrinterBrand::Prusa, "CORE One", &Module::Indx { slots: n }).is_err()
+                derive_slots(
+                    PrinterBrand::Prusa,
+                    "CORE One+",
+                    1,
+                    &Module::MultiSlot { slots: n }
+                )
+                .is_err()
             );
         }
-        assert!(derive_slots(PrinterBrand::Prusa, "MK4S", &Module::Indx { slots: 4 }).is_err());
-        assert!(derive_slots(PrinterBrand::Prusa, "XL", &Module::Indx { slots: 8 }).is_err());
+        assert!(
+            derive_slots(
+                PrinterBrand::Prusa,
+                "MK4S",
+                1,
+                &Module::MultiSlot { slots: 4 }
+            )
+            .is_err()
+        );
     }
     #[test]
     fn prusa_xl_all_head_counts() {
         for n in [1, 2, 5] {
             assert_eq!(
-                derive_slots(PrinterBrand::Prusa, "XL", &Module::ToolChanger { heads: n })
+                derive_slots(PrinterBrand::Prusa, "XL", n, &Module::None)
                     .unwrap()
                     .len(),
                 n as usize
             );
         }
         for n in [3, 4, 0, 6] {
-            assert!(
-                derive_slots(PrinterBrand::Prusa, "XL", &Module::ToolChanger { heads: n }).is_err()
-            );
+            assert!(derive_slots(PrinterBrand::Prusa, "XL", n, &Module::None).is_err());
         }
     }
     #[test]
     fn other_all_counts() {
         assert_eq!(
-            derive_slots(PrinterBrand::Other, "Ender", &Module::None)
+            derive_slots(PrinterBrand::Other, "Ender", 1, &Module::None)
                 .unwrap()
                 .len(),
             1
@@ -309,7 +390,8 @@ mod tests {
                 derive_slots(
                     PrinterBrand::Other,
                     "Ender",
-                    &Module::MultiColour { slots: *n }
+                    1,
+                    &Module::MultiSlot { slots: *n }
                 )
                 .unwrap()
                 .len(),
@@ -321,7 +403,8 @@ mod tests {
                 derive_slots(
                     PrinterBrand::Other,
                     "Ender",
-                    &Module::MultiColour { slots: n }
+                    1,
+                    &Module::MultiSlot { slots: n }
                 )
                 .is_err()
             );
@@ -329,7 +412,14 @@ mod tests {
     }
     #[test]
     fn invalid_cross_brand_modules() {
-        assert!(Module::validate(PrinterBrand::BambuLab, "P1S", Module::Mmu).is_err());
-        assert!(Module::validate(PrinterBrand::Prusa, "XL", Module::None).is_err());
+        assert!(Module::validate(PrinterBrand::BambuLab, "P1S", 1, Module::Mmu).is_err());
+        assert!(Module::validate(PrinterBrand::Prusa, "XL", 2, Module::Mmu).is_err());
+    }
+    #[test]
+    fn multi_slot_storage_round_trip() {
+        let module = Module::MultiSlot { slots: 4 };
+        assert_eq!(module.kind(), "multi_slot");
+        assert_eq!(module.count(), Some(4));
+        assert_eq!(Module::from_storage("multi_slot", Some(4)).unwrap(), module);
     }
 }

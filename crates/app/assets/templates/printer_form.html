@@ -10,6 +10,7 @@
     <label>{{ t(key="printers.form.model") }}<select id="printer-model-select"></select><input id="printer-model-free" placeholder="{{ t(key='printers.form.model_placeholder') }}"><input type="hidden" name="model" id="printer-model"></label>
   </div>
   <div id="module-controls">
+    <label id="heads-wrap">{{ t(key="printers.form.heads") }}<select name="heads" id="printer-heads"></select></label>
     <label id="module-select-wrap">{{ t(key="printers.form.module") }}<select name="module" id="printer-module"></select></label>
     <label id="module-count-wrap">{{ t(key="printers.form.count") }}<select name="module_count" id="printer-module-count"></select></label>
   </div>
@@ -18,20 +19,23 @@
 </form>
 <script>
 (() => {
- const initial={brand:'{% if editing %}{{ printer.brand }}{% else %}bambu{% endif %}',model:'{% if editing %}{{ printer.model }}{% else %}P1S{% endif %}',module:'{% if editing %}{{ printer.module }}{% else %}ams{% endif %}',count:{% if editing and printer.module_count %}{{ printer.module_count }}{% else %}4{% endif %}};
- const models={bambu:['P1S','P1P','X1C','X1E','A1','A1 mini'],prusa:['MK4S','MK4','MINI+','CORE One','CORE One L','XL']};
- const brand=document.querySelector('#printer-brand'), select=document.querySelector('#printer-model-select'), free=document.querySelector('#printer-model-free'), hidden=document.querySelector('#printer-model'), module=document.querySelector('#printer-module'), count=document.querySelector('#printer-module-count'), countWrap=document.querySelector('#module-count-wrap');
+ const initial={brand:'{% if editing %}{{ printer.brand }}{% else %}bambu{% endif %}',model:'{% if editing %}{{ printer.model }}{% else %}A1 mini{% endif %}',heads:{% if editing %}{{ printer.heads }}{% else %}1{% endif %},module:'{% if editing %}{{ printer.module }}{% else %}ams{% endif %}',count:{% if editing and printer.module_count %}{{ printer.module_count }}{% else %}4{% endif %}};
+ const models={bambu:{{ bambu_models_json | safe }},prusa:{{ prusa_models_json | safe }}};
+ const brand=document.querySelector('#printer-brand'), select=document.querySelector('#printer-model-select'), free=document.querySelector('#printer-model-free'), hidden=document.querySelector('#printer-model'), heads=document.querySelector('#printer-heads'), headsWrap=document.querySelector('#heads-wrap'), module=document.querySelector('#printer-module'), count=document.querySelector('#printer-module-count'), countWrap=document.querySelector('#module-count-wrap');
  brand.value=initial.brand;
  function option(v,label){const o=document.createElement('option');o.value=v;o.textContent=label;return o}
- function render(keep=true){const b=brand.value; select.hidden=b==='other';free.hidden=b!=='other';select.innerHTML='';if(b!=='other'){models[b].forEach(m=>select.append(option(m,m)));if(keep&&models[b].includes(initial.model))select.value=initial.model;}else free.value=keep?initial.model:''; syncModel(); module.innerHTML=''; count.innerHTML='';countWrap.hidden=true;
-   if(b==='bambu'){module.append(option('ams','{{ t(key="printers.module.ams") }}'));module.append(option('none','{{ t(key="printers.module.none") }}'));}
-   else if(b==='prusa'&&select.value==='XL'){module.append(option('tool_changer','{{ t(key="printers.module.tool_changer") }}'));[1,2,5].forEach(n=>count.append(option(n,n)));countWrap.hidden=false;}
-   else if(b==='prusa'){module.append(option('none','{{ t(key="printers.module.none") }}'));module.append(option('mmu','MMU'));if(select.value==='CORE One'||select.value==='CORE One L'){module.append(option('indx','INDX'));[4,8].forEach(n=>count.append(option(n,n)));}}
-   else {module.append(option('none','{{ t(key="printers.module.none") }}'));module.append(option('multi_colour','{{ t(key="printers.module.multi_colour") }}'));[2,3,4,5,6,8].forEach(n=>count.append(option(n,n)));}
+ function render(keep=true){const b=brand.value; select.hidden=b==='other';free.hidden=b!=='other';select.innerHTML='';if(b!=='other'){models[b].forEach(m=>select.append(option(m,m)));if(keep&&models[b].includes(initial.model))select.value=initial.model;}else free.value=keep?initial.model:''; syncModel(); heads.innerHTML='';module.innerHTML=''; count.innerHTML='';headsWrap.hidden=true;countWrap.hidden=true;
+   const model=hidden.value; let allowedHeads=[1]; if(b==='prusa'&&model==='XL'){allowedHeads=[1,2,5];headsWrap.hidden=false}else if(b==='bambu'&&(model==='X2D'||model==='H2D'))allowedHeads=[2]; allowedHeads.forEach(n=>heads.append(option(n,n)));if(keep&&allowedHeads.includes(initial.heads))heads.value=initial.heads;
+   if(+heads.value>1){module.append(option('none','{{ t(key="printers.module.none") }}'));}
+   else if(b==='bambu'&&model==='H2C'){module.append(option('multi_slot','{{ t(key="printers.module.multi_slot") }}'));module.append(option('none','{{ t(key="printers.module.none") }}'));count.append(option(7,7));}
+   else if(b==='bambu'){module.append(option('ams','{{ t(key="printers.module.ams") }}'));module.append(option('none','{{ t(key="printers.module.none") }}'));}
+   else if(b==='prusa'&&model==='XL'){module.append(option('none','{{ t(key="printers.module.none") }}'));}
+   else if(b==='prusa'){module.append(option('none','{{ t(key="printers.module.none") }}'));module.append(option('mmu','MMU'));if(model==='CORE One+'||model==='CORE One L'){module.append(option('multi_slot','INDX'));[4,8].forEach(n=>count.append(option(n,n)));}}
+   else {module.append(option('none','{{ t(key="printers.module.none") }}'));module.append(option('multi_slot','{{ t(key="printers.module.multi_slot") }}'));[2,3,4,5,6,8].forEach(n=>count.append(option(n,n)));}
    if(keep&&[...module.options].some(o=>o.value===initial.module))module.value=initial.module;if(keep&&[...count.options].some(o=>+o.value===initial.count))count.value=initial.count;toggleCount(); }
  function syncModel(){hidden.value=brand.value==='other'?free.value:select.value}
- function toggleCount(){countWrap.hidden=!(module.value==='tool_changer'||module.value==='multi_colour'||module.value==='indx')}
- brand.addEventListener('change',()=>{initial.model=brand.value==='bambu'?'P1S':brand.value==='prusa'?'MK4S':'';initial.module=brand.value==='bambu'?'ams':'none';render(true)});select.addEventListener('change',()=>{initial.model=select.value;initial.module='none';render(true)});free.addEventListener('input',syncModel);module.addEventListener('change',toggleCount);document.querySelector('#printer-form').addEventListener('submit',syncModel);render(true);
+ function toggleCount(){countWrap.hidden=!(module.value==='multi_slot'&&count.options.length>1)}
+ brand.addEventListener('change',()=>{initial.model=brand.value==='bambu'?'A1 mini':brand.value==='prusa'?'MINI+':'';initial.heads=1;initial.module=brand.value==='bambu'?'ams':'none';render(true)});select.addEventListener('change',()=>{initial.model=select.value;initial.heads=(select.value==='X2D'||select.value==='H2D'||select.value==='XL')?2:1;initial.module=select.value==='H2C'?'multi_slot':'none';initial.count=select.value==='H2C'?7:4;render(true)});heads.addEventListener('change',()=>{initial.heads=+heads.value;render(true)});free.addEventListener('input',syncModel);module.addEventListener('change',toggleCount);document.querySelector('#printer-form').addEventListener('submit',syncModel);render(true);
 })();
 </script>
 {% endblock content %}

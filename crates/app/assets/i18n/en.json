@@ -273,12 +273,12 @@
   "printers.group.mmu": "MMU",
   "printers.group.indx": "INDX",
   "printers.group.heads": "Tool heads",
-  "printers.group.multi_colour": "Multi-colour module",
+  "printers.group.buses": "Nozzle buses",
+  "printers.group.multi_slot": "Multi-material module",
   "printers.brand.other": "Other",
   "printers.module.none": "None (single spool)",
   "printers.module.ams": "AMS (4 slots)",
-  "printers.module.tool_changer": "Tool changer",
-  "printers.module.multi_colour": "Multi-colour module",
+  "printers.module.multi_slot": "Multi-Slot module",
   "printers.form.add_title": "New printer",
   "printers.form.edit_title": "Edit printer",
   "printers.form.subtitle": "Configure the printer and its filament slots.",
@@ -288,5 +288,6 @@
   "printers.form.model": "Model",
   "printers.form.model_placeholder": "e.g. Ender 3 V3",
   "printers.form.module": "Filament module",
+  "printers.form.heads": "Print heads",
   "printers.form.count": "Number of slots / heads"
 }
