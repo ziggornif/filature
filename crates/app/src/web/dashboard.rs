@@ -7,6 +7,7 @@
 
 use crate::web::router::{internal_error, resolve_locale, resolve_theme};
 use crate::web::state::AppState;
+use crate::web::templates::Renderer;
 use axum::{
     Router,
     extract::State,
@@ -15,6 +16,7 @@ use axum::{
     routing::get,
 };
 use domain::dashboard::{DashboardOverview, MaterialStockRow, SoonEmptyItem};
+use domain::spools::Colour;
 use serde::Serialize;
 use tera::Context;
 
@@ -48,24 +50,25 @@ pub struct SoonEmptyView {
     pub manufacturer_name: Option<String>,
     pub material_name: String,
     pub colour_hex: String,
-    /// The colour's human name if set, else the hex code — same convention
-    /// as `SpoolView::colour_label`.
+    /// The localized human name derived from the colour value.
     pub colour_label: String,
     pub location_name: Option<String>,
     pub remaining_g: f64,
     pub remaining_pct: u8,
 }
 
-impl From<SoonEmptyItem> for SoonEmptyView {
-    fn from(item: SoonEmptyItem) -> Self {
+impl SoonEmptyView {
+    fn localized(item: SoonEmptyItem, renderer: &Renderer, locale: &str) -> Self {
+        let colour_label = Colour::from_hex(item.colour_hex.clone())
+            .ok()
+            .and_then(|colour| colour.name().map(str::to_owned))
+            .map(|key| renderer.t(locale, &format!("spools.colour.preset.{key}")))
+            .unwrap_or_else(|| "—".into());
         Self {
             spool_id: item.spool_id,
             manufacturer_name: item.manufacturer_name,
             material_name: item.material_name,
-            colour_label: item
-                .colour_name
-                .clone()
-                .unwrap_or_else(|| item.colour_hex.clone()),
+            colour_label,
             colour_hex: item.colour_hex,
             location_name: item.location_name,
             remaining_g: round1(item.remaining_weight.value()),
@@ -90,8 +93,8 @@ pub struct DashboardView {
     pub soon_empty: Vec<SoonEmptyView>,
 }
 
-impl From<DashboardOverview> for DashboardView {
-    fn from(o: DashboardOverview) -> Self {
+impl DashboardView {
+    fn localized(o: DashboardOverview, renderer: &Renderer, locale: &str) -> Self {
         Self {
             stock_value: o.stock_value.to_string(),
             remaining_kg: to_kg(o.total_remaining.value()),
@@ -100,7 +103,11 @@ impl From<DashboardOverview> for DashboardView {
             empty_count: o.empty_count,
             alert_count: o.alert_count,
             material_breakdown: o.material_breakdown.into_iter().map(Into::into).collect(),
-            soon_empty: o.soon_empty.into_iter().map(Into::into).collect(),
+            soon_empty: o
+                .soon_empty
+                .into_iter()
+                .map(|item| SoonEmptyView::localized(item, renderer, locale))
+                .collect(),
         }
     }
 }
@@ -132,7 +139,7 @@ fn render(
     nav_spool_count: u64,
     nav_printer_count: usize,
 ) -> Response {
-    let view: DashboardView = overview.into();
+    let view = DashboardView::localized(overview, &st.renderer, locale);
     let mut ctx = Context::new();
     ctx.insert("stock_value", &view.stock_value);
     ctx.insert("remaining_kg", &view.remaining_kg);
@@ -345,7 +352,8 @@ mod tests {
 
     #[test]
     fn view_maps_kg_percent_and_money_formatting() {
-        let view: DashboardView = sample_overview().into();
+        let renderer = Renderer::new(Catalog::load("en"));
+        let view = DashboardView::localized(sample_overview(), &renderer, "en");
         assert_eq!(view.stock_value, "25.00");
         assert_eq!(view.remaining_kg, 1.23);
         assert_eq!(view.material_breakdown[0].remaining_kg, 0.5);
@@ -355,14 +363,15 @@ mod tests {
             view.soon_empty[0].manufacturer_name.as_deref(),
             Some("Prusament")
         );
-        assert_eq!(view.soon_empty[0].colour_label, "#1A9E4B"); // no name -> hex
+        assert_eq!(view.soon_empty[0].colour_label, "Green");
     }
 
     #[test]
     fn view_of_empty_overview_is_all_zeros() {
         let overview =
             DashboardOverview::from_rows(Vec::new(), domain::shared::LowStockThreshold::default());
-        let view: DashboardView = overview.into();
+        let renderer = Renderer::new(Catalog::load("en"));
+        let view = DashboardView::localized(overview, &renderer, "en");
         // `Money`'s `Display` always renders to the cent (TD-011), so zero
         // stock shows "0.00", not a raw "0".
         assert_eq!(view.stock_value, "0.00");

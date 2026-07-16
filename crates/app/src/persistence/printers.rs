@@ -359,7 +359,7 @@ impl PrinterRepository for SqlxPrinterRepository {
         current: Option<&SpoolId>,
     ) -> Result<Vec<LoadableSpool>, RepositoryError> {
         let rows = sqlx::query(
-            r#"SELECT s.id,mf.name AS manufacturer_name,s.colour_name,
+            r#"SELECT s.id,mf.name AS manufacturer_name,s.colour_hex,s.colour_name,
                       m.name AS material_name
                FROM spools s
                JOIN materials m ON m.id=s.material_id
@@ -378,6 +378,7 @@ impl PrinterRepository for SqlxPrinterRepository {
             .map(|r| LoadableSpool {
                 id: SpoolId::new(r.get::<String, _>("id")),
                 manufacturer_name: r.get("manufacturer_name"),
+                colour_hex: r.get("colour_hex"),
                 colour_name: r.get("colour_name"),
                 material_name: r.get("material_name"),
             })

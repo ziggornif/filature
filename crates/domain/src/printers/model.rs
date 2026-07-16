@@ -211,6 +211,7 @@ impl LoadedSpool {
 pub struct LoadableSpool {
     pub id: SpoolId,
     pub manufacturer_name: Option<String>,
+    pub colour_hex: Option<String>,
     pub colour_name: Option<String>,
     pub material_name: String,
 }

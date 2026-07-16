@@ -140,7 +140,7 @@ async fn stock_rows_excludes_archived_and_maps_fields_correctly() {
     assert_eq!(row1.material_name, "Dash-PLA");
     assert_eq!(row1.manufacturer_name, None);
     assert_eq!(row1.colour_hex, "#1A9E4B");
-    assert_eq!(row1.colour_name, Some("#1A9E4B".to_string()));
+    assert_eq!(row1.colour_name, Some("green".to_string()));
     assert_eq!(row1.status, StockStatus::Sealed);
     assert_eq!(row1.remaining_weight.value(), 1000.0);
     assert_eq!(row1.net_weight.value(), 1000.0);
