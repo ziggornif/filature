@@ -109,6 +109,39 @@ async fn insert_list_update_preserves_surviving_keys_and_delete_cascades() {
 }
 
 #[tokio::test]
+async fn list_tolerates_printer_without_stored_feed_modes() {
+    // A printer row with no `printer_head_feed_modes` (a legacy / pre-topology
+    // state, also produced by other tests sharing this database) must not make
+    // the global `list()` read fail: every head defaults to Direct.
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let id = "nofeed-regression-printer";
+    // Idempotent: clear any residue from an earlier run against a reused container.
+    sqlx::query("DELETE FROM printers WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO printers(id,name,brand,model,heads,module_kind,module_count) \
+         VALUES($1,'Legacy','other','Palette',1,'none',NULL)",
+    )
+    .bind(id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let repo = SqlxPrinterRepository::new(pool.clone());
+    let listed = repo.list().await.unwrap();
+    let printer = listed.into_iter().find(|p| p.id.as_str() == id).unwrap();
+    assert_eq!(printer.feed_modes, vec![FeedMode::Direct]);
+    sqlx::query("DELETE FROM printers WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
 async fn unknown_update_and_delete_are_not_found() {
     let url = support::postgres_url().await;
     let pool = connect_and_migrate(&url).await.unwrap();

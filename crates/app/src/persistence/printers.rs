@@ -39,13 +39,21 @@ async fn topology(
     .into_iter()
     .map(|mode| FeedMode::parse(&mode).map_err(RepositoryError::from))
     .collect::<Result<Vec<_>, _>>()?;
-    if modes.len() != usize::from(heads) {
+    // A printer with no stored feed-mode rows predates the AMS-topology model
+    // (or was inserted before its heads were backfilled); default every head to
+    // Direct, mirroring migration 0012 and the export adapter's tolerant read. A
+    // non-empty-but-wrong-length set is genuine corruption and still rejected.
+    let modes = if modes.is_empty() {
+        vec![FeedMode::Direct; usize::from(heads)]
+    } else if modes.len() != usize::from(heads) {
         return Err(RepositoryError::Domain(
             domain::shared::DomainError::InvalidPrinterConfiguration(
                 "stored feed modes do not match heads".into(),
             ),
         ));
-    }
+    } else {
+        modes
+    };
     Ok((
         u8::try_from(ams_units).map_err(|_| {
             RepositoryError::Domain(domain::shared::DomainError::InvalidPrinterConfiguration(
