@@ -65,6 +65,10 @@ struct WirePrinter {
     heads: u8,
     module_kind: String,
     module_count: Option<u16>,
+    #[serde(default)]
+    ams_units: Option<u8>,
+    #[serde(default)]
+    feed_modes: Option<Vec<String>>,
     slots: Vec<WirePrinterSlot>,
 }
 fn default_printer_heads() -> u8 {
@@ -229,6 +233,8 @@ impl From<&SnapshotPrinter> for WirePrinter {
             heads: printer.heads,
             module_kind: printer.module_kind.clone(),
             module_count: printer.module_count,
+            ams_units: Some(printer.ams_units),
+            feed_modes: Some(printer.feed_modes.clone()),
             slots: printer.slots.iter().map(WirePrinterSlot::from).collect(),
         }
     }
@@ -359,6 +365,7 @@ impl TryFrom<WireSnapshot> for InstanceSnapshot {
 
 impl From<WirePrinter> for SnapshotPrinter {
     fn from(printer: WirePrinter) -> Self {
+        let old_bambu_ams = printer.brand == "bambu" && printer.module_kind == "ams";
         let (heads, module_kind, module_count) = match printer.module_kind.as_str() {
             "tool_changer" => (
                 printer
@@ -373,8 +380,40 @@ impl From<WirePrinter> for SnapshotPrinter {
                 "multi_slot".to_string(),
                 printer.module_count,
             ),
+            "ams" if printer.brand == "bambu" => (printer.heads, "none".to_string(), None),
             _ => (printer.heads, printer.module_kind, printer.module_count),
         };
+        let ams_units = printer.ams_units.unwrap_or(u8::from(old_bambu_ams));
+        let feed_modes = printer.feed_modes.unwrap_or_else(|| {
+            vec![
+                if old_bambu_ams {
+                    "ams_fed".to_string()
+                } else {
+                    "direct".to_string()
+                };
+                usize::from(heads)
+            ]
+        });
+        let legacy_bambu = printer.brand == "bambu" && printer.ams_units.is_none();
+        let slots = printer
+            .slots
+            .into_iter()
+            .filter_map(|mut slot| {
+                if legacy_bambu && old_bambu_ams {
+                    if slot.slot_key == "ext" {
+                        return None;
+                    }
+                    if let Some(suffix) = slot.slot_key.strip_prefix("ams-") {
+                        slot.slot_key = format!("ams0-{suffix}");
+                        slot.group_label = "ams_unit_1".into();
+                    }
+                } else if legacy_bambu && slot.slot_key == "ext" {
+                    slot.slot_key = "head-0".into();
+                    slot.group_label = "heads".into();
+                }
+                Some(slot.into())
+            })
+            .collect();
         Self {
             id: printer.id,
             name: printer.name,
@@ -383,7 +422,9 @@ impl From<WirePrinter> for SnapshotPrinter {
             heads,
             module_kind,
             module_count,
-            slots: printer.slots.into_iter().map(Into::into).collect(),
+            ams_units,
+            feed_modes,
+            slots,
         }
     }
 }
@@ -520,15 +561,28 @@ mod tests {
           {"id":"p1","name":"XL","brand":"prusa","model":"XL","module_kind":"tool_changer","module_count":5,"slots":[]},
           {"id":"p2","name":"Core","brand":"prusa","model":"CORE One","module_kind":"indx","module_count":8,"slots":[]},
           {"id":"p3","name":"Other","brand":"other","model":"Custom","module_kind":"multi_colour","module_count":4,"slots":[]}
+          ,{"id":"p4","name":"P1S","brand":"bambu","model":"P1S","module_kind":"ams","module_count":null,"slots":[{"slot_key":"ext","group_label":"external","position":0,"spool_id":null},{"slot_key":"ams-0","group_label":"ams","position":1,"spool_id":"s1"}]}
+          ,{"id":"p5","name":"A1","brand":"bambu","model":"A1","module_kind":"none","module_count":null,"slots":[{"slot_key":"ext","group_label":"external","position":0,"spool_id":null}]}
         ],"#;
         let json = VALID.replace("\"configuration\"", &format!("{printers}\"configuration\""));
         let document = decode(json.as_bytes()).unwrap();
         assert_eq!(document.content.printers[0].heads, 5);
         assert_eq!(document.content.printers[0].module_kind, "none");
-        for printer in &document.content.printers[1..] {
+        for printer in &document.content.printers[1..3] {
             assert_eq!(printer.heads, 1);
             assert_eq!(printer.module_kind, "multi_slot");
         }
+        let ams = &document.content.printers[3];
+        assert_eq!(ams.module_kind, "none");
+        assert_eq!(ams.ams_units, 1);
+        assert_eq!(ams.feed_modes, ["ams_fed"]);
+        assert_eq!(ams.slots.len(), 1);
+        assert_eq!(ams.slots[0].slot_key, "ams0-0");
+        assert_eq!(ams.slots[0].spool_id.as_deref(), Some("s1"));
+        let direct = &document.content.printers[4];
+        assert_eq!(direct.ams_units, 0);
+        assert_eq!(direct.feed_modes, ["direct"]);
+        assert_eq!(direct.slots[0].slot_key, "head-0");
         assert_eq!(decode(&encode(&document).unwrap()).unwrap(), document);
     }
 

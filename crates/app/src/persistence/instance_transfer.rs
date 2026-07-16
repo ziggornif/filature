@@ -85,6 +85,8 @@ struct PrinterRow {
     heads: i32,
     module_kind: String,
     module_count: Option<i32>,
+    ams_units: i64,
+    feed_modes: Vec<String>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -224,7 +226,10 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
         .collect::<Result<Vec<_>, TransferError>>()?;
 
         let mut printers = sqlx::query_as::<_, PrinterRow>(
-            "SELECT id, name, brand, model, heads, module_kind, module_count FROM printers ORDER BY id",
+            r#"SELECT p.id, p.name, p.brand, p.model, p.heads, p.module_kind, p.module_count,
+                      (SELECT COUNT(*) FROM printer_ams_units a WHERE a.printer_id=p.id) AS ams_units,
+                      ARRAY(SELECT feed_mode FROM printer_head_feed_modes f WHERE f.printer_id=p.id ORDER BY head_index) AS feed_modes
+               FROM printers p ORDER BY p.id"#,
         )
         .fetch_all(&mut *transaction)
         .await
@@ -242,6 +247,8 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
                     .module_count
                     .map(|count| u16_field("module_count", count))
                     .transpose()?,
+                ams_units: u8::try_from(row.ams_units).map_err(|_| invalid_value("ams_units", row.ams_units))?,
+                feed_modes: row.feed_modes,
                 slots: vec![],
             })
         })
@@ -417,6 +424,22 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
             .execute(&mut *transaction)
             .await
             .map_err(backend)?;
+
+            for unit in 0..printer.ams_units {
+                sqlx::query(
+                    "INSERT INTO printer_ams_units (printer_id, unit_index) VALUES ($1, $2)",
+                )
+                .bind(&printer.id)
+                .bind(i32::from(unit))
+                .execute(&mut *transaction)
+                .await
+                .map_err(backend)?;
+            }
+            for (head, mode) in printer.feed_modes.iter().enumerate() {
+                sqlx::query("INSERT INTO printer_head_feed_modes (printer_id, head_index, feed_mode) VALUES ($1, $2, $3)")
+                    .bind(&printer.id).bind(i32::try_from(head).map_err(|_| invalid_value("head_index", head))?).bind(mode)
+                    .execute(&mut *transaction).await.map_err(backend)?;
+            }
 
             for slot in printer.slots {
                 sqlx::query(

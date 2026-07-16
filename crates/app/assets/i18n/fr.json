@@ -269,6 +269,10 @@
   "printers.error.already_loaded": "Cette bobine est déjà chargée.",
   "printers.group.external": "Bobine externe",
   "printers.group.ams": "AMS",
+  "printers.group.ams_unit_1": "AMS 1",
+  "printers.group.ams_unit_2": "AMS 2",
+  "printers.group.ams_unit_3": "AMS 3",
+  "printers.group.ams_unit_4": "AMS 4",
   "printers.group.spool": "Bobine",
   "printers.group.mmu": "MMU",
   "printers.group.indx": "INDX",
@@ -277,7 +281,6 @@
   "printers.group.multi_slot": "Module multi-matériaux",
   "printers.brand.other": "Autre",
   "printers.module.none": "Aucun (bobine unique)",
-  "printers.module.ams": "AMS (4 emplacements)",
   "printers.module.multi_slot": "Module Multi-Slot",
   "printers.form.add_title": "Nouvelle imprimante",
   "printers.form.edit_title": "Modifier l’imprimante",
@@ -289,5 +292,10 @@
   "printers.form.model_placeholder": "ex. Ender 3 V3",
   "printers.form.module": "Module filament",
   "printers.form.heads": "Têtes d’impression",
-  "printers.form.count": "Nombre d’emplacements / têtes"
+  "printers.form.count": "Nombre d’emplacements / têtes",
+  "printers.form.ams_units": "Unités AMS",
+  "printers.form.feed_modes": "Mode d’alimentation par tête",
+  "printers.form.head": "Tête",
+  "printers.feed.direct": "Bobine directe",
+  "printers.feed.ams_fed": "Alimentée par AMS"
 }
