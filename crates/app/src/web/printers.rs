@@ -183,8 +183,11 @@ pub struct PrinterForm {
     module_count: Option<u8>,
     #[serde(default)]
     ams_units: u8,
+    // Comma-separated per-head feed modes (e.g. "ams_fed,direct"). A single
+    // string field is used because urlencoded form bodies cannot deserialize
+    // repeated keys into a sequence.
     #[serde(default)]
-    feed_modes: Vec<String>,
+    feed_modes: String,
     #[serde(default)]
     from: String,
 }
@@ -231,13 +234,16 @@ impl PrinterForm {
         let module =
             Module::validate(brand, &model, self.heads, module).map_err(|e| e.to_string())?;
         let feed_modes = if brand == PrinterBrand::BambuLab {
-            if self.feed_modes.len() != usize::from(self.heads) {
+            let parsed = self
+                .feed_modes
+                .split(',')
+                .filter(|m| !m.is_empty())
+                .map(|m| FeedMode::parse(m).map_err(|e| e.to_string()))
+                .collect::<Result<Vec<_>, _>>()?;
+            if parsed.len() != usize::from(self.heads) {
                 return Err("invalid feed modes".into());
             }
-            self.feed_modes
-                .iter()
-                .map(|m| FeedMode::parse(m).map_err(|e| e.to_string()))
-                .collect::<Result<Vec<_>, _>>()?
+            parsed
         } else {
             vec![FeedMode::Direct; usize::from(self.heads)]
         };
@@ -549,4 +555,59 @@ pub fn routes() -> Router<AppState> {
             "/printers/{printer_id}/slots/{slot_key}",
             axum::routing::post(set_slot),
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PrinterForm;
+    use domain::printers::FeedMode;
+
+    // Reproduces the axum::Form path: urlencoded bodies cannot deserialize
+    // repeated keys into a sequence, so feed_modes travels as one CSV field.
+    fn form(body: &str) -> PrinterForm {
+        serde_urlencoded::from_str(body).expect("urlencoded body deserializes")
+    }
+
+    #[test]
+    fn single_head_bambu_feed_mode_round_trips() {
+        let (_, _, _, heads, _, ams_units, feed_modes) = form(
+            "name=Shop&brand=bambu&model=P1S&heads=1&module=none&ams_units=1&feed_modes=ams_fed",
+        )
+        .domain()
+        .unwrap();
+        assert_eq!(heads, 1);
+        assert_eq!(ams_units, 1);
+        assert_eq!(feed_modes, vec![FeedMode::AmsFed]);
+    }
+
+    #[test]
+    fn dual_head_bambu_parses_csv_feed_modes_in_order() {
+        let (_, _, _, _, _, _, feed_modes) = form(
+            "name=H2D&brand=bambu&model=H2D&heads=2&module=none&ams_units=1&feed_modes=direct,ams_fed",
+        )
+        .domain()
+        .unwrap();
+        assert_eq!(feed_modes, vec![FeedMode::Direct, FeedMode::AmsFed]);
+    }
+
+    #[test]
+    fn non_bambu_ignores_absent_feed_modes() {
+        let (_, _, _, _, _, ams_units, feed_modes) =
+            form("name=MK&brand=prusa&model=MK4S&heads=1&module=none")
+                .domain()
+                .unwrap();
+        assert_eq!(ams_units, 0);
+        assert_eq!(feed_modes, vec![FeedMode::Direct]);
+    }
+
+    #[test]
+    fn feed_modes_count_must_match_heads() {
+        assert!(
+            form(
+                "name=H2D&brand=bambu&model=H2D&heads=2&module=none&ams_units=1&feed_modes=direct"
+            )
+            .domain()
+            .is_err()
+        );
+    }
 }
