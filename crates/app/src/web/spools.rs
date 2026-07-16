@@ -10,6 +10,7 @@
 
 use crate::web::router::{internal_error, resolve_locale, resolve_theme};
 use crate::web::state::AppState;
+use crate::web::templates::Renderer;
 use axum::{
     Router,
     body::Body,
@@ -38,8 +39,7 @@ pub struct SpoolView {
     pub id: String,
     pub material_name: String,
     pub colour_hex: String,
-    /// The colour's human name if set, else the hex code — always
-    /// something displayable (e.g. as a swatch `title`).
+    /// The localized human name derived from the colour value.
     pub colour_label: String,
     pub diameter: String, // "1.75" | "2.85"
     pub remaining_weight: f64,
@@ -54,8 +54,8 @@ pub struct SpoolView {
     pub manufacturer_name: Option<String>,
 }
 
-impl From<SpoolListItem> for SpoolView {
-    fn from(item: SpoolListItem) -> Self {
+impl SpoolView {
+    fn localized(item: SpoolListItem, renderer: &Renderer, locale: &str) -> Self {
         let remaining_pct = (item.remaining_ratio() * 100.0).round();
         let remaining_length_m = round1(item.remaining_length_m());
         let (colour_hex, colour_label) = item
@@ -64,7 +64,7 @@ impl From<SpoolListItem> for SpoolView {
             .map(|colour| {
                 (
                     colour.hex().to_string(),
-                    colour.name().unwrap_or(colour.hex()).to_string(),
+                    localized_colour_name(renderer, locale, colour),
                 )
             })
             .unwrap_or_default();
@@ -99,12 +99,9 @@ pub struct SpoolDetailView {
     pub id: String,
     pub material_name: String,
     pub colour_hex: String,
-    /// The colour's human name if set, else the hex code — always
-    /// something displayable (e.g. as a swatch `title`).
+    /// The localized human name derived from the colour value.
     pub colour_label: String,
-    /// Whether a colour name was actually set — lets the template show the
-    /// name next to the swatch only when there's a name distinct from the
-    /// hex code.
+    /// Whether a colour is present.
     pub has_colour_name: bool,
     pub diameter: String, // "1.75" | "2.85"
     pub net_weight: f64,
@@ -128,8 +125,8 @@ pub struct SpoolDetailView {
     pub opened_at: Option<String>,
 }
 
-impl From<SpoolDetail> for SpoolDetailView {
-    fn from(d: SpoolDetail) -> Self {
+impl SpoolDetailView {
+    fn localized(d: SpoolDetail, renderer: &Renderer, locale: &str) -> Self {
         let remaining_pct = (d.remaining_ratio() * 100.0).round();
         let remaining_length_m = round1(d.remaining_length_m());
         let total_length_m = round1(calculate_length_m(d.net_weight, d.density, d.diameter));
@@ -145,7 +142,7 @@ impl From<SpoolDetail> for SpoolDetailView {
             .map(|colour| {
                 (
                     colour.hex().to_string(),
-                    colour.name().unwrap_or(colour.hex()).to_string(),
+                    localized_colour_name(renderer, locale, colour),
                     true,
                 )
             })
@@ -173,6 +170,11 @@ impl From<SpoolDetail> for SpoolDetailView {
             opened_at: d.opened_at.map(|date| date.to_string()),
         }
     }
+}
+
+fn localized_colour_name(renderer: &Renderer, locale: &str, colour: &Colour) -> String {
+    let key = colour.name().expect("a colour always has a derived name");
+    renderer.t(locale, &format!("spools.colour.preset.{key}"))
 }
 
 /// A material option for the filter dropdown — the web layer's own
@@ -323,7 +325,10 @@ fn render_rows(
     low_stock_threshold_pct: u8,
 ) -> Response {
     let filtered_count = items.len();
-    let views: Vec<SpoolView> = items.into_iter().map(Into::into).collect();
+    let views: Vec<SpoolView> = items
+        .into_iter()
+        .map(|item| SpoolView::localized(item, &st.renderer, locale))
+        .collect();
     let mut ctx = Context::new();
     ctx.insert("spools", &views);
     ctx.insert("stock_value", stock_value);
@@ -392,7 +397,10 @@ async fn list_page(
     match st.spools.list(filter, q.to_sort()).await {
         Ok(items) => {
             let filtered_count = items.len();
-            let views: Vec<SpoolView> = items.into_iter().map(Into::into).collect();
+            let views: Vec<SpoolView> = items
+                .into_iter()
+                .map(|item| SpoolView::localized(item, &st.renderer, &locale))
+                .collect();
             let mut ctx = Context::new();
             ctx.insert("spools", &views);
             ctx.insert("materials", &materials);
@@ -952,7 +960,7 @@ async fn detail_page(
         Err(e) => return internal_error(e),
     };
 
-    let view: SpoolDetailView = detail.into();
+    let view = SpoolDetailView::localized(detail, &st.renderer, &locale);
     let mut ctx = Context::new();
     ctx.insert("spool", &view);
     ctx.insert("locations", &locations);
@@ -999,7 +1007,7 @@ async fn render_card(
         Ok(configuration) => configuration.low_stock_threshold.percent(),
         Err(e) => return internal_error(e),
     };
-    let view: SpoolDetailView = detail.into();
+    let view = SpoolDetailView::localized(detail, &st.renderer, locale);
     let mut ctx = Context::new();
     ctx.insert("spool", &view);
     ctx.insert("locations", &locations);
@@ -2107,7 +2115,7 @@ mod tests {
         let new = form.to_new().unwrap();
         assert_eq!(new.material_id, MaterialId::new("01HMAT"));
         assert_eq!(new.colour.as_ref().unwrap().hex(), "#1A9E4B");
-        assert_eq!(new.colour.as_ref().unwrap().name(), Some("#1A9E4B"));
+        assert_eq!(new.colour.as_ref().unwrap().name(), Some("green"));
         assert_eq!(new.diameter, Diameter::Mm1_75);
         assert_eq!(new.net_weight.value(), 1000.0);
         assert_eq!(

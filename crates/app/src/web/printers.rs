@@ -12,6 +12,7 @@ use domain::printers::{
     PrinterName, RepositoryError,
 };
 use domain::shared::{PrinterId, SpoolId};
+use domain::spools::Colour;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use tera::Context;
@@ -57,7 +58,7 @@ pub struct PrinterView {
     pub slot_summary: String,
 }
 impl PrinterView {
-    async fn build(p: Printer, st: &AppState) -> Result<Self, RepositoryError> {
+    async fn build(p: Printer, st: &AppState, locale: &str) -> Result<Self, RepositoryError> {
         let mut grouped: BTreeMap<String, Vec<SlotView>> = BTreeMap::new();
         let mut order = Vec::new();
         for slot in p.slots {
@@ -70,14 +71,14 @@ impl PrinterView {
                 .loadable_spools(current)
                 .await?
                 .into_iter()
-                .map(LoadableSpoolView::from)
+                .map(|spool| LoadableSpoolView::localized(spool, st, locale))
                 .collect();
             let loaded = slot.loaded_spool.map(|s| {
                 let remaining_pct = s.remaining_pct();
                 LoadedSpoolView {
                     id: s.id.as_str().into(),
                     brand: s.manufacturer_name.unwrap_or_else(|| "—".into()),
-                    colour_name: s.colour_name.unwrap_or_else(|| "—".into()),
+                    colour_name: localized_colour_name(st, locale, s.colour_hex.as_deref()),
                     colour_hex: s.colour_hex.unwrap_or_else(|| "transparent".into()),
                     material_name: s.material_name,
                     remaining_pct,
@@ -155,15 +156,25 @@ impl From<Printer> for PrinterView {
     }
 }
 
-impl From<LoadableSpool> for LoadableSpoolView {
-    fn from(s: LoadableSpool) -> Self {
+impl LoadableSpoolView {
+    fn localized(s: LoadableSpool, st: &AppState, locale: &str) -> Self {
         let brand = s.manufacturer_name.unwrap_or_else(|| "—".into());
-        let colour = s.colour_name.unwrap_or_else(|| "—".into());
+        let colour = localized_colour_name(st, locale, s.colour_hex.as_deref());
         Self {
             id: s.id.as_str().into(),
             label: format!("{brand} · {colour} ({})", s.material_name),
         }
     }
+}
+
+fn localized_colour_name(st: &AppState, locale: &str, hex: Option<&str>) -> String {
+    hex.and_then(|value| Colour::from_hex(value.to_string()).ok())
+        .and_then(|colour| colour.name().map(str::to_owned))
+        .map(|key| {
+            st.renderer
+                .t(locale, &format!("spools.colour.preset.{key}"))
+        })
+        .unwrap_or_else(|| "—".into())
 }
 
 #[derive(Default, Deserialize)]
@@ -282,7 +293,7 @@ async fn page(State(st): State<AppState>, headers: HeaderMap) -> Response {
         Ok(items) => {
             let mut views = Vec::with_capacity(items.len());
             for item in items {
-                match PrinterView::build(item, &st).await {
+                match PrinterView::build(item, &st, &locale).await {
                     Ok(view) => views.push(view),
                     Err(e) => return internal_error(e),
                 }
@@ -321,7 +332,7 @@ async fn loading_fragment(st: &AppState, headers: &HeaderMap) -> Response {
     };
     let mut views = Vec::with_capacity(items.len());
     for item in items {
-        match PrinterView::build(item, st).await {
+        match PrinterView::build(item, st, &locale).await {
             Ok(view) => views.push(view),
             Err(e) => return internal_error(e),
         }

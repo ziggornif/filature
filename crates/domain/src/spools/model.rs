@@ -48,20 +48,66 @@ fn normalize_hex(raw: &str) -> Option<String> {
     Some(format!("#{}", expanded.to_ascii_uppercase()))
 }
 
-fn colour_name(hex: &str) -> &str {
+fn colour_name(hex: &str) -> &'static str {
     match hex {
-        "#F2F0EA" => "White",
-        "#1A1A1A" => "Black",
-        "#8A8D8F" => "Grey",
-        "#E6DDC8" => "Natural",
-        "#C62828" => "Red",
-        "#E8631A" => "Orange",
-        "#F2B900" => "Yellow",
-        "#2E7D43" => "Green",
-        "#0F7D7A" => "Teal",
-        "#1F5FB0" => "Blue",
-        "transparent" => "Transparent",
-        other => other,
+        "#F2F0EA" => "white",
+        "#1A1A1A" => "black",
+        "#8A8D8F" => "grey",
+        "#E6DDC8" => "natural",
+        "#C62828" => "red",
+        "#E8631A" => "orange",
+        "#F2B900" => "yellow",
+        "#2E7D43" => "green",
+        "#0F7D7A" => "teal",
+        "#1F5FB0" => "blue",
+        "transparent" => "transparent",
+        _ => derived_colour_name(hex),
+    }
+}
+
+fn derived_colour_name(hex: &str) -> &'static str {
+    let rgb = u32::from_str_radix(&hex[1..], 16).expect("colour hex is normalized");
+    let red = ((rgb >> 16) & 0xff) as f64 / 255.0;
+    let green = ((rgb >> 8) & 0xff) as f64 / 255.0;
+    let blue = (rgb & 0xff) as f64 / 255.0;
+    let max = red.max(green).max(blue);
+    let min = red.min(green).min(blue);
+    let lightness = (max + min) / 2.0;
+
+    if lightness < 0.12 {
+        return "black";
+    }
+    if lightness > 0.92 {
+        return "white";
+    }
+
+    let delta = max - min;
+    let saturation = if delta == 0.0 {
+        0.0
+    } else {
+        delta / (1.0 - (2.0 * lightness - 1.0).abs())
+    };
+    if saturation < 0.12 {
+        return "grey";
+    }
+
+    let hue = if max == red {
+        60.0 * ((green - blue) / delta).rem_euclid(6.0)
+    } else if max == green {
+        60.0 * ((blue - red) / delta + 2.0)
+    } else {
+        60.0 * ((red - green) / delta + 4.0)
+    };
+    match hue {
+        h if !(15.0..345.0).contains(&h) => "red",
+        h if h < 40.0 => "orange",
+        h if h < 70.0 => "yellow",
+        h if h < 160.0 => "green",
+        h if h < 195.0 => "teal",
+        h if h < 255.0 => "blue",
+        h if h < 290.0 => "purple",
+        h if h < 330.0 => "magenta",
+        _ => "pink",
     }
 }
 
@@ -429,7 +475,7 @@ mod tests {
     fn colour_normalizes_hex_and_derives_name() {
         let c = Colour::from_hex("1a9e4b".into()).unwrap();
         assert_eq!(c.hex(), "#1A9E4B");
-        assert_eq!(c.name(), Some("#1A9E4B"));
+        assert_eq!(c.name(), Some("green"));
     }
     #[test]
     fn colour_rejects_bad_hex() {
@@ -441,12 +487,24 @@ mod tests {
     fn colour_supports_transparent_and_preset_names() {
         assert_eq!(
             Colour::from_hex("transparent".into()).unwrap().name(),
-            Some("Transparent")
+            Some("transparent")
         );
         assert_eq!(
             Colour::from_hex("#c62828".into()).unwrap().name(),
-            Some("Red")
+            Some("red")
         );
+    }
+
+    #[test]
+    fn colour_buckets_custom_hex_values() {
+        for (hex, expected) in [
+            ("#40BF56", "green"),
+            ("#0066FF", "blue"),
+            ("#101010", "black"),
+            ("#7D8082", "grey"),
+        ] {
+            assert_eq!(Colour::from_hex(hex.into()).unwrap().name(), Some(expected));
+        }
     }
 
     #[test]

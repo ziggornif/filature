@@ -81,7 +81,7 @@ async fn insert_get_full_roundtrip() {
         Money::from_decimal(Decimal::from_str_exact("24.99").unwrap()).unwrap()
     );
     assert_eq!(created.colour.as_ref().unwrap().hex(), "#1A9E4B");
-    assert_eq!(created.colour.as_ref().unwrap().name(), Some("#1A9E4B"));
+    assert_eq!(created.colour.as_ref().unwrap().name(), Some("green"));
     assert_eq!(created.diameter, Diameter::Mm1_75);
     assert_eq!(created.notes.as_deref(), Some("Prototype spool"));
     assert_eq!(created.purchased_at.unwrap().to_string(), "2026-07-01");
@@ -93,7 +93,7 @@ async fn insert_get_full_roundtrip() {
     assert_eq!(detail.material_name, "PLA-A");
     assert_eq!(detail.density, 1.24);
     assert_eq!(detail.colour.as_ref().unwrap().hex(), "#1A9E4B");
-    assert_eq!(detail.colour.as_ref().unwrap().name(), Some("#1A9E4B"));
+    assert_eq!(detail.colour.as_ref().unwrap().name(), Some("green"));
     assert_eq!(detail.diameter, Diameter::Mm1_75);
     assert_eq!(detail.net_weight.value(), 1000.0);
     assert_eq!(detail.remaining_weight.value(), 1000.0);
@@ -157,7 +157,7 @@ async fn update_persists_changes() {
 
     let updated = spools.update(created.clone()).await.unwrap();
     assert_eq!(updated.colour.as_ref().unwrap().hex(), "#FF0000");
-    assert_eq!(updated.colour.as_ref().unwrap().name(), Some("#FF0000"));
+    assert_eq!(updated.colour.as_ref().unwrap().name(), Some("red"));
     assert_eq!(updated.status, SpoolStatus::Open);
     assert_eq!(updated.remaining_weight.value(), 400.0);
     assert_eq!(
@@ -378,11 +378,12 @@ async fn list_filters_by_manufacturer_location_and_search() {
     assert!(!by_loc.iter().any(|i| i.id == sp_a.id));
     assert!(!by_loc.iter().any(|i| i.id == sp_c.id));
 
-    // Search matches the colour name (case-insensitive substring).
+    // Search matches the derived colour name (case-insensitive substring).
+    // #AA11CC buckets to "purple"; #00CCDD -> "teal", #123456 -> "blue".
     let by_colour = spools
         .list(
             SpoolFilter {
-                search: Some("aa11cc".into()),
+                search: Some("purple".into()),
                 ..Default::default()
             },
             SpoolSort::CreatedDesc,
