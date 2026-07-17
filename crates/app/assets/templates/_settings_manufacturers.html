@@ -4,10 +4,10 @@
   <div class="table-scroll referential-table-scroll">
     <table class="manufacturers-table referential-table" hx-ext="response-targets">
       <thead><tr>
-        <th>{{ t(key="manufacturers.col.name") }}</th>
-        <th>{{ t(key="manufacturers.col.country") }}</th>
-        <th>{{ t(key="manufacturers.col.spool_count") }}</th>
-        <th>{{ t(key="manufacturers.col.actions") }}</th>
+        <th scope="col">{{ t(key="manufacturers.col.name") }}</th>
+        <th scope="col">{{ t(key="manufacturers.col.country") }}</th>
+        <th scope="col">{{ t(key="manufacturers.col.spool_count") }}</th>
+        <th scope="col">{{ t(key="manufacturers.col.actions") }}</th>
       </tr></thead>
       <tbody id="manufacturers-table-body">
         {% for m in manufacturers %}{% include "_manufacturer_row.html" %}{% endfor %}
@@ -18,8 +18,8 @@
         hx-target="#manufacturers-table-body" hx-swap="beforeend"
         hx-target-409="#manufacturers-msg" hx-ext="response-targets"
         hx-on::after-request="if(event.detail.successful) this.reset()">
-    <input type="text" name="name" placeholder="{{ t(key='manufacturers.col.name') }}" required>
-    <input type="text" name="country" placeholder="{{ t(key='manufacturers.country.placeholder') }}"
+    <input type="text" name="name" aria-label="{{ t(key='manufacturers.col.name') }}" placeholder="{{ t(key='manufacturers.col.name') }}" required>
+    <input type="text" name="country" aria-label="{{ t(key='manufacturers.col.country') }}" placeholder="{{ t(key='manufacturers.country.placeholder') }}"
            maxlength="2" pattern="[A-Za-z]{2}">
     <button type="submit">{{ t(key="manufacturers.add") }}</button>
   </form>

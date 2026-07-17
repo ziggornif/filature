@@ -15,13 +15,13 @@
     <table class="materials-table referential-table" hx-ext="response-targets">
     <thead>
       <tr>
-        <th>{{ t(key="materials.col.material") }}</th>
-        <th>{{ t(key="materials.col.density") }}</th>
-        <th>{{ t(key="materials.col.drying") }}</th>
-        <th>{{ t(key="materials.col.sensitivity") }}</th>
-        <th>{{ t(key="materials.col.threshold") }}</th>
-        <th>{{ t(key="materials.col.nozzle") }}</th>
-        <th>{{ t(key="materials.col.bed") }}</th>
+        <th scope="col">{{ t(key="materials.col.material") }}</th>
+        <th scope="col">{{ t(key="materials.col.density") }}</th>
+        <th scope="col">{{ t(key="materials.col.drying") }}</th>
+        <th scope="col">{{ t(key="materials.col.sensitivity") }}</th>
+        <th scope="col">{{ t(key="materials.col.threshold") }}</th>
+        <th scope="col">{{ t(key="materials.col.nozzle") }}</th>
+        <th scope="col">{{ t(key="materials.col.bed") }}</th>
       </tr>
     </thead>
     <tbody id="materials-table-body">
@@ -47,17 +47,17 @@
         hx-swap="beforeend"
         hx-target-error="#materials-msg"
         hx-on::after-request="if(event.detail.successful) this.reset()">
-    <input type="text" name="name" placeholder="{{ t(key="materials.col.material") }}" required>
-    <input type="number" name="density" step="0.01" placeholder="{{ t(key="materials.col.density") }}" required>
-    <input type="number" name="drying_temp_c" placeholder="{{ t(key="materials.col.temp") }}" required>
-    <input type="number" name="drying_time_h" placeholder="{{ t(key="materials.col.time") }}" required>
-    <select name="sensitivity">
+    <input type="text" name="name" aria-label="{{ t(key='materials.col.material') }}" placeholder="{{ t(key="materials.col.material") }}" required>
+    <input type="number" name="density" aria-label="{{ t(key='materials.col.density') }}" step="0.01" placeholder="{{ t(key="materials.col.density") }}" required>
+    <input type="number" name="drying_temp_c" aria-label="{{ t(key='materials.col.temp') }}" placeholder="{{ t(key="materials.col.temp") }}" required>
+    <input type="number" name="drying_time_h" aria-label="{{ t(key='materials.col.time') }}" placeholder="{{ t(key="materials.col.time") }}" required>
+    <select name="sensitivity" aria-label="{{ t(key='materials.col.sensitivity') }}">
       <option value="Low">{{ t(key="materials.sensitivity.low") }}</option>
       <option value="Medium">{{ t(key="materials.sensitivity.medium") }}</option>
       <option value="High">{{ t(key="materials.sensitivity.high") }}</option>
     </select>
-    <input type="number" name="nozzle_c" placeholder="{{ t(key="materials.field.nozzle") }}" required>
-    <input type="number" name="bed_c" placeholder="{{ t(key="materials.field.bed") }}" required>
+    <input type="number" name="nozzle_c" aria-label="{{ t(key='materials.field.nozzle') }}" placeholder="{{ t(key="materials.field.nozzle") }}" required>
+    <input type="number" name="bed_c" aria-label="{{ t(key='materials.field.bed') }}" placeholder="{{ t(key="materials.field.bed") }}" required>
     <button type="submit">{{ t(key="materials.add") }}</button>
   </form>
 {% endblock content %}

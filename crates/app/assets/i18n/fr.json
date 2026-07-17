@@ -21,6 +21,7 @@
   "settings.tab.locations": "Emplacements",
   "settings.tab.backup": "Sauvegarde",
   "shell.tagline": "Zig Factory · auto-hébergé",
+  "shell.skip_to_content": "Aller au contenu principal",
   "dashboard.subtitle": "Vue d'ensemble du stock",
   "dashboard.kpi.remaining_weight": "Poids restant",
   "dashboard.kpi.active": "actives",

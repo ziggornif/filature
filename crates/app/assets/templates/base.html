@@ -21,6 +21,7 @@
   <script src="/static/slot-picker.js" defer></script>
 </head>
 <body>
+  <a class="skip-link" href="#main">{{ t(key="shell.skip_to_content") }}</a>
   <aside class="sidebar">
     <div class="wordmark sidebar-wordmark">
       <svg class="sidebar-brand-logo" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="var(--border-strong)" stroke-width="1.1" stroke-dasharray="2.2 2.2"/><circle cx="12" cy="12" r="6.2" stroke="var(--muted)" stroke-width="1.3"/><circle cx="12" cy="12" r="2" fill="var(--accent)"/></svg>
@@ -41,7 +42,7 @@
     </details>
     <div class="sidebar-foot">{{ t(key="shell.tagline") }}</div>
   </aside>
-  <main class="content">
+  <main id="main" class="content" tabindex="-1">
     {% block content %}{% endblock content %}
   </main>
 </body>

@@ -20,7 +20,7 @@
       <span class="colour-swatch spool-detail-swatch{% if not spool.colour_hex %} colour-swatch--unset{% elif spool.colour_hex == 'transparent' %} colour-swatch--transparent{% endif %}"
             style="background:{{ spool.colour_hex }}" title="{{ spool.colour_label }}"></span>
       <div class="spool-detail-name">
-        <strong>{{ spool.manufacturer_name | default(value=t(key="spools.manufacturer.unassigned")) }}</strong>
+        <h1>{{ spool.manufacturer_name | default(value=t(key="spools.manufacturer.unassigned")) }}</h1>
         <span>{% if spool.has_colour_name %}{{ spool.colour_label }}{% else %}{{ t(key="spools.colour.unset") }}{% endif %}</span>
       </div>
       <div class="spool-detail-badges">

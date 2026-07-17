@@ -1,24 +1,25 @@
 <tr id="material-row-{{ m.id }}" class="material-row material-row--{{ m.sensitivity | lower }}">
   <td>
     <input class="material-name-badge referential-name-badge" type="text" name="name" value="{{ m.name }}"
+           aria-label="{{ t(key='materials.col.material') }} — {{ m.name }}"
            hx-put="/materials/{{ m.id }}" hx-target="closest tr" hx-swap="outerHTML"
            hx-trigger="change" hx-include="closest tr" hx-target-error="#materials-msg">
   </td>
   <td>
     <input type="number" name="density" step="0.01" value="{{ m.density }}"
-           aria-label="{{ t(key="materials.col.density") }}"
+           aria-label="{{ t(key='materials.col.density') }} — {{ m.name }}"
            hx-put="/materials/{{ m.id }}" hx-target="closest tr" hx-swap="outerHTML"
            hx-trigger="change" hx-include="closest tr" hx-target-error="#materials-msg">
   </td>
   <td class="material-drying">
     <span class="material-drying-fields">
       <input type="number" name="drying_temp_c" value="{{ m.drying_temp_c }}"
-             aria-label="{{ t(key="materials.col.temp") }}"
+             aria-label="{{ t(key='materials.col.temp') }} — {{ m.name }}"
              hx-put="/materials/{{ m.id }}" hx-target="closest tr" hx-swap="outerHTML"
              hx-trigger="change" hx-include="closest tr" hx-target-error="#materials-msg">
       <span>{{ t(key="materials.unit.celsius") }} ·</span>
       <input type="number" name="drying_time_h" value="{{ m.drying_time_h }}"
-             aria-label="{{ t(key="materials.col.time") }}"
+             aria-label="{{ t(key='materials.col.time') }} — {{ m.name }}"
              hx-put="/materials/{{ m.id }}" hx-target="closest tr" hx-swap="outerHTML"
              hx-trigger="change" hx-include="closest tr" hx-target-error="#materials-msg">
       <span>{{ t(key="materials.unit.hour") }}</span>
@@ -26,7 +27,7 @@
   </td>
   <td>
     <select class="material-sensitivity-pill" name="sensitivity"
-            aria-label="{{ t(key="materials.col.sensitivity") }}"
+            aria-label="{{ t(key='materials.col.sensitivity') }} — {{ m.name }}"
             hx-put="/materials/{{ m.id }}" hx-target="closest tr" hx-swap="outerHTML"
             hx-trigger="change" hx-include="closest tr" hx-target-error="#materials-msg">
       <option value="Low"{% if m.sensitivity == "Low" %} selected{% endif %}>{{ t(key="materials.sensitivity.low") }}</option>
@@ -37,13 +38,13 @@
   <td class="material-threshold">{{ m.threshold_pct }}</td>
   <td>
     <input type="number" name="nozzle_c" value="{{ m.nozzle_c }}"
-           aria-label="{{ t(key="materials.field.nozzle") }}"
+           aria-label="{{ t(key='materials.field.nozzle') }} — {{ m.name }}"
            hx-put="/materials/{{ m.id }}" hx-target="closest tr" hx-swap="outerHTML"
            hx-trigger="change" hx-include="closest tr" hx-target-error="#materials-msg">
   </td>
   <td>
     <input type="number" name="bed_c" value="{{ m.bed_c }}"
-           aria-label="{{ t(key="materials.field.bed") }}"
+           aria-label="{{ t(key='materials.field.bed') }} — {{ m.name }}"
            hx-put="/materials/{{ m.id }}" hx-target="closest tr" hx-swap="outerHTML"
            hx-trigger="change" hx-include="closest tr" hx-target-error="#materials-msg">
   </td>

@@ -1,0 +1,1 @@
+{"name":"filature-a11y-e2e","private":true,"scripts":{"test":"playwright test","test:local":"./run-a11y.sh","test:advisory":"A11Y_ENFORCE_CONTRAST=0 playwright test"},"devDependencies":{"@axe-core/playwright":"^4.10.2","@playwright/test":"^1.54.1"}}
