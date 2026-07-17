@@ -46,6 +46,7 @@ pub struct LoadedSpoolView {
 pub struct LoadableSpoolView {
     pub id: String,
     pub label: String,
+    pub colour_hex: String,
 }
 #[derive(Serialize)]
 pub struct PrinterView {
@@ -163,6 +164,7 @@ impl LoadableSpoolView {
         Self {
             id: s.id.as_str().into(),
             label: format!("{brand} · {colour} ({})", s.material_name),
+            colour_hex: s.colour_hex.unwrap_or_else(|| "transparent".into()),
         }
     }
 }
@@ -571,7 +573,10 @@ pub fn routes() -> Router<AppState> {
 #[cfg(test)]
 mod tests {
     use super::PrinterForm;
+    use crate::web::{i18n::Catalog, templates::Renderer};
     use domain::printers::FeedMode;
+    use serde_json::json;
+    use tera::Context;
 
     // Reproduces the axum::Form path: urlencoded bodies cannot deserialize
     // repeated keys into a sequence, so feed_modes travels as one CSV field.
@@ -620,5 +625,40 @@ mod tests {
             .domain()
             .is_err()
         );
+    }
+
+    #[test]
+    fn loading_partial_renders_slot_picker_with_spool_colour() {
+        let mut ctx = Context::new();
+        ctx.insert("loaded_spools_count", &0usize);
+        ctx.insert(
+            "printers",
+            &json!([{
+                "id": "printer-1",
+                "name": "MK4S",
+                "model": "MK4S",
+                "liner": "#000000",
+                "groups": [{
+                    "label_key": "printers.group.head",
+                    "multi": false,
+                    "slots": [{
+                        "key": "head-1",
+                        "loaded": null,
+                        "options": [{
+                            "id": "spool-1",
+                            "label": "Filature · Green (PLA)",
+                            "colour_hex": "#1A9E4B"
+                        }]
+                    }]
+                }]
+            }]),
+        );
+
+        let html = Renderer::new(Catalog::load("en"))
+            .render("_printer_loading.html", "en", "", ctx)
+            .unwrap();
+
+        assert!(html.contains(r#"class="slot-picker""#));
+        assert!(html.contains(r#"class="colour-swatch" style="background:#1A9E4B""#));
     }
 }

@@ -28,14 +28,23 @@
             {% if not g.multi %}<span class="slot-circle"></span>{% endif %}
             <div class="empty-slot-content">
               <span>{% if not g.multi %}{{ t(key=g.label_key) }} — {% endif %}{{ t(key="printers.slot.empty") }}</span>
-              <form>
-                <select name="spool_id" aria-label="{{ t(key='printers.slot.load') }}"
-                        hx-post="/printers/{{ p.id }}/slots/{{ s.key }}"
-                        hx-target="#printer-loading-content" hx-swap="outerHTML">
-                  <option value="">{{ t(key="printers.slot.none") }}</option>
-                  {% for option in s.options %}<option value="{{ option.id }}">{{ option.label }}</option>{% endfor %}
-                </select>
-              </form>
+              <details class="slot-picker">
+                <summary>{{ t(key="printers.slot.load") }}</summary>
+                <form class="slot-picker-list"
+                      hx-post="/printers/{{ p.id }}/slots/{{ s.key }}"
+                      hx-target="#printer-loading-content" hx-swap="outerHTML">
+                  <button type="submit" name="spool_id" value="" class="slot-option">
+                    <span class="colour-swatch colour-swatch--unset"></span>
+                    <span class="slot-option-label">{{ t(key="printers.slot.none") }}</span>
+                  </button>
+                  {% for option in s.options %}
+                  <button type="submit" name="spool_id" value="{{ option.id }}" class="slot-option">
+                    <span class="colour-swatch" style="background:{{ option.colour_hex }}"></span>
+                    <span class="slot-option-label">{{ option.label }}</span>
+                  </button>
+                  {% endfor %}
+                </form>
+              </details>
             </div>
           </div>
           {% endif %}
