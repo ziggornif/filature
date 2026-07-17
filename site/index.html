@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Filature is a self-hosted filament stock manager for 3D-printing workshops.">
+  <meta name="theme-color" content="#ece8e1">
+  <title>Filature — Filament stock management</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>try{const t=localStorage.getItem('filature-docs-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="wordmark" href="#hero" aria-label="Filature home"><span class="spool-mark" aria-hidden="true">◎</span><span>FILATURE</span></a>
+      <nav class="header-nav" aria-label="Primary navigation"><a href="#features">Features</a><a href="#screenshots">Screenshots</a><a href="#installation">Install</a></nav>
+      <div class="header-actions">
+        <div class="theme-switcher" role="group" aria-label="Theme preference">
+          <button type="button" data-theme-choice="auto" aria-pressed="true">Auto</button><button type="button" data-theme-choice="light" aria-pressed="false">Light</button><button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+        </div>
+        <a class="github-button" href="https://github.com/ziggornif/filature">GitHub</a>
+        <button class="menu-toggle" type="button" aria-label="Toggle documentation menu" aria-controls="sidebar" aria-expanded="false"><span></span><span></span><span></span></button>
+      </div>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar" aria-label="Documentation navigation">
+      <nav><span class="sidebar-label">Documentation</span><a class="sidebar-link active" href="#hero">Introduction</a><a class="sidebar-link" href="#features">Features</a><a class="sidebar-link" href="#screenshots">Screenshots</a><a class="sidebar-link" href="#installation">Installation</a><a class="sidebar-link" href="#contributing">Contributing</a></nav>
+    </aside>
+    <main id="main-content">
+      <section id="hero" class="hero">
+        <p class="eyebrow">A workshop instrument, not another cloud service</p>
+        <h1><span class="hero-wordmark">FILATURE</span><br>Know every spool.</h1>
+        <p class="lede">A self-hosted filament stock manager for your 3D-printing workshop — track every spool, weight, value and printer from one calm dashboard.</p>
+        <div class="hero-actions"><a class="button primary" href="https://github.com/ziggornif/filature">GitHub</a><a class="button" href="#installation">Install</a></div>
+        <ul class="badges" aria-label="Project attributes"><li>Rust</li><li>Single binary</li><li>Self-hosted</li><li>Light &amp; dark</li></ul>
+        <figure class="hero-shot"><img data-theme-image data-light-src="img/dashboard-light.png" data-dark-src="img/dashboard-dark.png" src="img/dashboard-light.png" alt="Filature dashboard showing stock value, remaining weight, spool counts, material breakdown, and low-stock alerts"></figure>
+      </section>
+
+      <section id="features" class="doc-section">
+        <p class="section-kicker">Features</p><h2>Your filament stock, made legible</h2><p class="section-intro">From the first sealed spool to the last few metres, Filature keeps workshop data useful without turning it into administrative work.</p>
+        <div class="feature-grid">
+          <article class="feature-card feature-wide"><div><h3>Dashboard</h3><p>See stock value, remaining weight, spool counts, low-stock alerts, stock split by material, and the spools closest to empty.</p></div><img data-theme-image data-light-src="img/dashboard-light.png" data-dark-src="img/dashboard-dark.png" src="img/dashboard-light.png" alt="Dashboard with filament stock KPIs and material breakdown"></article>
+          <article class="feature-card"><h3>Spools</h3><p>Filter and sort table or card views, edit remaining weight inline, and use a two-screen add wizard. Follow the complete <span class="mono">Sealed → Open → Empty → Archived</span> lifecycle.</p><img data-theme-image data-light-src="img/spools-cards-light.png" data-dark-src="img/spools-cards-dark.png" src="img/spools-cards-light.png" alt="Spool inventory displayed as colour-coded cards"></article>
+          <article class="feature-card"><h3>Spool detail</h3><p>Read remaining grams, calculated metres and percentage at a glance, with a weight gauge, identity, purchase information, and notes.</p><img data-theme-image data-light-src="img/spool-detail-light.png" data-dark-src="img/spool-detail-dark.png" src="img/spool-detail-light.png" alt="Detailed spool view with remaining weight, length, percentage, and purchase information"></article>
+          <article class="feature-card"><h3>Materials referential</h3><p>Edit density, drying parameters, humidity sensitivity, and default nozzle and bed temperatures in one source of truth.</p><img data-theme-image data-light-src="img/materials-light.png" data-dark-src="img/materials-dark.png" src="img/materials-light.png" alt="Editable materials reference table with density, drying, sensitivity, and temperature fields"></article>
+          <article class="feature-card"><h3>Locations</h3><p>Model shelves, dryboxes, and every other physical place where spools are stored.</p><img data-theme-image data-light-src="img/settings-locations-light.png" data-dark-src="img/settings-locations-dark.png" src="img/settings-locations-light.png" alt="Settings page listing spool storage locations"></article>
+          <article class="feature-card"><h3>Printers</h3><p>Represent Bambu multi-AMS topology, multiple print heads, feed modes, and the spool loaded in each slot with its colour pastille.</p><img data-theme-image data-light-src="img/printers-light.png" data-dark-src="img/printers-dark.png" src="img/printers-light.png" alt="Printer page showing a Bambu multi-AMS topology and colour-coded loaded spools"></article>
+          <article class="feature-card compact"><h3>Settings</h3><p>Tabbed controls for the low-stock alert threshold, locale, and theme.</p></article>
+          <article class="feature-card compact"><h3>Export / Import</h3><p>Back up or restore the complete instance as a portable file from the UI.</p></article>
+          <article class="feature-card compact"><h3>International &amp; themed</h3><p>Use Filature in English or French, with equal care in light and dark modes.</p></article>
+        </div>
+      </section>
+
+      <section id="screenshots" class="doc-section">
+        <p class="section-kicker">Screenshots</p><h2>A closer look</h2>
+        <div class="gallery">
+          <figure><img data-theme-image data-light-src="img/spools-table-light.png" data-dark-src="img/spools-table-dark.png" src="img/spools-table-light.png" alt="Filterable spool inventory table with inline remaining-weight gauges"><figcaption>Spools · table view</figcaption></figure>
+          <figure><img data-theme-image data-light-src="img/spool-new-light.png" data-dark-src="img/spool-new-dark.png" src="img/spool-new-light.png" alt="First step of the add-spool wizard for choosing spool condition"><figcaption>Add a spool · condition</figcaption></figure>
+          <figure><img data-theme-image data-light-src="img/spool-new-details-light.png" data-dark-src="img/spool-new-details-dark.png" src="img/spool-new-details-light.png" alt="Second step of the add-spool wizard with identity, measurements, storage, and purchase fields"><figcaption>Add a spool · details</figcaption></figure>
+          <figure><img data-theme-image data-light-src="img/settings-backup-light.png" data-dark-src="img/settings-backup-dark.png" src="img/settings-backup-light.png" alt="Settings backup tab with full-instance export and import controls"><figcaption>Backup &amp; restore</figcaption></figure>
+        </div>
+      </section>
+
+      <section id="installation" class="doc-section">
+        <p class="section-kicker">Installation</p><h2>One binary, one database</h2>
+        <p>Filature is a single self-contained Rust binary with templates, static assets, i18n catalogs, and migrations embedded. It uses PostgreSQL. HTTPS is terminated by a separate reverse proxy.</p>
+        <h3>Measured footprint</h3>
+        <div class="stats"><div><strong>12 MB</strong><span>release binary</span></div><div><strong>~118 MB</strong><span>runtime image</span></div><div><strong>&lt; ~50 MB</strong><span>app idle RAM</span></div><div><strong>~120 MB</strong><span>image on disk</span></div></div>
+        <p>PostgreSQL is the larger memory consumer. A Raspberry Pi 4 with <span class="mono">4 GB</span> is comfortable; <span class="mono">2 GB</span> is workable for PostgreSQL, one app instance, and the OS. A personal database is typically only tens of megabytes.</p>
+        <div class="callout ok"><strong>Raspberry Pi 4 (arm64) supported.</strong><p>The published image is multi-architecture. On a Pi, Docker automatically pulls the arm64 variant:</p><pre><code>docker compose -f docker-compose.prod.yml up -d --pull always</code></pre></div>
+        <h3>Install</h3>
+        <div class="tabs" role="tablist" aria-label="Installation methods"><button id="tab-image" role="tab" aria-selected="true" aria-controls="panel-image" tabindex="0">Published image</button><button id="tab-source" role="tab" aria-selected="false" aria-controls="panel-source" tabindex="-1">From source</button></div>
+        <div id="panel-image" class="tab-panel" role="tabpanel" aria-labelledby="tab-image"><ol class="steps"><li><div><h4>Get the repository files</h4><p>Use a Compose file referencing <code>ghcr.io/ziggornif/filature:latest</code>, such as <code>docker-compose.prod.yml</code>.</p><pre><code>git clone https://github.com/ziggornif/filature.git
+cd filature
+cp .env.example .env</code></pre></div></li><li><div><h4>Configure the database and login</h4><p>Set <code>POSTGRES_PASSWORD</code> in <code>.env</code>, then generate the mandatory Argon2 password hash:</p><pre><code>docker compose run --rm app hash-password '&lt;your-password&gt;'</code></pre></div></li><li><div><h4>Start and verify</h4><pre><code>docker compose up -d --pull always
+docker compose ps
+curl -I http://localhost:${APP_PORT:-8080}</code></pre><p>Point your HTTPS reverse proxy at the published port.</p></div></li></ol></div>
+        <div id="panel-source" class="tab-panel" role="tabpanel" aria-labelledby="tab-source" hidden><ol class="steps"><li><div><h4>Clone and configure</h4><pre><code>git clone https://github.com/ziggornif/filature.git
+cd filature
+cp .env.example .env
+# Set POSTGRES_PASSWORD in .env</code></pre></div></li><li><div><h4>Build and start</h4><pre><code>docker compose up -d --build
+docker compose ps
+curl -I http://localhost:${APP_PORT:-8080}</code></pre><p>Point your HTTPS reverse proxy at the published port.</p></div></li></ol></div>
+        <h3>Configuration</h3>
+        <div class="table-wrap"><table><thead><tr><th scope="col">Variable</th><th scope="col">Purpose</th></tr></thead><tbody>
+          <tr><td><code>POSTGRES_USER</code></td><td>PostgreSQL role used by Filature.</td></tr><tr><td><code>POSTGRES_PASSWORD</code></td><td>PostgreSQL password; set this before starting.</td></tr><tr><td><code>POSTGRES_DB</code></td><td>PostgreSQL database name.</td></tr><tr><td><code>APP_PORT</code></td><td>Host port published for the application.</td></tr><tr><td><code>APP_BIND</code></td><td>Address and port the application binds to.</td></tr><tr><td><code>FILATURE_DEFAULT_LOCALE</code></td><td>Default UI locale: <code>fr</code> or <code>en</code>.</td></tr><tr><td><code>FILATURE_AUTH__USERNAME</code></td><td>Mandatory shared operator username.</td></tr><tr><td><code>FILATURE_AUTH__PASSWORD_HASH</code></td><td>Mandatory Argon2 PHC password hash from <code>filature hash-password</code>.</td></tr><tr><td><code>FILATURE_&lt;SECTION&gt;__&lt;KEY&gt;</code></td><td>Override any nested configuration key; double underscores separate levels.</td></tr>
+        </tbody></table></div>
+        <div class="callout warn"><strong>Secure the boundary.</strong><p>Filature has a mandatory single-credential login gate. It refuses to boot without <code>FILATURE_AUTH__USERNAME</code> and <code>FILATURE_AUTH__PASSWORD_HASH</code>, and default-denies every path without a valid session. This is one shared operator credential—not multi-user access or roles. Filature does not provide TLS; terminate HTTPS at your reverse proxy and keep the application port private.</p></div>
+        <h3>Backup and restore</h3><p>Use the in-app Export / Import tab for a portable full-instance backup, or work directly with PostgreSQL:</p>
+        <pre><code># Backup
+docker compose exec db pg_dump -U filature filature &gt; backup-$(date +%F).sql
+
+# Restore
+cat backup.sql | docker compose exec -T db psql -U filature -d filature</code></pre>
+      </section>
+
+      <section id="contributing" class="doc-section contributing"><p class="section-kicker">Contributing</p><h2>Build the workshop tool with us</h2><p>Bug reports, focused pull requests, and careful improvements are welcome. The contributor guide covers local setup, tests, architecture, i18n, and the project workflow.</p><div class="hero-actions"><a class="button primary" href="https://github.com/ziggornif/filature/blob/main/CONTRIBUTING.md">Contribution guide</a><a class="button" href="https://github.com/ziggornif/filature">Repository</a></div></section>
+    </main>
+  </div>
+  <footer><div><span class="wordmark"><span class="spool-mark" aria-hidden="true">◎</span><span>FILATURE</span></span><span>MIT licensed · Zig Factory · self-hosted</span></div><nav aria-label="Footer links"><a href="https://github.com/ziggornif/filature">GitHub</a><a href="https://github.com/ziggornif/filature/blob/main/LICENSE">License</a></nav></footer>
+  <script src="script.js"></script>
+</body>
+</html>
