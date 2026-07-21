@@ -62,7 +62,7 @@
           <label class="colour-preview{% if not colour_hex %} is-unset{% endif %}" title="{{ t(key='spools.new.colour_picker') }}">
             <span class="colour-preview__chip" style="--preview:{% if colour_hex and colour_hex != 'transparent' %}{{ colour_hex }}{% else %}#CCCCCC{% endif %}"></span>
             <span class="colour-preview__edit" aria-hidden="true">✎</span>
-            <input type="color" class="colour-picker" value="{% if colour_hex and colour_hex != 'transparent' %}{{ colour_hex }}{% else %}#cccccc{% endif %}">
+            <input type="color" class="colour-picker" aria-label="{{ t(key='spools.new.colour_picker') }}" value="{% if colour_hex and colour_hex != 'transparent' %}{{ colour_hex }}{% else %}#cccccc{% endif %}">
           </label>
           <div class="colour-text-stack">
             <input type="text" name="colour_hex" placeholder="#RRGGBB" value="{{ colour_hex }}"

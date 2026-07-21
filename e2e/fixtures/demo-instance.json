@@ -1,0 +1,819 @@
+{
+  "format": "filature-instance",
+  "version": 1,
+  "content": {
+    "materials": [
+      {
+        "id": "mat-abs",
+        "name": "ABS",
+        "density": 1.04,
+        "drying_temp_c": 70,
+        "drying_time_h": 4,
+        "sensitivity": "Medium",
+        "nozzle_c": 245,
+        "bed_c": 100
+      },
+      {
+        "id": "mat-asa",
+        "name": "ASA",
+        "density": 1.07,
+        "drying_temp_c": 70,
+        "drying_time_h": 4,
+        "sensitivity": "Medium",
+        "nozzle_c": 250,
+        "bed_c": 100
+      },
+      {
+        "id": "mat-pa612cf15",
+        "name": "PA612-CF15",
+        "density": 1.16,
+        "drying_temp_c": 80,
+        "drying_time_h": 8,
+        "sensitivity": "High",
+        "nozzle_c": 270,
+        "bed_c": 90
+      },
+      {
+        "id": "mat-pa6gf25",
+        "name": "PA6-GF25",
+        "density": 1.2,
+        "drying_temp_c": 80,
+        "drying_time_h": 8,
+        "sensitivity": "High",
+        "nozzle_c": 270,
+        "bed_c": 90
+      },
+      {
+        "id": "mat-petg",
+        "name": "PETG",
+        "density": 1.27,
+        "drying_temp_c": 65,
+        "drying_time_h": 6,
+        "sensitivity": "Medium",
+        "nozzle_c": 240,
+        "bed_c": 80
+      },
+      {
+        "id": "mat-pla",
+        "name": "PLA",
+        "density": 1.24,
+        "drying_temp_c": 45,
+        "drying_time_h": 6,
+        "sensitivity": "Low",
+        "nozzle_c": 210,
+        "bed_c": 60
+      }
+    ],
+    "manufacturers": [
+      {
+        "id": "mfg-bambulab",
+        "name": "Bambu Lab",
+        "country": "CN"
+      },
+      {
+        "id": "mfg-polymaker",
+        "name": "Polymaker",
+        "country": "CN"
+      },
+      {
+        "id": "mfg-prusament",
+        "name": "Prusament",
+        "country": "CZ"
+      },
+      {
+        "id": "mfg-qidi",
+        "name": "Qidi",
+        "country": "CN"
+      },
+      {
+        "id": "mfg-sunlu",
+        "name": "Sunlu",
+        "country": "CN"
+      }
+    ],
+    "locations": [
+      {
+        "id": "loc-db1",
+        "name": "Drybox 1",
+        "note": null
+      },
+      {
+        "id": "loc-db2",
+        "name": "Drybox 2",
+        "note": null
+      },
+      {
+        "id": "loc-db3",
+        "name": "Drybox 3",
+        "note": null
+      },
+      {
+        "id": "loc-eta-a",
+        "name": "Étagère A",
+        "note": null
+      },
+      {
+        "id": "loc-eta-b",
+        "name": "Étagère B",
+        "note": null
+      }
+    ],
+    "spools": [
+      {
+        "id": "sp-01",
+        "material_id": "mat-pla",
+        "spool_type": "Complete",
+        "colour_hex": "#1A1A1A",
+        "colour_name": "Noir",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 780.0,
+        "price_paid": "18.99",
+        "status": "Open",
+        "location_id": "loc-eta-a",
+        "manufacturer_id": "mfg-sunlu",
+        "notes": null,
+        "purchased_at": "2026-04-10",
+        "opened_at": "2026-04-20",
+        "created_at": "2026-04-10T09:00:00Z"
+      },
+      {
+        "id": "sp-02",
+        "material_id": "mat-pla",
+        "spool_type": "Complete",
+        "colour_hex": "#F5F5F5",
+        "colour_name": "Blanc",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 120.0,
+        "price_paid": "18.99",
+        "status": "Open",
+        "location_id": "loc-eta-a",
+        "manufacturer_id": "mfg-sunlu",
+        "notes": null,
+        "purchased_at": "2026-03-05",
+        "opened_at": "2026-03-12",
+        "created_at": "2026-03-05T09:00:00Z"
+      },
+      {
+        "id": "sp-03",
+        "material_id": "mat-petg",
+        "spool_type": "Complete",
+        "colour_hex": "#808080",
+        "colour_name": "Gris",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 640.0,
+        "price_paid": "21.99",
+        "status": "Open",
+        "location_id": "loc-db1",
+        "manufacturer_id": "mfg-sunlu",
+        "notes": null,
+        "purchased_at": "2026-04-01",
+        "opened_at": "2026-04-15",
+        "created_at": "2026-04-01T09:00:00Z"
+      },
+      {
+        "id": "sp-04",
+        "material_id": "mat-petg",
+        "spool_type": "Complete",
+        "colour_hex": "#DCDCDC",
+        "colour_name": "Transparent",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 950.0,
+        "price_paid": "21.99",
+        "status": "Sealed",
+        "location_id": "loc-db1",
+        "manufacturer_id": "mfg-sunlu",
+        "notes": null,
+        "purchased_at": "2026-06-20",
+        "opened_at": null,
+        "created_at": "2026-06-20T09:00:00Z"
+      },
+      {
+        "id": "sp-05",
+        "material_id": "mat-pla",
+        "spool_type": "Complete",
+        "colour_hex": "#2E2E2E",
+        "colour_name": "Charbon mat",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 430.0,
+        "price_paid": "24.99",
+        "status": "Open",
+        "location_id": "loc-eta-a",
+        "manufacturer_id": "mfg-bambulab",
+        "notes": null,
+        "purchased_at": "2026-03-28",
+        "opened_at": "2026-04-05",
+        "created_at": "2026-03-28T09:00:00Z"
+      },
+      {
+        "id": "sp-06",
+        "material_id": "mat-pla",
+        "spool_type": "Complete",
+        "colour_hex": "#F4C430",
+        "colour_name": "Jaune tournesol",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 90.0,
+        "price_paid": "24.99",
+        "status": "Open",
+        "location_id": "loc-eta-b",
+        "manufacturer_id": "mfg-bambulab",
+        "notes": null,
+        "purchased_at": "2026-02-14",
+        "opened_at": "2026-02-20",
+        "created_at": "2026-02-14T09:00:00Z"
+      },
+      {
+        "id": "sp-07",
+        "material_id": "mat-pla",
+        "spool_type": "Complete",
+        "colour_hex": "#EEF0EA",
+        "colour_name": "Blanc jade",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 1000.0,
+        "price_paid": "24.99",
+        "status": "Sealed",
+        "location_id": "loc-eta-b",
+        "manufacturer_id": "mfg-bambulab",
+        "notes": null,
+        "purchased_at": "2026-07-01",
+        "opened_at": null,
+        "created_at": "2026-07-01T09:00:00Z"
+      },
+      {
+        "id": "sp-08",
+        "material_id": "mat-asa",
+        "spool_type": "Complete",
+        "colour_hex": "#808080",
+        "colour_name": "Gris",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 560.0,
+        "price_paid": "27.99",
+        "status": "Open",
+        "location_id": "loc-db2",
+        "manufacturer_id": "mfg-bambulab",
+        "notes": null,
+        "purchased_at": "2026-03-18",
+        "opened_at": "2026-03-25",
+        "created_at": "2026-03-18T09:00:00Z"
+      },
+      {
+        "id": "sp-09",
+        "material_id": "mat-asa",
+        "spool_type": "Complete",
+        "colour_hex": "#1A1A1A",
+        "colour_name": "Noir",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 210.0,
+        "price_paid": "23.99",
+        "status": "Open",
+        "location_id": "loc-db2",
+        "manufacturer_id": "mfg-qidi",
+        "notes": null,
+        "purchased_at": "2026-02-28",
+        "opened_at": "2026-03-10",
+        "created_at": "2026-02-28T09:00:00Z"
+      },
+      {
+        "id": "sp-10",
+        "material_id": "mat-abs",
+        "spool_type": "Complete",
+        "colour_hex": "#E8E0D0",
+        "colour_name": "Naturel",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 700.0,
+        "price_paid": "19.99",
+        "status": "Open",
+        "location_id": "loc-db2",
+        "manufacturer_id": "mfg-qidi",
+        "notes": null,
+        "purchased_at": "2026-04-22",
+        "opened_at": "2026-05-01",
+        "created_at": "2026-04-22T09:00:00Z"
+      },
+      {
+        "id": "sp-11",
+        "material_id": "mat-petg",
+        "spool_type": "Complete",
+        "colour_hex": "#E8622C",
+        "colour_name": "Orange",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 320.0,
+        "price_paid": "29.99",
+        "status": "Open",
+        "location_id": "loc-db1",
+        "manufacturer_id": "mfg-prusament",
+        "notes": null,
+        "purchased_at": "2026-03-02",
+        "opened_at": "2026-03-15",
+        "created_at": "2026-03-02T09:00:00Z"
+      },
+      {
+        "id": "sp-12",
+        "material_id": "mat-petg",
+        "spool_type": "Complete",
+        "colour_hex": "#16181D",
+        "colour_name": "Galaxy Black",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 880.0,
+        "price_paid": "29.99",
+        "status": "Sealed",
+        "location_id": "loc-db1",
+        "manufacturer_id": "mfg-prusament",
+        "notes": null,
+        "purchased_at": "2026-06-25",
+        "opened_at": null,
+        "created_at": "2026-06-25T09:00:00Z"
+      },
+      {
+        "id": "sp-13",
+        "material_id": "mat-petg",
+        "spool_type": "Complete",
+        "colour_hex": "#2C7A7B",
+        "colour_name": "Teal",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 540.0,
+        "price_paid": "26.99",
+        "status": "Open",
+        "location_id": "loc-db1",
+        "manufacturer_id": "mfg-polymaker",
+        "notes": null,
+        "purchased_at": "2026-04-08",
+        "opened_at": "2026-04-18",
+        "created_at": "2026-04-08T09:00:00Z"
+      },
+      {
+        "id": "sp-14",
+        "material_id": "mat-pa612cf15",
+        "spool_type": "Complete",
+        "colour_hex": "#1A1A1A",
+        "colour_name": "Noir",
+        "diameter": "1.75",
+        "net_weight": 500.0,
+        "remaining_weight": 470.0,
+        "price_paid": "44.90",
+        "status": "Open",
+        "location_id": "loc-db3",
+        "manufacturer_id": "mfg-polymaker",
+        "notes": null,
+        "purchased_at": "2026-05-30",
+        "opened_at": "2026-06-05",
+        "created_at": "2026-05-30T09:00:00Z"
+      },
+      {
+        "id": "sp-15",
+        "material_id": "mat-pa6gf25",
+        "spool_type": "Complete",
+        "colour_hex": "#D9CBA8",
+        "colour_name": "Naturel",
+        "diameter": "1.75",
+        "net_weight": 500.0,
+        "remaining_weight": 380.0,
+        "price_paid": "42.90",
+        "status": "Open",
+        "location_id": "loc-db3",
+        "manufacturer_id": "mfg-polymaker",
+        "notes": null,
+        "purchased_at": "2026-05-12",
+        "opened_at": "2026-05-20",
+        "created_at": "2026-05-12T09:00:00Z"
+      },
+      {
+        "id": "sp-16",
+        "material_id": "mat-pa612cf15",
+        "spool_type": "Complete",
+        "colour_hex": "#1A1A1A",
+        "colour_name": "Noir",
+        "diameter": "1.75",
+        "net_weight": 500.0,
+        "remaining_weight": 55.0,
+        "price_paid": "44.90",
+        "status": "Open",
+        "location_id": "loc-db3",
+        "manufacturer_id": "mfg-polymaker",
+        "notes": null,
+        "purchased_at": "2026-01-20",
+        "opened_at": "2026-02-01",
+        "created_at": "2026-01-20T09:00:00Z"
+      },
+      {
+        "id": "sp-17",
+        "material_id": "mat-pla",
+        "spool_type": "Complete",
+        "colour_hex": "#C0392B",
+        "colour_name": "Rouge",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 0.0,
+        "price_paid": "18.99",
+        "status": "Empty",
+        "location_id": "loc-eta-a",
+        "manufacturer_id": "mfg-sunlu",
+        "notes": null,
+        "purchased_at": "2026-01-05",
+        "opened_at": "2026-01-12",
+        "created_at": "2026-01-05T09:00:00Z"
+      },
+      {
+        "id": "sp-18",
+        "material_id": "mat-pla",
+        "spool_type": "Complete",
+        "colour_hex": "#2B5CC4",
+        "colour_name": "Bleu",
+        "diameter": "1.75",
+        "net_weight": 1000.0,
+        "remaining_weight": 620.0,
+        "price_paid": "24.99",
+        "status": "Sealed",
+        "location_id": "loc-eta-b",
+        "manufacturer_id": "mfg-bambulab",
+        "notes": null,
+        "purchased_at": "2026-06-30",
+        "opened_at": null,
+        "created_at": "2026-06-30T09:00:00Z"
+      }
+    ],
+    "printers": [
+      {
+        "id": "01KXPB0RJFEK6A2FZTP900VT9T",
+        "name": "P1S Atelier",
+        "brand": "bambu",
+        "model": "P1S",
+        "heads": 1,
+        "module_kind": "none",
+        "module_count": null,
+        "ams_units": 2,
+        "feed_modes": [
+          "ams_fed"
+        ],
+        "slots": [
+          {
+            "slot_key": "ams0-0",
+            "group_label": "ams_unit_1",
+            "position": 0,
+            "spool_id": "sp-01"
+          },
+          {
+            "slot_key": "ams0-1",
+            "group_label": "ams_unit_1",
+            "position": 1,
+            "spool_id": "sp-02"
+          },
+          {
+            "slot_key": "ams0-2",
+            "group_label": "ams_unit_1",
+            "position": 2,
+            "spool_id": null
+          },
+          {
+            "slot_key": "ams0-3",
+            "group_label": "ams_unit_1",
+            "position": 3,
+            "spool_id": null
+          },
+          {
+            "slot_key": "ams1-0",
+            "group_label": "ams_unit_2",
+            "position": 4,
+            "spool_id": "sp-03"
+          },
+          {
+            "slot_key": "ams1-1",
+            "group_label": "ams_unit_2",
+            "position": 5,
+            "spool_id": null
+          },
+          {
+            "slot_key": "ams1-2",
+            "group_label": "ams_unit_2",
+            "position": 6,
+            "spool_id": null
+          },
+          {
+            "slot_key": "ams1-3",
+            "group_label": "ams_unit_2",
+            "position": 7,
+            "spool_id": null
+          }
+        ]
+      },
+      {
+        "id": "01KXPB0RM6NTG2JM083TC7W7FK",
+        "name": "H2D Prod",
+        "brand": "bambu",
+        "model": "H2D",
+        "heads": 2,
+        "module_kind": "none",
+        "module_count": null,
+        "ams_units": 1,
+        "feed_modes": [
+          "ams_fed",
+          "direct"
+        ],
+        "slots": [
+          {
+            "slot_key": "head-1",
+            "group_label": "heads",
+            "position": 0,
+            "spool_id": "sp-04"
+          },
+          {
+            "slot_key": "ams0-0",
+            "group_label": "ams_unit_1",
+            "position": 1,
+            "spool_id": "sp-05"
+          },
+          {
+            "slot_key": "ams0-1",
+            "group_label": "ams_unit_1",
+            "position": 2,
+            "spool_id": null
+          },
+          {
+            "slot_key": "ams0-2",
+            "group_label": "ams_unit_1",
+            "position": 3,
+            "spool_id": "sp-06"
+          },
+          {
+            "slot_key": "ams0-3",
+            "group_label": "ams_unit_1",
+            "position": 4,
+            "spool_id": null
+          }
+        ]
+      },
+      {
+        "id": "01KXPB0RP0AW0FN5H6KZ3HV047",
+        "name": "X2D Bench",
+        "brand": "bambu",
+        "model": "X2D",
+        "heads": 2,
+        "module_kind": "none",
+        "module_count": null,
+        "ams_units": 0,
+        "feed_modes": [
+          "direct",
+          "direct"
+        ],
+        "slots": [
+          {
+            "slot_key": "head-0",
+            "group_label": "heads",
+            "position": 0,
+            "spool_id": "sp-07"
+          },
+          {
+            "slot_key": "head-1",
+            "group_label": "heads",
+            "position": 1,
+            "spool_id": null
+          }
+        ]
+      },
+      {
+        "id": "01KXPB0RQF4JSM2J0DXWJ735YF",
+        "name": "H2C Studio",
+        "brand": "bambu",
+        "model": "H2C",
+        "heads": 1,
+        "module_kind": "multi_slot",
+        "module_count": 7,
+        "ams_units": 0,
+        "feed_modes": [
+          "direct"
+        ],
+        "slots": [
+          {
+            "slot_key": "multi-0",
+            "group_label": "buses",
+            "position": 0,
+            "spool_id": "sp-08"
+          },
+          {
+            "slot_key": "multi-1",
+            "group_label": "buses",
+            "position": 1,
+            "spool_id": null
+          },
+          {
+            "slot_key": "multi-2",
+            "group_label": "buses",
+            "position": 2,
+            "spool_id": null
+          },
+          {
+            "slot_key": "multi-3",
+            "group_label": "buses",
+            "position": 3,
+            "spool_id": "sp-09"
+          },
+          {
+            "slot_key": "multi-4",
+            "group_label": "buses",
+            "position": 4,
+            "spool_id": null
+          },
+          {
+            "slot_key": "multi-5",
+            "group_label": "buses",
+            "position": 5,
+            "spool_id": null
+          },
+          {
+            "slot_key": "multi-6",
+            "group_label": "buses",
+            "position": 6,
+            "spool_id": null
+          }
+        ]
+      },
+      {
+        "id": "01KXPB0RRSEWBJ6MMVDZDVYN7W",
+        "name": "XL Ferme",
+        "brand": "prusa",
+        "model": "XL",
+        "heads": 2,
+        "module_kind": "none",
+        "module_count": null,
+        "ams_units": 0,
+        "feed_modes": [
+          "direct",
+          "direct"
+        ],
+        "slots": [
+          {
+            "slot_key": "head-0",
+            "group_label": "heads",
+            "position": 0,
+            "spool_id": "sp-10"
+          },
+          {
+            "slot_key": "head-1",
+            "group_label": "heads",
+            "position": 1,
+            "spool_id": "sp-11"
+          }
+        ]
+      },
+      {
+        "id": "01KXPB0RT0ZFWRWHR3H89E586A",
+        "name": "Core One Bureau",
+        "brand": "prusa",
+        "model": "CORE One+",
+        "heads": 1,
+        "module_kind": "multi_slot",
+        "module_count": 4,
+        "ams_units": 0,
+        "feed_modes": [
+          "direct"
+        ],
+        "slots": [
+          {
+            "slot_key": "indx-0",
+            "group_label": "indx",
+            "position": 0,
+            "spool_id": "sp-12"
+          },
+          {
+            "slot_key": "indx-1",
+            "group_label": "indx",
+            "position": 1,
+            "spool_id": null
+          },
+          {
+            "slot_key": "indx-2",
+            "group_label": "indx",
+            "position": 2,
+            "spool_id": null
+          },
+          {
+            "slot_key": "indx-3",
+            "group_label": "indx",
+            "position": 3,
+            "spool_id": null
+          }
+        ]
+      },
+      {
+        "id": "01KXPB0RV93GKGAHCM73K67XM3",
+        "name": "MK4S Etabli",
+        "brand": "prusa",
+        "model": "MK4S",
+        "heads": 1,
+        "module_kind": "mmu",
+        "module_count": null,
+        "ams_units": 0,
+        "feed_modes": [
+          "direct"
+        ],
+        "slots": [
+          {
+            "slot_key": "mmu-0",
+            "group_label": "mmu",
+            "position": 0,
+            "spool_id": "sp-13"
+          },
+          {
+            "slot_key": "mmu-1",
+            "group_label": "mmu",
+            "position": 1,
+            "spool_id": null
+          },
+          {
+            "slot_key": "mmu-2",
+            "group_label": "mmu",
+            "position": 2,
+            "spool_id": null
+          },
+          {
+            "slot_key": "mmu-3",
+            "group_label": "mmu",
+            "position": 3,
+            "spool_id": null
+          },
+          {
+            "slot_key": "mmu-4",
+            "group_label": "mmu",
+            "position": 4,
+            "spool_id": null
+          }
+        ]
+      },
+      {
+        "id": "01KXPB0RWFG622WZS7KTZK1VYV",
+        "name": "Qidi X-Max 3",
+        "brand": "other",
+        "model": "Qidi X-Max 3",
+        "heads": 1,
+        "module_kind": "multi_slot",
+        "module_count": 4,
+        "ams_units": 0,
+        "feed_modes": [
+          "direct"
+        ],
+        "slots": [
+          {
+            "slot_key": "multi-0",
+            "group_label": "multi_slot",
+            "position": 0,
+            "spool_id": "sp-14"
+          },
+          {
+            "slot_key": "multi-1",
+            "group_label": "multi_slot",
+            "position": 1,
+            "spool_id": null
+          },
+          {
+            "slot_key": "multi-2",
+            "group_label": "multi_slot",
+            "position": 2,
+            "spool_id": null
+          },
+          {
+            "slot_key": "multi-3",
+            "group_label": "multi_slot",
+            "position": 3,
+            "spool_id": null
+          }
+        ]
+      },
+      {
+        "id": "01KXPB0RY7AWP3J10XZJSZ263P",
+        "name": "Ender 3",
+        "brand": "other",
+        "model": "Ender 3",
+        "heads": 1,
+        "module_kind": "none",
+        "module_count": null,
+        "ams_units": 0,
+        "feed_modes": [
+          "direct"
+        ],
+        "slots": [
+          {
+            "slot_key": "main",
+            "group_label": "spool",
+            "position": 0,
+            "spool_id": "sp-15"
+          }
+        ]
+      }
+    ],
+    "configuration": {
+      "low_stock_threshold": 15
+    }
+  }
+}

@@ -9,7 +9,7 @@
   <div class="spools-head">
     <div class="spools-head-title">
       <h1>{{ t(key="spools.title") }}</h1>
-      <p class="spools-count">
+      <p class="spools-count" role="status" aria-live="polite" aria-atomic="true">
         <span id="spools-filtered-count">{{ filtered_count }}</span>
         {{ t(key="spools.count.separator") }}
         <span id="spools-total-count">{{ total_count }}</span>
@@ -112,15 +112,15 @@
       <table class="spools-table">
       <thead>
         <tr>
-          <th>{{ t(key="spools.col.colour") }}</th>
-          <th>{{ t(key="spools.col.material") }}</th>
-          <th>{{ t(key="spools.col.diameter") }}</th>
-          <th>{{ t(key="spools.col.remaining_weight") }}</th>
-          <th>{{ t(key="spools.col.net_weight") }}</th>
-          <th>{{ t(key="spools.col.remaining_pct") }}</th>
-          <th>{{ t(key="spools.col.manufacturer") }}</th>
-          <th>{{ t(key="spools.col.status") }}</th>
-          <th>{{ t(key="spools.col.actions") }}</th>
+          <th scope="col">{{ t(key="spools.col.colour") }}</th>
+          <th scope="col">{{ t(key="spools.col.material") }}</th>
+          <th scope="col">{{ t(key="spools.col.diameter") }}</th>
+          <th scope="col">{{ t(key="spools.col.remaining_weight") }}</th>
+          <th scope="col">{{ t(key="spools.col.net_weight") }}</th>
+          <th scope="col">{{ t(key="spools.col.remaining_pct") }}</th>
+          <th scope="col">{{ t(key="spools.col.manufacturer") }}</th>
+          <th scope="col">{{ t(key="spools.col.status") }}</th>
+          <th scope="col">{{ t(key="spools.col.actions") }}</th>
         </tr>
       </thead>
       <tbody id="spools-table-body">

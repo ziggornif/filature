@@ -1,11 +1,13 @@
 <tr id="location-row-{{ l.id }}" class="location-row">
   <td>
     <input class="referential-name-badge" type="text" name="name" value="{{ l.name }}"
+           aria-label="{{ t(key='locations.col.name') }} — {{ l.name }}"
            hx-put="/locations/{{ l.id }}" hx-target="closest tr" hx-swap="outerHTML"
            hx-trigger="change" hx-include="closest tr" hx-target-error="#locations-msg">
   </td>
   <td>
     <input type="text" name="note" value="{{ l.note }}"
+           aria-label="{{ t(key='locations.col.note') }} — {{ l.name }}"
            hx-put="/locations/{{ l.id }}" hx-target="closest tr" hx-swap="outerHTML"
            hx-trigger="change" hx-include="closest tr" hx-target-error="#locations-msg">
   </td>

@@ -130,6 +130,21 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.skip-link {
+  position: fixed;
+  z-index: 1000;
+  top: 8px;
+  left: 8px;
+  padding: 9px 12px;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--bg);
+  transform: translateY(-200%);
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+
 ::-webkit-scrollbar {
   width: 11px;
   height: 11px;
@@ -1983,11 +1998,12 @@ a {
   flex: 1;
   min-width: 0;
 }
-.spool-detail-name strong,
+.spool-detail-name h1,
 .spool-detail-name span {
   display: block;
 }
-.spool-detail-name strong {
+.spool-detail-name h1 {
+  margin: 0;
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.01em;

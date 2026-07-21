@@ -21,6 +21,7 @@
   "settings.tab.locations": "Locations",
   "settings.tab.backup": "Backup",
   "shell.tagline": "Zig Factory · self-hosted",
+  "shell.skip_to_content": "Skip to main content",
   "dashboard.subtitle": "Stock overview",
   "dashboard.kpi.remaining_weight": "Remaining weight",
   "dashboard.kpi.active": "active",

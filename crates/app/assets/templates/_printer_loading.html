@@ -3,7 +3,7 @@
 <div class="printer-grid">
 {% for p in printers %}
   <article class="printer-card" style="--printer-liner:{{ p.liner }}">
-    <header><div><h2>{{ p.name }}</h2><p>{{ p.model }}</p></div><a class="printer-edit" href="/printers/{{ p.id }}/edit" title="{{ t(key='printers.edit') }}">✎</a></header>
+    <header><div><h2>{{ p.name }}</h2><p>{{ p.model }}</p></div><a class="printer-edit" href="/printers/{{ p.id }}/edit" aria-label="{{ t(key='printers.edit') }}" title="{{ t(key='printers.edit') }}">✎</a></header>
     {% for g in p.groups %}
       <section class="slot-group{% if g.multi %} multi{% else %} single{% endif %}">
         {% if g.multi %}<h3>{{ t(key=g.label_key) }}</h3><div class="slot-tiles">{% endif %}
@@ -20,7 +20,7 @@
             </a>
             <form class="slot-unload" hx-post="/printers/{{ p.id }}/slots/{{ s.key }}" hx-target="#printer-loading-content" hx-swap="outerHTML">
               <input type="hidden" name="spool_id" value="">
-              <button type="submit" title="{{ t(key='printers.slot.unload') }}">✕</button>
+              <button type="submit" aria-label="{{ t(key='printers.slot.unload') }}" title="{{ t(key='printers.slot.unload') }}">✕</button>
             </form>
           </div>
           {% else %}

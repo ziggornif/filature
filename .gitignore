@@ -26,3 +26,6 @@ Cargo.lock.orig
 
 # local dev runtime config (db url, bind)
 filature.toml
+e2e/node_modules/
+e2e/playwright-report/
+e2e/test-results/

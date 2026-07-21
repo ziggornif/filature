@@ -29,6 +29,21 @@ cargo test
 
 SQLx uses the checked-in `.sqlx/` offline cache; CI builds with `SQLX_OFFLINE=true`. Keep that cache synchronized whenever queries change. Integration tests use testcontainers to start PostgreSQL. `tools/test.sh` also manages the testcontainers reaper when running the repository test workflow.
 
+### End-to-end accessibility
+
+The Playwright and axe-core suite runs against a disposable Docker Compose project. It binds Filature to `127.0.0.1:18081`, imports the bundled demo dataset (`e2e/fixtures/demo-instance.json`), checks every authenticated screen in light and dark mode, then removes its dedicated containers and volume.
+
+```sh
+cd e2e
+npm install
+npx playwright install chromium
+npm run test:local
+```
+
+Set `FILATURE_E2E_PORT` to override the port. Deterministic critical/serious WCAG failures are blocking. Color contrast is attached to the report and logged as advisory; set `A11Y_ENFORCE_CONTRAST=1` to make that one test blocking after the palette decision.
+
+CI should initially run `npm run test:local` as an advisory job and always publish the Playwright report. Use the repository's `ci-setup` skill when wiring it; this slice intentionally does not add CI configuration.
+
 ## Architecture
 
 Filature uses hexagonal architecture organized into vertical use-case slices. Read [docs/architecture.md](docs/architecture.md), the [architecture decision records](docs/adr/), and [docs/glossary.md](docs/glossary.md) before making structural or domain-language changes.
