@@ -105,11 +105,10 @@ test('m1 — le lien d’évitement cible et focalise le contenu principal', asy
   await expect(skip).toHaveAttribute('href','#main'); await skip.focus(); await expect(skip).toBeVisible(); await skip.press('Enter'); await expect(page.locator('#main')).toBeFocused();
 });
 
-test('M1/M5 — contraste WCAG AA (advisory)', async ({ page }, testInfo) => {
+test('M1/M5 — contraste WCAG AA', async ({ page }, testInfo) => {
   const reports = [];
   for (const [name, route] of await routes(page)) { await page.goto(route); const result = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze(); if (result.violations.length) reports.push(`${name} (${route})\n${report(result.violations)}`); }
   const body = reports.join('\n\n');
-  await testInfo.attach('color-contrast-advisory.txt', { body: body || 'No color-contrast violations.', contentType: 'text/plain' });
-  if (body) console.warn(`\nAccessibility contrast advisory:\n${body}`);
-  if (process.env.A11Y_ENFORCE_CONTRAST === '1') expect(reports, body).toEqual([]);
+  await testInfo.attach('color-contrast.txt', { body: body || 'No color-contrast violations.', contentType: 'text/plain' });
+  expect(reports, body).toEqual([]);
 });
