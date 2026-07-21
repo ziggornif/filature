@@ -167,6 +167,14 @@ body {
   display: flex;
   flex-direction: column;
   padding: 16px 0;
+  /* Reste dans le viewport pendant que .content scrolle (sinon la barre
+     s'étire sur toute la hauteur de la page et le haut du menu part hors
+     écran sur les vues longues). Neutralisé en mobile (barre haute). */
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .sidebar .wordmark {
@@ -2276,6 +2284,9 @@ a {
     padding: 0;
     border-right: 0;
     border-bottom: 1px solid var(--border);
+    /* Barre haute : hauteur naturelle (le sticky top:0 la garde visible). */
+    height: auto;
+    overflow-y: visible;
   }
 
   .sidebar-wordmark {
