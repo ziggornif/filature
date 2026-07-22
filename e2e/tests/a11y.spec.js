@@ -112,3 +112,11 @@ test('M1/M5 — contraste WCAG AA', async ({ page }, testInfo) => {
   await testInfo.attach('color-contrast.txt', { body: body || 'No color-contrast violations.', contentType: 'text/plain' });
   expect(reports, body).toEqual([]);
 });
+
+test('m4 — les transitions respectent prefers-reduced-motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/spools');
+  // Élément avec une transition connue (bouton : transition filter .12s).
+  const dur = await page.locator('.spools-add').first().evaluate((el) => getComputedStyle(el).transitionDuration);
+  expect(parseFloat(dur), `transition-duration sous reduced-motion = ${dur}`).toBeLessThan(0.05);
+});
