@@ -34,6 +34,13 @@ never decoration.
 - **Icons:** Feather/Lucide light set, inline SVG.
 - **Radii/spacing:** cards 11–12px, controls 6–8px, chips circular, status pills
   20px; grid gap 14px. Exact values in the handoff.
+- **CSS units: px, not rem/em** (decided July 2026, see
+  `init_assets/design_handoff_filature/BRIEF_imprimantes_3d.md` §2). This is a
+  fixed-dimension instrument layout, not editorial content meant to rescale with
+  browser font size; every handoff token is in px — reproduce them as px. If a
+  concrete accessibility need surfaces later (user zoom, system font-size
+  preference), re-evaluate case by case (typically `font-size` in rem, other
+  dimensions staying px).
 
 ## Screens (6, specified in the handoff README §Screens)
 

@@ -269,6 +269,7 @@
   "printers.slot.load": "Charger une bobine",
   "printers.slot.unload": "Décharger",
   "printers.loaded_count": "bobines chargées",
+  "printers.occupancy.loaded": "chargées",
   "printers.error.spool_not_loadable": "Seules les bobines scellées ou ouvertes peuvent être chargées.",
   "printers.error.already_loaded": "Cette bobine est déjà chargée.",
   "printers.group.external": "Bobine externe",

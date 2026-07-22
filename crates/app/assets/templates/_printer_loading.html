@@ -3,10 +3,10 @@
 <div class="printer-grid">
 {% for p in printers %}
   <article class="printer-card" style="--printer-liner:{{ p.liner }}">
-    <header><div><h2>{{ p.name }}</h2><p>{{ p.model }}</p></div><a class="printer-edit" href="/printers/{{ p.id }}/edit" aria-label="{{ t(key='printers.edit') }}" title="{{ t(key='printers.edit') }}">✎</a></header>
+    <header><div><h2>{{ p.name }}</h2><p>{{ p.model }}</p></div><div class="printer-card-actions"><span class="printer-occupancy printer-occupancy--{{ p.occupancy_state }}">{{ p.filled }} / {{ p.total }} {{ t(key="printers.occupancy.loaded") }}</span><a class="printer-edit" href="/printers/{{ p.id }}/edit" aria-label="{{ t(key='printers.edit') }}" title="{{ t(key='printers.edit') }}">✎</a></div></header>
     {% for g in p.groups %}
       <section class="slot-group{% if g.multi %} multi{% else %} single{% endif %}">
-        {% if g.multi %}<h3>{{ t(key=g.label_key) }}</h3><div class="slot-tiles">{% endif %}
+        <h3>{{ t(key=g.label_key) }}</h3>{% if g.multi %}<div class="slot-tiles">{% endif %}
         {% for s in g.slots %}
           {% if s.loaded %}
           <div class="loaded-slot{% if not g.multi %} loaded-slot-wide{% endif %}">
@@ -27,7 +27,7 @@
           <div class="empty-slot{% if not g.multi %} empty-slot-wide{% endif %}">
             {% if not g.multi %}<span class="slot-circle"></span>{% endif %}
             <div class="empty-slot-content">
-              <span>{% if not g.multi %}{{ t(key=g.label_key) }} — {% endif %}{{ t(key="printers.slot.empty") }}</span>
+              <span>{{ t(key="printers.slot.empty") }}</span>
               <details class="slot-picker">
                 <summary>{{ t(key="printers.slot.load") }}</summary>
                 <form class="slot-picker-list"

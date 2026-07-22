@@ -57,6 +57,9 @@ pub struct PrinterView {
     pub liner: String,
     pub groups: Vec<SlotGroupView>,
     pub slot_summary: String,
+    pub filled: usize,
+    pub total: usize,
+    pub occupancy_state: &'static str,
 }
 impl PrinterView {
     async fn build(p: Printer, st: &AppState, locale: &str) -> Result<Self, RepositoryError> {
@@ -111,6 +114,17 @@ impl PrinterView {
             .map(|g| format!("{} ({})", g.label_key, g.slots.len()))
             .collect::<Vec<_>>()
             .join(", ");
+        let total = groups.iter().map(|group| group.slots.len()).sum();
+        let filled = groups
+            .iter()
+            .flat_map(|group| &group.slots)
+            .filter(|slot| slot.loaded.is_some())
+            .count();
+        let occupancy_state = match filled {
+            0 => "empty",
+            filled if filled == total => "full",
+            _ => "partial",
+        };
         Ok(Self {
             id: p.id.as_str().into(),
             name: p.name.as_str().into(),
@@ -119,6 +133,9 @@ impl PrinterView {
             liner: p.brand.liner().into(),
             groups,
             slot_summary,
+            filled,
+            total,
+            occupancy_state,
         })
     }
 }
@@ -153,6 +170,9 @@ impl From<Printer> for PrinterView {
             liner: p.brand.liner().into(),
             groups,
             slot_summary: String::new(),
+            filled: 0,
+            total: p.slots.len(),
+            occupancy_state: "empty",
         }
     }
 }
@@ -638,8 +658,11 @@ mod tests {
                 "name": "MK4S",
                 "model": "MK4S",
                 "liner": "#000000",
+                "filled": 0,
+                "total": 1,
+                "occupancy_state": "empty",
                 "groups": [{
-                    "label_key": "printers.group.head",
+                    "label_key": "printers.group.spool",
                     "multi": false,
                     "slots": [{
                         "key": "head-1",
@@ -660,5 +683,66 @@ mod tests {
 
         assert!(html.contains(r#"class="slot-picker""#));
         assert!(html.contains(r#"class="colour-swatch" style="background:#1A9E4B""#));
+        assert!(html.contains("<h3>Spool</h3>"));
+        assert!(!html.contains("Spool — Empty slot"));
+    }
+
+    #[test]
+    fn loading_partial_renders_occupancy_badge_in_all_three_states() {
+        let mut ctx = Context::new();
+        ctx.insert("loaded_spools_count", &6usize);
+        ctx.insert(
+            "printers",
+            &json!([
+                {
+                    "id": "full",
+                    "name": "Full",
+                    "model": "P1S",
+                    "liner": "#000000",
+                    "filled": 4,
+                    "total": 4,
+                    "occupancy_state": "full",
+                    "groups": []
+                },
+                {
+                    "id": "partial",
+                    "name": "Partial",
+                    "model": "P1S",
+                    "liner": "#000000",
+                    "filled": 2,
+                    "total": 4,
+                    "occupancy_state": "partial",
+                    "groups": []
+                },
+                {
+                    "id": "empty",
+                    "name": "Empty",
+                    "model": "P1S",
+                    "liner": "#000000",
+                    "filled": 0,
+                    "total": 4,
+                    "occupancy_state": "empty",
+                    "groups": []
+                }
+            ]),
+        );
+
+        let html = Renderer::new(Catalog::load("en"))
+            .render("_printer_loading.html", "en", "", ctx)
+            .unwrap();
+
+        assert!(
+            html.contains(
+                r#"class="printer-occupancy printer-occupancy--full">4 / 4 loaded</span>"#
+            )
+        );
+        assert!(html.contains(
+            r#"class="printer-occupancy printer-occupancy--partial">2 / 4 loaded</span>"#
+        ));
+        assert!(
+            html.contains(
+                r#"class="printer-occupancy printer-occupancy--empty">0 / 4 loaded</span>"#
+            )
+        );
     }
 }
