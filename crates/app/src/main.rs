@@ -45,6 +45,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cfg = Config::load("filature.toml")?;
     let db = persistence::connect_and_migrate(&cfg.database.url).await?;
+    let credentials_cipher = filature::credentials::CredentialCipher::from_env()
+        .map_err(|e| format!("invalid FILATURE_CREDENTIALS_KEY: {e}"))?;
+    filature::persistence::machine_links::validate_credentials_at_boot(
+        &db,
+        credentials_cipher.as_ref(),
+    )
+    .await
+    .map_err(|e| format!("machine credentials validation failed: {e}"))?;
 
     let repo: Arc<dyn MaterialRepository> = Arc::new(SqlxMaterialRepository::new(db.clone()));
     let materials: Arc<dyn MaterialsUseCases> = Arc::new(MaterialsService::new(repo));

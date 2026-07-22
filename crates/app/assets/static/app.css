@@ -29,6 +29,12 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
+.machine-link-form{border:1px solid var(--border);border-radius:.75rem;padding:1rem;display:grid;gap:.75rem}.machine-link-form legend{font-weight:700}.machine-link-form [hidden]{display:none!important}
+.machine-status{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}.machine-state-badge{border:1px solid var(--border);border-radius:999px;padding:.2rem .55rem;font-size:.78rem;font-weight:700}.machine-status--offline .machine-state-badge{border-style:dashed}.machine-status--printing .machine-state-badge{color:var(--ok)}.machine-status--paused .machine-state-badge{color:var(--warn)}.machine-status--error .machine-state-badge{color:var(--danger)}
+.machine-job{display:grid;min-width:10rem;max-width:18rem;font-size:.78rem}.machine-job-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.machine-progress{height:.35rem;background:var(--border);border-radius:999px;overflow:hidden}.machine-progress i{display:block;height:100%;background:var(--ok)}
+.farm-activity{grid-column:1/-1}.farm-activity ul{list-style:none;padding:0;margin:0}.farm-activity li{display:flex;justify-content:space-between;gap:1rem;padding:.65rem 0;border-bottom:1px solid var(--border)}
+@media (prefers-reduced-motion:reduce){.machine-progress i{transition:none!important;animation:none!important}}
+
 .printers-header { display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:22px }
 .printers-header h1 { margin:0 }.printers-header p { margin:3px 0 0;color:var(--muted) }
 .printer-grid { columns:340px;column-gap:16px }

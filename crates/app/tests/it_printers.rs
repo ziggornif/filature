@@ -17,6 +17,7 @@ fn sample(name: &str, module: Module) -> NewPrinter {
         module,
         ams_units: 0,
         feed_modes: vec![FeedMode::Direct],
+        machine_link: None,
     }
 }
 
@@ -156,6 +157,7 @@ async fn unknown_update_and_delete_are_not_found() {
         module: Module::None,
         ams_units: 0,
         feed_modes: vec![FeedMode::Direct],
+        machine_link: None,
         slots: vec![],
     };
     assert!(matches!(

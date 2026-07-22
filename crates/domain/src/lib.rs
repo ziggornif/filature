@@ -2,6 +2,7 @@ pub mod dashboard;
 pub mod instance_configuration;
 pub mod instance_transfer;
 pub mod locations;
+pub mod machine_connectivity;
 pub mod manufacturers;
 pub mod materials;
 pub mod printers;

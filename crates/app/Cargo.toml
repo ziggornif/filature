@@ -33,6 +33,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ulid = "1"
 async-trait = "0.1"
 argon2 = { version = "0.5", features = ["std"] }
+base64 = "0.22"
+ring = "0.17"
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
 
 [dev-dependencies]
 domain = { path = "../domain", features = ["stubs"] }
