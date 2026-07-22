@@ -40,7 +40,7 @@ npx playwright install chromium
 npm run test:local
 ```
 
-Set `FILATURE_E2E_PORT` to override the port. Deterministic critical/serious WCAG failures are blocking. Color contrast is attached to the report and logged as advisory; set `A11Y_ENFORCE_CONTRAST=1` to make that one test blocking after the palette decision.
+Set `FILATURE_E2E_PORT` to override the port. All critical/serious WCAG failures are blocking by default, including color contrast. Contrast details are attached to the Playwright report when the test fails.
 
 CI should initially run `npm run test:local` as an advisory job and always publish the Playwright report. Use the repository's `ci-setup` skill when wiring it; this slice intentionally does not add CI configuration.
 
