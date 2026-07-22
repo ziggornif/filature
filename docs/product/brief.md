@@ -41,6 +41,12 @@ Prioritized; each maps to ~one downstream vertical slice.
 4. **Catch damp sensitive filament before it prints** — ingest SHT31 readings
    per drybox over MQTT, colour status by the stored material's sensitivity
    threshold. *(slices: `locations` + `humidity` — the differentiator)*
+5. **See the farm's live state at a glance** *(added 2026-07-22)* — know from
+   the open Filature tab whether each machine is idle, printing (progress,
+   job, temperatures) or unreachable, without opening PrusaLink, Fluidd or
+   Bambu Studio. *(slices: `22a-machine-link-rest` + `22b-machine-link-bambu`;
+   follow-up noted: sync loaded spools from machines that report them —
+   Bambu AMS first, slice `23`.)*
 
 ## Desired outcomes & success measures
 
