@@ -6,6 +6,17 @@ use domain::{
 };
 use sqlx::Row;
 
+fn bambu_endpoint(endpoint: &str) -> Result<(String, String), String> {
+    let value: serde_json::Value = serde_json::from_str(endpoint).map_err(|e| e.to_string())?;
+    let host = value["host"]
+        .as_str()
+        .ok_or_else(|| "stored Bambu host is missing".to_string())?;
+    let serial = value["serial"]
+        .as_str()
+        .ok_or_else(|| "stored Bambu serial is missing".to_string())?;
+    Ok((host.to_string(), serial.to_string()))
+}
+
 pub struct SqlxMachineLinkRepository {
     pool: Db,
     cipher: Option<CredentialCipher>,
@@ -41,6 +52,21 @@ impl MachineLinkRepository for SqlxMachineLinkRepository {
             "moonraker" => Ok(MachineLink::Moonraker {
                 url: r.get("endpoint"),
             }),
+            "bambu" => {
+                let (host, serial) =
+                    bambu_endpoint(r.get("endpoint")).map_err(MachineError::Repository)?;
+                let encrypted: String = r.get("credential");
+                let cipher = self.cipher.as_ref().ok_or_else(|| {
+                    MachineError::Repository("FILATURE_CREDENTIALS_KEY is required".into())
+                })?;
+                Ok(MachineLink::BambuLan {
+                    host,
+                    serial,
+                    access_code: cipher
+                        .decrypt(&encrypted)
+                        .map_err(MachineError::Repository)?,
+                })
+            }
             _ => Err(MachineError::Repository(
                 "unknown stored machine link kind".into(),
             )),

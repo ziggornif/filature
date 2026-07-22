@@ -36,6 +36,15 @@ impl SqlxPrinterRepository {
             "moonraker" => Ok(MachineLink::Moonraker {
                 url: r.get("endpoint"),
             }),
+            "bambu" => {
+                let endpoint: serde_json::Value = serde_json::from_str(r.get("endpoint"))
+                    .map_err(|e| RepositoryError::Backend(e.to_string()))?;
+                Ok(MachineLink::BambuLan {
+                    host: endpoint["host"].as_str().unwrap_or_default().to_string(),
+                    serial: endpoint["serial"].as_str().unwrap_or_default().to_string(),
+                    access_code: String::new(),
+                })
+            }
             _ => Err(RepositoryError::Backend("unknown machine link kind".into())),
         })
         .transpose()
@@ -47,7 +56,8 @@ impl SqlxPrinterRepository {
         id: &str,
         link: Option<&MachineLink>,
     ) -> Result<(), RepositoryError> {
-        let preserve = matches!(link, Some(MachineLink::PrusaLink { api_key, .. }) if api_key == "__configured__");
+        let preserve = matches!(link, Some(MachineLink::PrusaLink { api_key, .. }) if api_key == "__configured__")
+            || matches!(link, Some(MachineLink::BambuLan { access_code, .. }) if access_code == "__configured__");
         if !preserve {
             sqlx::query("DELETE FROM machine_links WHERE printer_id=$1")
                 .bind(id)
@@ -77,6 +87,51 @@ impl SqlxPrinterRepository {
                 }
                 MachineLink::Moonraker { url } => {
                     sqlx::query("INSERT INTO machine_links(printer_id,kind,endpoint,credential) VALUES($1,'moonraker',$2,NULL)").bind(id).bind(url).execute(&mut **tx).await.map_err(backend)?;
+                }
+                MachineLink::BambuLan {
+                    host,
+                    access_code,
+                    serial,
+                } if access_code == "__configured__" => {
+                    let endpoint =
+                        serde_json::json!({ "host": host, "serial": serial }).to_string();
+                    let result = sqlx::query(
+                        "UPDATE machine_links SET endpoint=$2 WHERE printer_id=$1 AND kind='bambu'",
+                    )
+                    .bind(id)
+                    .bind(endpoint)
+                    .execute(&mut **tx)
+                    .await
+                    .map_err(backend)?;
+                    if result.rows_affected() == 0 {
+                        return Err(RepositoryError::Backend(
+                            "configured Bambu credential is missing".into(),
+                        ));
+                    }
+                }
+                MachineLink::BambuLan {
+                    host,
+                    access_code,
+                    serial,
+                } => {
+                    let cipher = self.cipher.as_ref().ok_or_else(|| {
+                        RepositoryError::Backend(
+                            "FILATURE_CREDENTIALS_KEY is required to save a Bambu access code"
+                                .into(),
+                        )
+                    })?;
+                    let encrypted = cipher
+                        .encrypt(access_code)
+                        .map_err(RepositoryError::Backend)?;
+                    let endpoint =
+                        serde_json::json!({ "host": host, "serial": serial }).to_string();
+                    sqlx::query("INSERT INTO machine_links(printer_id,kind,endpoint,credential) VALUES($1,'bambu',$2,$3)")
+                        .bind(id)
+                        .bind(endpoint)
+                        .bind(encrypted)
+                        .execute(&mut **tx)
+                        .await
+                        .map_err(backend)?;
                 }
             }
         }

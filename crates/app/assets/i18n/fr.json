@@ -309,6 +309,8 @@
   "machine_link.form.host": "Hôte / adresse IP",
   "machine_link.form.url": "URL de l’API Moonraker",
   "machine_link.form.api_key": "Clé API PrusaLink",
+  "machine_link.form.access_code": "Code d’accès LAN",
+  "machine_link.form.serial": "Numéro de série",
   "machine_link.form.configured": "configuré",
   "machine_link.form.test": "Tester la connexion",
   "machine_link.test.failed": "Connexion impossible. Vérifiez l’adresse et les identifiants.",

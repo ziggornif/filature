@@ -61,8 +61,8 @@ impl AppState {
             crate::persistence::machine_links::SqlxMachineLinkRepository::new(db.clone(), cipher),
         );
         let probe = Arc::new(
-            crate::machine_http::RestMachineStatusProbe::new()
-                .expect("machine HTTP client configuration is valid"),
+            crate::machine_http::MachineStatusProbeAdapter::new()
+                .expect("machine client configuration is valid"),
         );
         Self {
             db,
