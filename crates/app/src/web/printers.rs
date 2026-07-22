@@ -8,8 +8,8 @@ use axum::{
     routing::get,
 };
 use domain::printers::{
-    BAMBU_MODELS, FeedMode, LoadableSpool, Module, NewPrinter, PRUSA_MODELS, Printer, PrinterBrand,
-    PrinterName, RepositoryError,
+    BAMBU_MODELS, FeedMode, LoadableSpool, MachineLink, MachineState, MachineStatus, Module,
+    NewPrinter, PRUSA_MODELS, Printer, PrinterBrand, PrinterName, RepositoryError, Temperature,
 };
 use domain::shared::{PrinterId, SpoolId};
 use domain::spools::Colour;
@@ -60,9 +60,11 @@ pub struct PrinterView {
     pub filled: usize,
     pub total: usize,
     pub occupancy_state: &'static str,
+    pub has_machine_link: bool,
 }
 impl PrinterView {
     async fn build(p: Printer, st: &AppState, locale: &str) -> Result<Self, RepositoryError> {
+        let has_machine_link = p.machine_link.is_some();
         let mut grouped: BTreeMap<String, Vec<SlotView>> = BTreeMap::new();
         let mut order = Vec::new();
         for slot in p.slots {
@@ -136,12 +138,14 @@ impl PrinterView {
             filled,
             total,
             occupancy_state,
+            has_machine_link,
         })
     }
 }
 
 impl From<Printer> for PrinterView {
     fn from(p: Printer) -> Self {
+        let has_machine_link = p.machine_link.is_some();
         let mut grouped: BTreeMap<String, usize> = BTreeMap::new();
         let mut order = Vec::new();
         for slot in &p.slots {
@@ -173,6 +177,7 @@ impl From<Printer> for PrinterView {
             filled: 0,
             total: p.slots.len(),
             occupancy_state: "empty",
+            has_machine_link,
         }
     }
 }
@@ -222,6 +227,14 @@ pub struct PrinterForm {
     #[serde(default)]
     feed_modes: String,
     #[serde(default)]
+    machine_link_enabled: String,
+    #[serde(default)]
+    machine_endpoint: String,
+    #[serde(default)]
+    machine_api_key: String,
+    #[serde(default)]
+    machine_api_key_configured: bool,
+    #[serde(default)]
     from: String,
 }
 fn default_heads() -> u8 {
@@ -235,6 +248,7 @@ type PrinterDomain = (
     Module,
     u8,
     Vec<FeedMode>,
+    Option<MachineLink>,
 );
 impl PrinterForm {
     fn domain(&self) -> Result<PrinterDomain, String> {
@@ -289,6 +303,36 @@ impl PrinterForm {
             &feed_modes,
         )
         .map_err(|e| e.to_string())?;
+        let machine_link = if self.machine_link_enabled.is_empty() {
+            None
+        } else {
+            match brand {
+                PrinterBrand::Prusa => Some(
+                    MachineLink::PrusaLink {
+                        host: self.machine_endpoint.trim().to_string(),
+                        api_key: if self.machine_api_key.trim().is_empty()
+                            && self.machine_api_key_configured
+                        {
+                            "__configured__".into()
+                        } else {
+                            self.machine_api_key.trim().to_string()
+                        },
+                    }
+                    .validate_for_brand(brand)
+                    .map_err(|e| e.to_string())?,
+                ),
+                PrinterBrand::Other => Some(
+                    MachineLink::Moonraker {
+                        url: self.machine_endpoint.trim().to_string(),
+                    }
+                    .validate_for_brand(brand)
+                    .map_err(|e| e.to_string())?,
+                ),
+                PrinterBrand::BambuLab => {
+                    return Err("machine link unsupported for Bambu Lab".into());
+                }
+            }
+        };
         Ok((
             name,
             brand,
@@ -297,6 +341,7 @@ impl PrinterForm {
             module,
             self.ams_units,
             feed_modes,
+            machine_link,
         ))
     }
     fn destination(&self) -> &'static str {
@@ -454,6 +499,7 @@ async fn render_form(
     let theme = resolve_theme(headers);
     let mut ctx = Context::new();
     ctx.insert("page", "printers");
+    ctx.insert("machine_links_enabled", &st.machine_links_enabled);
     ctx.insert("printer", &printer.map(PrinterFormView::from));
     ctx.insert(
         "from",
@@ -495,9 +541,17 @@ struct PrinterFormView {
     ams_units: u8,
     feed_modes: Vec<String>,
     feed_modes_json: String,
+    machine_link_enabled: bool,
+    machine_endpoint: String,
+    machine_api_key_configured: bool,
 }
 impl From<Printer> for PrinterFormView {
     fn from(p: Printer) -> Self {
+        let (machine_endpoint, machine_api_key_configured) = match &p.machine_link {
+            Some(MachineLink::PrusaLink { host, .. }) => (host.clone(), true),
+            Some(MachineLink::Moonraker { url }) => (url.clone(), false),
+            None => (String::new(), false),
+        };
         Self {
             id: p.id.as_str().into(),
             name: p.name.as_str().into(),
@@ -512,21 +566,28 @@ impl From<Printer> for PrinterFormView {
                 &p.feed_modes.iter().map(|m| m.as_str()).collect::<Vec<_>>(),
             )
             .unwrap_or_else(|_| "[]".into()),
+            machine_link_enabled: p.machine_link.is_some(),
+            machine_endpoint,
+            machine_api_key_configured,
         }
     }
 }
 async fn create(State(st): State<AppState>, Form(f): Form<PrinterForm>) -> Response {
     let dest = f.destination();
-    let (name, brand, model, heads, module, ams_units, feed_modes) = match f.domain() {
-        Ok(v) => v,
-        Err(_) => {
-            return (
-                StatusCode::UNPROCESSABLE_ENTITY,
-                Html(st.renderer.t(&st.default_locale, "printers.error.invalid")),
-            )
-                .into_response();
-        }
-    };
+    let (name, brand, model, heads, module, ams_units, feed_modes, mut machine_link) =
+        match f.domain() {
+            Ok(v) => v,
+            Err(_) => {
+                return (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    Html(st.renderer.t(&st.default_locale, "printers.error.invalid")),
+                )
+                    .into_response();
+            }
+        };
+    if !st.machine_links_enabled {
+        machine_link = None;
+    }
     match st
         .printers
         .add(NewPrinter {
@@ -537,6 +598,7 @@ async fn create(State(st): State<AppState>, Form(f): Form<PrinterForm>) -> Respo
             module,
             ams_units,
             feed_modes,
+            machine_link,
         })
         .await
     {
@@ -550,10 +612,14 @@ async fn update(
     Form(f): Form<PrinterForm>,
 ) -> Response {
     let dest = f.destination();
-    let (name, brand, model, heads, module, ams_units, feed_modes) = match f.domain() {
-        Ok(v) => v,
-        Err(_) => return StatusCode::UNPROCESSABLE_ENTITY.into_response(),
-    };
+    let (name, brand, model, heads, module, ams_units, feed_modes, mut machine_link) =
+        match f.domain() {
+            Ok(v) => v,
+            Err(_) => return StatusCode::UNPROCESSABLE_ENTITY.into_response(),
+        };
+    if !st.machine_links_enabled {
+        machine_link = None;
+    }
     let printer = Printer {
         id: PrinterId::new(id),
         name,
@@ -563,6 +629,7 @@ async fn update(
         module,
         ams_units,
         feed_modes,
+        machine_link,
         slots: vec![],
     };
     match st.printers.edit(printer).await {
@@ -578,6 +645,141 @@ async fn delete(State(st): State<AppState>, Path(id): Path<String>) -> Response 
         Err(e) => internal_error(e),
     }
 }
+
+#[derive(Serialize)]
+struct MachineStatusView {
+    state: &'static str,
+    state_key: String,
+    progress: Option<u8>,
+    remaining: Option<String>,
+    job_name: Option<String>,
+    nozzle: Option<String>,
+    bed: Option<String>,
+    active: bool,
+}
+impl From<MachineStatus> for MachineStatusView {
+    fn from(s: MachineStatus) -> Self {
+        let state = match s.state {
+            MachineState::Offline => "offline",
+            MachineState::Idle => "idle",
+            MachineState::Printing => "printing",
+            MachineState::Paused => "paused",
+            MachineState::Error => "error",
+        };
+        let temp = |t: Temperature| {
+            format!(
+                "{:.0}°C{}",
+                t.actual,
+                t.target.map(|n| format!(" / {n:.0}°C")).unwrap_or_default()
+            )
+        };
+        Self {
+            state,
+            state_key: format!("machine_state.{state}"),
+            progress: s.telemetry.progress_percent,
+            remaining: s.telemetry.remaining_seconds.map(format_duration),
+            job_name: s.telemetry.job_name.clone(),
+            nozzle: s.active_nozzle().map(temp),
+            bed: s.telemetry.bed_temperature.map(temp),
+            active: matches!(s.state, MachineState::Printing | MachineState::Paused),
+        }
+    }
+}
+fn format_duration(seconds: u64) -> String {
+    format!("{}:{:02}", seconds / 3600, (seconds % 3600) / 60)
+}
+async fn status_fragment(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    if !st.machine_links_enabled {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let status = match st
+        .machine_connectivity
+        .get_printer_status(PrinterId::new(id.clone()))
+        .await
+    {
+        Ok(s) => s,
+        Err(_) => return StatusCode::NOT_FOUND.into_response(),
+    };
+    let mut response = render_status(&st, &headers, status);
+    response.headers_mut().insert(
+        "hx-trigger",
+        axum::http::HeaderValue::from_static("machine-status-loaded"),
+    );
+    response
+}
+fn render_status(st: &AppState, headers: &HeaderMap, status: MachineStatus) -> Response {
+    let mut ctx = Context::new();
+    ctx.insert("status", &MachineStatusView::from(status));
+    match st.renderer.render(
+        "_machine_status.html",
+        &resolve_locale(headers, st),
+        "",
+        ctx,
+    ) {
+        Ok(h) => Html(h).into_response(),
+        Err(e) => internal_error(e),
+    }
+}
+#[derive(Deserialize)]
+struct TestLinkForm {
+    machine_endpoint: String,
+    #[serde(default)]
+    machine_api_key: String,
+    #[serde(default)]
+    machine_api_key_configured: bool,
+    #[serde(default)]
+    brand: String,
+    #[serde(default)]
+    printer_id: Option<String>,
+}
+async fn test_link(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Form(f): Form<TestLinkForm>,
+) -> Response {
+    if !st.machine_links_enabled {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let result = if f.brand == "prusa"
+        && f.machine_api_key.is_empty()
+        && f.machine_api_key_configured
+        && let Some(printer_id) = f.printer_id
+    {
+        st.machine_connectivity
+            .test_printer_machine_link(PrinterId::new(printer_id), f.machine_endpoint)
+            .await
+    } else {
+        let link = if f.brand == "prusa" {
+            MachineLink::PrusaLink {
+                host: f.machine_endpoint,
+                api_key: f.machine_api_key,
+            }
+        } else {
+            MachineLink::Moonraker {
+                url: f.machine_endpoint,
+            }
+        };
+        st.machine_connectivity.test_machine_link(link).await
+    };
+    match result {
+        Ok(s) => render_status(&st, &headers, s),
+        Err(e) => {
+            tracing::warn!(error = %e, "machine link test failed");
+            (
+                StatusCode::BAD_GATEWAY,
+                Html(
+                    st.renderer
+                        .t(&resolve_locale(&headers, &st), "machine_link.test.failed"),
+                ),
+            )
+                .into_response()
+        }
+    }
+}
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/printers", get(page).post(create))
@@ -588,11 +790,13 @@ pub fn routes() -> Router<AppState> {
             "/printers/{printer_id}/slots/{slot_key}",
             axum::routing::post(set_slot),
         )
+        .route("/printers/{id}/machine-status", get(status_fragment))
+        .route("/machine-links/test", axum::routing::post(test_link))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::PrinterForm;
+    use super::{PrinterForm, TestLinkForm};
     use crate::web::{i18n::Catalog, templates::Renderer};
     use domain::printers::FeedMode;
     use serde_json::json;
@@ -606,7 +810,7 @@ mod tests {
 
     #[test]
     fn single_head_bambu_feed_mode_round_trips() {
-        let (_, _, _, heads, _, ams_units, feed_modes) = form(
+        let (_, _, _, heads, _, ams_units, feed_modes, _) = form(
             "name=Shop&brand=bambu&model=P1S&heads=1&module=none&ams_units=1&feed_modes=ams_fed",
         )
         .domain()
@@ -618,7 +822,7 @@ mod tests {
 
     #[test]
     fn dual_head_bambu_parses_csv_feed_modes_in_order() {
-        let (_, _, _, _, _, _, feed_modes) = form(
+        let (_, _, _, _, _, _, feed_modes, _) = form(
             "name=H2D&brand=bambu&model=H2D&heads=2&module=none&ams_units=1&feed_modes=direct,ams_fed",
         )
         .domain()
@@ -628,12 +832,48 @@ mod tests {
 
     #[test]
     fn non_bambu_ignores_absent_feed_modes() {
-        let (_, _, _, _, _, ams_units, feed_modes) =
+        let (_, _, _, _, _, ams_units, feed_modes, _) =
             form("name=MK&brand=prusa&model=MK4S&heads=1&module=none")
                 .domain()
                 .unwrap();
         assert_eq!(ams_units, 0);
         assert_eq!(feed_modes, vec![FeedMode::Direct]);
+    }
+
+    #[test]
+    fn moonraker_link_deserializes_from_a_real_urlencoded_body() {
+        let (_, _, _, _, _, _, _, link) = form("name=Ender&brand=other&model=Ender+3&heads=1&module=none&machine_link_enabled=1&machine_endpoint=http%3A%2F%2Fmoonraker.local%3A7125").domain().unwrap();
+        assert_eq!(
+            link,
+            Some(domain::printers::MachineLink::Moonraker {
+                url: "http://moonraker.local:7125".into()
+            })
+        );
+    }
+
+    #[test]
+    fn prusalink_link_deserializes_from_a_real_urlencoded_body() {
+        let (_, _, _, _, _, _, _, link) = form("name=MK4&brand=prusa&model=MK4S&heads=1&module=none&machine_link_enabled=1&machine_endpoint=http%3A%2F%2Fprusa.local&machine_api_key=top-secret").domain().unwrap();
+        assert!(
+            matches!(link, Some(domain::printers::MachineLink::PrusaLink { ref api_key, .. }) if api_key == "top-secret")
+        );
+    }
+
+    #[test]
+    fn configured_prusa_test_form_carries_printer_identity_without_a_secret() {
+        let form: TestLinkForm = serde_urlencoded::from_str("brand=prusa&printer_id=printer-1&machine_endpoint=https%3A%2F%2Fprusa.local&machine_api_key_configured=true&machine_api_key=").unwrap();
+        assert_eq!(form.brand, "prusa");
+        assert_eq!(form.printer_id.as_deref(), Some("printer-1"));
+        assert!(form.machine_api_key_configured);
+        assert!(form.machine_api_key.is_empty());
+    }
+
+    #[test]
+    fn configured_prusa_save_uses_preserve_sentinel_when_key_is_blank() {
+        let (_, _, _, _, _, _, _, link) = form("name=MK4&brand=prusa&model=MK4S&heads=1&module=none&machine_link_enabled=1&machine_endpoint=https%3A%2F%2Fprusa.local&machine_api_key_configured=true&machine_api_key=").domain().unwrap();
+        assert!(
+            matches!(link, Some(domain::printers::MachineLink::PrusaLink { ref api_key, .. }) if api_key == "__configured__")
+        );
     }
 
     #[test]

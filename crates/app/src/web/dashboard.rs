@@ -92,6 +92,11 @@ pub struct DashboardView {
     pub material_breakdown: Vec<MaterialBreakdownView>,
     pub soon_empty: Vec<SoonEmptyView>,
 }
+#[derive(Serialize)]
+struct FarmPrinterView {
+    id: String,
+    name: String,
+}
 
 impl DashboardView {
     fn localized(o: DashboardOverview, renderer: &Renderer, locale: &str) -> Self {
@@ -130,6 +135,7 @@ fn pct(fraction: f64) -> u8 {
     (fraction * 100.0).round() as u8
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render(
     st: &AppState,
     locale: &str,
@@ -138,6 +144,8 @@ fn render(
     low_stock_threshold_pct: u8,
     nav_spool_count: u64,
     nav_printer_count: usize,
+    farm_printers: Vec<FarmPrinterView>,
+    machine_links_enabled: bool,
 ) -> Response {
     let view = DashboardView::localized(overview, &st.renderer, locale);
     let mut ctx = Context::new();
@@ -152,6 +160,8 @@ fn render(
     ctx.insert("low_stock_threshold_pct", &low_stock_threshold_pct);
     ctx.insert("nav_spool_count", &nav_spool_count);
     ctx.insert("nav_printer_count", &nav_printer_count);
+    ctx.insert("farm_printers", &farm_printers);
+    ctx.insert("machine_links_enabled", &machine_links_enabled);
     // Read by `base.html` to mark the "Tableau de bord" nav item active.
     ctx.insert("page", "dashboard");
     match st
@@ -175,6 +185,21 @@ async fn index(State(st): State<AppState>, headers: HeaderMap) -> Response {
         Ok(overview) => {
             let nav_spool_count = st.nav_spool_count().await;
             let nav_printer_count = st.nav_printer_count().await;
+            let farm_printers = if st.machine_links_enabled {
+                st.printers
+                    .list()
+                    .await
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter(|p| p.machine_link.is_some())
+                    .map(|p| FarmPrinterView {
+                        id: p.id.as_str().into(),
+                        name: p.name.as_str().into(),
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
             render(
                 &st,
                 &locale,
@@ -183,6 +208,8 @@ async fn index(State(st): State<AppState>, headers: HeaderMap) -> Response {
                 threshold.percent(),
                 nav_spool_count,
                 nav_printer_count,
+                farm_printers,
+                st.machine_links_enabled,
             )
         }
         Err(e) => internal_error(e),

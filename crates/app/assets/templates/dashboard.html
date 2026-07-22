@@ -40,6 +40,7 @@
   </div>
 
   <div class="dashboard-grid">
+    {% if machine_links_enabled %}<section class="dashboard-panel farm-activity" id="farm-activity"><div class="dashboard-panel-header"><h2>{{ t(key="farm_activity.title") }}</h2></div>{% if farm_printers | length > 0 %}<ul>{% for printer in farm_printers %}<li><a href="/printers"><strong>{{ printer.name }}</strong></a><div hx-get="/printers/{{ printer.id }}/machine-status" hx-trigger="load, every 10s" hx-swap="innerHTML" aria-live="polite"></div></li>{% endfor %}</ul>{% else %}<p class="empty-state">{{ t(key="farm_activity.empty") }}</p>{% endif %}</section>{% endif %}
     <section class="dashboard-panel" id="dashboard-breakdown">
       <div class="dashboard-panel-header">
         <h2>{{ t(key="dashboard.breakdown.title") }}</h2>

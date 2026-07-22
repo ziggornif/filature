@@ -1,8 +1,8 @@
-use crate::persistence::Db;
+use crate::{credentials::CredentialCipher, persistence::Db};
 use async_trait::async_trait;
 use domain::printers::{
-    FeedMode, LoadableSpool, LoadedSpool, Module, NewPrinter, Printer, PrinterBrand, PrinterName,
-    PrinterRepository, RepositoryError, Slot, derive_slots,
+    FeedMode, LoadableSpool, LoadedSpool, MachineLink, Module, NewPrinter, Printer, PrinterBrand,
+    PrinterName, PrinterRepository, RepositoryError, Slot, derive_slots,
 };
 use domain::shared::{PrinterId, SpoolId};
 use sqlx::Row;
@@ -11,10 +11,76 @@ use ulid::Ulid;
 
 pub struct SqlxPrinterRepository {
     pool: Db,
+    cipher: Option<CredentialCipher>,
 }
 impl SqlxPrinterRepository {
     pub fn new(pool: Db) -> Self {
-        Self { pool }
+        Self { pool, cipher: None }
+    }
+    pub fn with_cipher(pool: Db, cipher: Option<CredentialCipher>) -> Self {
+        Self { pool, cipher }
+    }
+
+    async fn read_link(&self, id: &str) -> Result<Option<MachineLink>, RepositoryError> {
+        let row =
+            sqlx::query("SELECT kind,endpoint,credential FROM machine_links WHERE printer_id=$1")
+                .bind(id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(backend)?;
+        row.map(|r| match r.get::<String, _>("kind").as_str() {
+            "prusalink" => Ok(MachineLink::PrusaLink {
+                host: r.get("endpoint"),
+                api_key: String::new(),
+            }),
+            "moonraker" => Ok(MachineLink::Moonraker {
+                url: r.get("endpoint"),
+            }),
+            _ => Err(RepositoryError::Backend("unknown machine link kind".into())),
+        })
+        .transpose()
+    }
+
+    async fn write_link(
+        &self,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        id: &str,
+        link: Option<&MachineLink>,
+    ) -> Result<(), RepositoryError> {
+        let preserve = matches!(link, Some(MachineLink::PrusaLink { api_key, .. }) if api_key == "__configured__");
+        if !preserve {
+            sqlx::query("DELETE FROM machine_links WHERE printer_id=$1")
+                .bind(id)
+                .execute(&mut **tx)
+                .await
+                .map_err(backend)?;
+        }
+        if let Some(link) = link {
+            match link {
+                MachineLink::PrusaLink { host, api_key } if api_key == "__configured__" => {
+                    let result=sqlx::query("UPDATE machine_links SET endpoint=$2 WHERE printer_id=$1 AND kind='prusalink'").bind(id).bind(host).execute(&mut **tx).await.map_err(backend)?;
+                    if result.rows_affected() == 0 {
+                        return Err(RepositoryError::Backend(
+                            "configured PrusaLink credential is missing".into(),
+                        ));
+                    }
+                }
+                MachineLink::PrusaLink { host, api_key } => {
+                    let cipher = self.cipher.as_ref().ok_or_else(|| {
+                        RepositoryError::Backend(
+                            "FILATURE_CREDENTIALS_KEY is required to save a PrusaLink API key"
+                                .into(),
+                        )
+                    })?;
+                    let encrypted = cipher.encrypt(api_key).map_err(RepositoryError::Backend)?;
+                    sqlx::query("INSERT INTO machine_links(printer_id,kind,endpoint,credential) VALUES($1,'prusalink',$2,$3)").bind(id).bind(host).bind(encrypted).execute(&mut **tx).await.map_err(backend)?;
+                }
+                MachineLink::Moonraker { url } => {
+                    sqlx::query("INSERT INTO machine_links(printer_id,kind,endpoint,credential) VALUES($1,'moonraker',$2,NULL)").bind(id).bind(url).execute(&mut **tx).await.map_err(backend)?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -155,6 +221,7 @@ impl PrinterRepository for SqlxPrinterRepository {
                 .into_iter()
                 .filter_map(|expected| persisted.get(&expected.key).cloned())
                 .collect();
+            let machine_link = self.read_link(&id).await?;
             out.push(Printer {
                 id: PrinterId::new(id),
                 name: PrinterName::new(row.get::<String, _>("name"))?,
@@ -164,6 +231,7 @@ impl PrinterRepository for SqlxPrinterRepository {
                 module,
                 ams_units,
                 feed_modes,
+                machine_link,
                 slots,
             });
         }
@@ -200,6 +268,8 @@ impl PrinterRepository for SqlxPrinterRepository {
                 .bind(Ulid::new().to_string()).bind(id.as_str()).bind(&s.group_label).bind(&s.key).bind(i32::from(s.position))
                 .execute(&mut *tx).await.map_err(backend)?;
         }
+        self.write_link(&mut tx, id.as_str(), p.machine_link.as_ref())
+            .await?;
         tx.commit().await.map_err(backend)?;
         Ok(Printer {
             id,
@@ -210,6 +280,7 @@ impl PrinterRepository for SqlxPrinterRepository {
             module: p.module,
             ams_units: p.ams_units,
             feed_modes: p.feed_modes,
+            machine_link: p.machine_link,
             slots,
         })
     }
@@ -263,6 +334,8 @@ impl PrinterRepository for SqlxPrinterRepository {
                 .bind(Ulid::new().to_string()).bind(p.id.as_str()).bind(&s.group_label).bind(&s.key).bind(i32::from(s.position))
                 .execute(&mut *tx).await.map_err(backend)?;
         }
+        self.write_link(&mut tx, p.id.as_str(), p.machine_link.as_ref())
+            .await?;
         tx.commit().await.map_err(backend)?;
         p.slots = new_slots;
         Ok(p)

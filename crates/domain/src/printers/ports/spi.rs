@@ -1,4 +1,6 @@
-use crate::printers::{LoadableSpool, NewPrinter, Printer};
+use crate::printers::{
+    LoadableSpool, MachineError, MachineLink, MachineStatus, NewPrinter, Printer,
+};
 use crate::shared::{DomainError, PrinterId, SpoolId};
 use async_trait::async_trait;
 use thiserror::Error;
@@ -40,4 +42,14 @@ pub trait PrinterRepository: Send + Sync {
         &self,
         current: Option<&SpoolId>,
     ) -> Result<Vec<LoadableSpool>, RepositoryError>;
+}
+
+#[async_trait]
+pub trait MachineLinkRepository: Send + Sync {
+    async fn find_link(&self, printer_id: &PrinterId) -> Result<Option<MachineLink>, MachineError>;
+}
+
+#[async_trait]
+pub trait MachineStatusProbe: Send + Sync {
+    async fn fetch_status(&self, link: &MachineLink) -> Result<MachineStatus, MachineError>;
 }

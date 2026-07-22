@@ -1,0 +1,4 @@
+<div class="machine-status machine-status--{{ status.state }}">
+  <span class="machine-state-badge">{{ t(key=status.state_key) }}</span>
+  {% if status.active %}<div class="machine-job"><strong class="machine-job-name" title="{{ status.job_name | default(value='') }}">{{ status.job_name | default(value='—') }}</strong>{% if status.progress is defined and status.progress != null %}<span class="machine-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ status.progress }}"><i style="width:{{ status.progress }}%"></i></span><span>{{ status.progress }} %{% if status.remaining %} · {{ status.remaining }}{% endif %}</span>{% endif %}<small>{% if status.nozzle %}{{ t(key="machine_status.nozzle") }} {{ status.nozzle }}{% endif %}{% if status.bed %} · {{ t(key="machine_status.bed") }} {{ status.bed }}{% endif %}</small></div>{% endif %}
+</div>

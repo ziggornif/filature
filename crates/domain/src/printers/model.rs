@@ -225,6 +225,7 @@ pub struct Printer {
     pub module: Module,
     pub ams_units: u8,
     pub feed_modes: Vec<FeedMode>,
+    pub machine_link: Option<MachineLink>,
     pub slots: Vec<Slot>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -236,6 +237,30 @@ pub struct NewPrinter {
     pub module: Module,
     pub ams_units: u8,
     pub feed_modes: Vec<FeedMode>,
+    pub machine_link: Option<MachineLink>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MachineLink {
+    PrusaLink { host: String, api_key: String },
+    Moonraker { url: String },
+}
+
+impl MachineLink {
+    pub fn validate_for_brand(self, brand: PrinterBrand) -> Result<Self, DomainError> {
+        let valid = match (&self, brand) {
+            (Self::PrusaLink { host, api_key }, PrinterBrand::Prusa) => {
+                !host.trim().is_empty() && !api_key.trim().is_empty()
+            }
+            (Self::Moonraker { url }, PrinterBrand::Other) => !url.trim().is_empty(),
+            _ => false,
+        };
+        valid.then_some(self).ok_or_else(|| {
+            DomainError::InvalidPrinterConfiguration(
+                "machine link does not match printer brand".into(),
+            )
+        })
+    }
 }
 
 fn slots(label: &str, prefix: &str, count: u8) -> Vec<Slot> {
