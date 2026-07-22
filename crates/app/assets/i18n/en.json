@@ -269,6 +269,7 @@
   "printers.slot.load": "Load a spool",
   "printers.slot.unload": "Unload",
   "printers.loaded_count": "loaded spools",
+  "printers.occupancy.loaded": "loaded",
   "printers.error.spool_not_loadable": "Only sealed or open spools can be loaded.",
   "printers.error.already_loaded": "This spool is already loaded.",
   "printers.group.external": "External spool",
