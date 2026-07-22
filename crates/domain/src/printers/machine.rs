@@ -1,4 +1,4 @@
-use crate::printers::MachineLink;
+use super::{MachineConnectivityUseCases, MachineLink, MachineLinkRepository, MachineStatusProbe};
 use crate::shared::PrinterId;
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -42,6 +42,7 @@ impl MachineStatus {
             telemetry: MachineTelemetry::default(),
         }
     }
+
     pub fn active_nozzle(&self) -> Option<Temperature> {
         self.telemetry
             .active_head
@@ -60,30 +61,6 @@ pub enum MachineError {
     Connection(String),
     #[error("machine link repository failed: {0}")]
     Repository(String),
-}
-
-#[async_trait]
-pub trait MachineLinkRepository: Send + Sync {
-    async fn find_link(&self, printer_id: &PrinterId) -> Result<Option<MachineLink>, MachineError>;
-}
-
-#[async_trait]
-pub trait MachineStatusProbe: Send + Sync {
-    async fn fetch_status(&self, link: &MachineLink) -> Result<MachineStatus, MachineError>;
-}
-
-#[async_trait]
-pub trait MachineConnectivityUseCases: Send + Sync {
-    async fn get_printer_status(
-        &self,
-        printer_id: PrinterId,
-    ) -> Result<MachineStatus, MachineError>;
-    async fn test_machine_link(&self, link: MachineLink) -> Result<MachineStatus, MachineError>;
-    async fn test_printer_machine_link(
-        &self,
-        printer_id: PrinterId,
-        endpoint: String,
-    ) -> Result<MachineStatus, MachineError>;
 }
 
 pub struct MachineConnectivityService {
@@ -117,9 +94,11 @@ impl MachineConnectivityUseCases for MachineConnectivityService {
             .await
             .unwrap_or_else(|_| MachineStatus::offline()))
     }
+
     async fn test_machine_link(&self, link: MachineLink) -> Result<MachineStatus, MachineError> {
         self.probe.fetch_status(&link).await
     }
+
     async fn test_printer_machine_link(
         &self,
         printer_id: PrinterId,
@@ -145,6 +124,7 @@ impl MachineConnectivityUseCases for MachineConnectivityService {
 mod tests {
     use super::*;
     use std::sync::Mutex;
+
     #[test]
     fn active_head_falls_back_to_first_head() {
         let status = MachineStatus {

@@ -1,10 +1,7 @@
 use async_trait::async_trait;
-use domain::{
-    machine_connectivity::{
-        MachineError, MachineState, MachineStatus, MachineStatusProbe, MachineTelemetry,
-        Temperature,
-    },
-    printers::MachineLink,
+use domain::printers::{
+    MachineError, MachineLink, MachineState, MachineStatus, MachineStatusProbe, MachineTelemetry,
+    Temperature,
 };
 use reqwest::{Client, redirect::Policy};
 use serde_json::Value;
@@ -178,7 +175,7 @@ impl MachineStatusProbe for RestMachineStatusProbe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use domain::machine_connectivity::MachineStatusProbe;
+    use domain::printers::MachineStatusProbe;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     async fn fake(response: &'static str) -> Option<String> {

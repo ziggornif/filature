@@ -7,10 +7,9 @@ use axum::{
     response::{Html, IntoResponse, Redirect, Response},
     routing::get,
 };
-use domain::machine_connectivity::{MachineState, MachineStatus};
 use domain::printers::{
-    BAMBU_MODELS, FeedMode, LoadableSpool, MachineLink, Module, NewPrinter, PRUSA_MODELS, Printer,
-    PrinterBrand, PrinterName, RepositoryError,
+    BAMBU_MODELS, FeedMode, LoadableSpool, MachineLink, MachineState, MachineStatus, Module,
+    NewPrinter, PRUSA_MODELS, Printer, PrinterBrand, PrinterName, RepositoryError, Temperature,
 };
 use domain::shared::{PrinterId, SpoolId};
 use domain::spools::Colour;
@@ -667,7 +666,7 @@ impl From<MachineStatus> for MachineStatusView {
             MachineState::Paused => "paused",
             MachineState::Error => "error",
         };
-        let temp = |t: domain::machine_connectivity::Temperature| {
+        let temp = |t: Temperature| {
             format!(
                 "{:.0}°C{}",
                 t.actual,

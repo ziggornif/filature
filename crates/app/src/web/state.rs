@@ -6,10 +6,11 @@ use domain::dashboard::DashboardUseCases;
 use domain::instance_configuration::InstanceConfigurationUseCases;
 use domain::instance_transfer::InstanceTransferUseCases;
 use domain::locations::LocationsUseCases;
-use domain::machine_connectivity::{MachineConnectivityService, MachineConnectivityUseCases};
 use domain::manufacturers::ManufacturersUseCases;
 use domain::materials::MaterialsUseCases;
-use domain::printers::{PrintersService, PrintersUseCases};
+use domain::printers::{
+    MachineConnectivityService, MachineConnectivityUseCases, PrintersService, PrintersUseCases,
+};
 use domain::spools::{SpoolFilter, SpoolsUseCases};
 use std::sync::Arc;
 

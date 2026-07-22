@@ -1,8 +1,7 @@
 use crate::{credentials::CredentialCipher, persistence::Db};
 use async_trait::async_trait;
 use domain::{
-    machine_connectivity::{MachineError, MachineLinkRepository},
-    printers::MachineLink,
+    printers::{MachineError, MachineLink, MachineLinkRepository},
     shared::PrinterId,
 };
 use sqlx::Row;
