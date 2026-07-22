@@ -43,7 +43,8 @@ impl RestMachineStatusProbe {
     }
 
     async fn prusa(&self, host: &str, key: &str) -> Result<MachineStatus, MachineError> {
-        let base = host.trim_end_matches('/');
+        let base = normalize_base(host);
+        let base = base.trim_end_matches('/');
         let status_url = format!("{base}/api/v1/status");
         let job_url = format!("{base}/api/v1/job");
         let (status, job) = tokio::join!(
@@ -60,15 +61,24 @@ impl RestMachineStatusProbe {
                     .or_else(|| status.get("state").and_then(Value::as_str)),
             ),
             telemetry: MachineTelemetry {
+                // PrusaLink v1 (`/api/v1/job`): progress is a bare 0-100 number,
+                // remaining is `time_remaining`. Older OctoPrint-compatible
+                // firmwares nest them under `progress.{completion,printTimeLeft}`.
                 progress_percent: percent(
-                    job.pointer("/progress/completion").and_then(Value::as_f64),
+                    job.get("progress")
+                        .and_then(Value::as_f64)
+                        .or_else(|| job.pointer("/progress/completion").and_then(Value::as_f64)),
                 ),
-                remaining_seconds: job
-                    .pointer("/progress/printTimeLeft")
-                    .and_then(Value::as_u64),
+                remaining_seconds: job.get("time_remaining").and_then(Value::as_u64).or_else(
+                    || {
+                        job.pointer("/progress/printTimeLeft")
+                            .and_then(Value::as_u64)
+                    },
+                ),
                 job_name: job
-                    .pointer("/file/name")
+                    .pointer("/file/display_name")
                     .and_then(Value::as_str)
+                    .or_else(|| job.pointer("/file/name").and_then(Value::as_str))
                     .map(str::to_owned),
                 nozzle_temperatures: vec![
                     temperature(status.pointer("/temperature/tool0"))
@@ -87,7 +97,7 @@ impl RestMachineStatusProbe {
     async fn moonraker(&self, url: &str) -> Result<MachineStatus, MachineError> {
         let value = self
             .json(
-                &format!("{}/printer/objects/query?print_stats&virtual_sdcard&extruder&heater_bed&toolhead", url.trim_end_matches('/')),
+                &format!("{}/printer/objects/query?print_stats&virtual_sdcard&extruder&heater_bed&toolhead", normalize_base(url).trim_end_matches('/')),
                 None,
             )
             .await?;
@@ -118,12 +128,27 @@ impl RestMachineStatusProbe {
     }
 }
 
+/// Users paste bare IPs/hostnames ("192.168.1.71") as often as full URLs;
+/// reqwest rejects scheme-less URLs instantly, so default to http:// (the
+/// PrusaLink/Moonraker LAN norm) when no scheme is given.
+fn normalize_base(value: &str) -> String {
+    let value = value.trim();
+    if value.starts_with("http://") || value.starts_with("https://") {
+        value.to_string()
+    } else {
+        format!("http://{value}")
+    }
+}
+
 fn parse_state(value: Option<&str>) -> MachineState {
+    // PrusaLink: IDLE BUSY PRINTING PAUSED FINISHED STOPPED ERROR ATTENTION
+    // Moonraker print_stats: standby printing paused complete cancelled error
     match value.unwrap_or("").to_ascii_lowercase().as_str() {
         "printing" => MachineState::Printing,
         "paused" => MachineState::Paused,
-        "idle" | "ready" | "operational" | "standby" | "complete" => MachineState::Idle,
-        "error" | "shutdown" | "cancelled" => MachineState::Error,
+        "idle" | "ready" | "operational" | "standby" | "complete" | "finished" | "stopped"
+        | "busy" | "cancelled" => MachineState::Idle,
+        "error" | "shutdown" | "attention" => MachineState::Error,
         _ => MachineState::Offline,
     }
 }
@@ -177,6 +202,17 @@ mod tests {
     use super::*;
     use domain::printers::MachineStatusProbe;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[test]
+    fn bare_hosts_default_to_http_scheme() {
+        assert_eq!(normalize_base("192.168.1.71"), "http://192.168.1.71");
+        assert_eq!(normalize_base(" prusa.local "), "http://prusa.local");
+        assert_eq!(
+            normalize_base("http://192.168.1.71/"),
+            "http://192.168.1.71/"
+        );
+        assert_eq!(normalize_base("https://voron.lan"), "https://voron.lan");
+    }
 
     async fn fake(response: &'static str) -> Option<String> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.ok()?;

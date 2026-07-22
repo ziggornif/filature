@@ -767,14 +767,17 @@ async fn test_link(
     };
     match result {
         Ok(s) => render_status(&st, &headers, s),
-        Err(_) => (
-            StatusCode::BAD_GATEWAY,
-            Html(
-                st.renderer
-                    .t(&resolve_locale(&headers, &st), "machine_link.test.failed"),
-            ),
-        )
-            .into_response(),
+        Err(e) => {
+            tracing::warn!(error = %e, "machine link test failed");
+            (
+                StatusCode::BAD_GATEWAY,
+                Html(
+                    st.renderer
+                        .t(&resolve_locale(&headers, &st), "machine_link.test.failed"),
+                ),
+            )
+                .into_response()
+        }
     }
 }
 pub fn routes() -> Router<AppState> {

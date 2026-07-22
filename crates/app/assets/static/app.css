@@ -29,10 +29,20 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.28), 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
-.machine-link-form{border:1px solid var(--border);border-radius:.75rem;padding:1rem;display:grid;gap:.75rem}.machine-link-form legend{font-weight:700}.machine-link-form [hidden]{display:none!important}
-.machine-status{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}.machine-state-badge{border:1px solid var(--border);border-radius:999px;padding:.2rem .55rem;font-size:.78rem;font-weight:700}.machine-status--offline .machine-state-badge{border-style:dashed}.machine-status--printing .machine-state-badge{color:var(--ok)}.machine-status--paused .machine-state-badge{color:var(--warn)}.machine-status--error .machine-state-badge{color:var(--danger)}
-.machine-job{display:grid;min-width:10rem;max-width:18rem;font-size:.78rem}.machine-job-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.machine-progress{height:.35rem;background:var(--border);border-radius:999px;overflow:hidden}.machine-progress i{display:block;height:100%;background:var(--ok)}
-.farm-activity{grid-column:1/-1}.farm-activity ul{list-style:none;padding:0;margin:0}.farm-activity li{display:flex;justify-content:space-between;gap:1rem;padding:.65rem 0;border-bottom:1px solid var(--border)}
+.machine-link-form{border:1px solid var(--border);border-radius:11px;padding:16px;display:flex;flex-direction:column;gap:14px}.machine-link-form legend{font-weight:700;font-size:13px;padding:0 6px}#machine-link-toggle-wrap{flex-direction:row;align-items:center;gap:8px}#machine-link-toggle-wrap input{padding:0;margin:0;width:15px;height:15px;accent-color:var(--accent)}#machine-link-fields{display:flex;flex-direction:column;gap:14px}#machine-link-fields .button{align-self:flex-start}.machine-link-form [hidden]{display:none!important}
+.machine-status-slot:empty{display:none}
+.machine-status{display:flex;flex-direction:column;align-items:flex-start;gap:8px}.machine-state-badge{padding:4px 10px;border-radius:100px;background:var(--active-bg);color:var(--muted);font:10.5px var(--mono);font-weight:600;white-space:nowrap}.machine-status--offline .machine-state-badge{background:transparent;border:1px dashed var(--border-strong)}.machine-status--printing .machine-state-badge{background:var(--ok-bg);color:var(--ok)}.machine-status--paused .machine-state-badge{background:var(--warn-bg);color:var(--warn)}.machine-status--error .machine-state-badge{background:var(--danger-bg);color:var(--danger)}
+.machine-job{display:flex;flex-direction:column;gap:5px;width:100%;padding:10px 11px;border:1px solid var(--border);border-radius:9px;background:var(--surface);font-size:12px;min-width:0}.machine-job-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.machine-job small{font:10.5px var(--mono);color:var(--muted)}.machine-progress{display:block;height:5px;background:var(--active-bg);border-radius:3px;overflow:hidden}.machine-progress i{display:block;height:100%;background:var(--ok)}
+.farm-activity{grid-column:1/-1}.farm-activity ul{list-style:none;padding:0;margin:0}
+.farm-activity li{display:grid;grid-template-columns:minmax(110px,220px) minmax(0,1fr);align-items:center;gap:16px;padding:10px 0;border-top:1px solid var(--border)}
+.farm-activity li a{color:var(--text);text-decoration:none;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.farm-activity li>div{min-width:0}
+/* Ligne compacte (maquette) : nom | job — barre — % · temps | badge. Températures réservées aux cartes. */
+.farm-activity .machine-status{flex-direction:row;align-items:center;gap:12px;width:100%}
+.farm-activity .machine-state-badge{order:2;margin-left:auto}
+.farm-activity .machine-job{order:1;flex:1;display:grid;grid-template-columns:minmax(80px,1.3fr) minmax(60px,1fr) auto;align-items:center;column-gap:10px;padding:0;border:0;background:transparent;min-width:0}
+.farm-activity .machine-job>span:not(.machine-progress){font:11px var(--mono);color:var(--muted);white-space:nowrap}
+.farm-activity .machine-job small{display:none}
 @media (prefers-reduced-motion:reduce){.machine-progress i{transition:none!important;animation:none!important}}
 
 .printers-header { display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:22px }
