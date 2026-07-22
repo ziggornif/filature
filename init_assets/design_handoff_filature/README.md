@@ -1,7 +1,7 @@
 # Handoff : Filature — gestionnaire de stock de filament 3D (UI)
 
 ## Overview
-Filature est un outil auto-hébergé de suivi de stock de filament 3D (usage perso + micro-entreprise « Zig Factory »). C'est un **instrument d'atelier** qu'on garde ouvert dans un onglet, pas une app grand public. Cette maquette couvre les 6 écrans clés : Tableau de bord, Bobines (liste), Humidité (dryboxes), Détail bobine, Formulaire ajout/édition, Référentiel matériaux.
+Filature est un outil auto-hébergé de suivi de stock de filament 3D (usage perso + micro-entreprise « Zig Factory »). C'est un **instrument d'atelier** qu'on garde ouvert dans un onglet, pas une app grand public. Cette maquette couvre les 7 écrans clés : Tableau de bord, Bobines (liste), Humidité (dryboxes), Détail bobine, Formulaire ajout/édition, Référentiel matériaux, Paramètres (config d'instance + référentiels Fabricants/Emplacements).
 
 ## About the Design Files
 Le fichier `Filature.dc.html` est une **référence de design réalisée en HTML** — un prototype qui montre l'apparence et le comportement voulus, **pas du code de production à copier tel quel**. Il est écrit dans un mini-framework interne (balises `<x-dc>`, `<sc-for>`, `<sc-if>`, holes `{{ }}`, classe `Component extends DCLogic`) qui **n'est pas** la cible d'implémentation.
@@ -84,8 +84,9 @@ Ne portez pas la logique JS du proto (state en mémoire, `setState`) ; elle simu
 ### Navigation (shell, présent partout)
 - **Sidebar gauche**, largeur 216px, `background:--surface`, bord droit 1px.
 - Wordmark en haut : petit pictogramme « bobine » (2 cercles concentriques + 4 tirets d'axe) + `FILATURE` en mono 15px, `letter-spacing:.16em`.
-- 4 items : **Tableau de bord**, **Bobines** (badge compteur à droite), **Humidité** (pastille rouge si alerte), **Matériaux**. Item actif : fond `--active-bg`, texte `--text` ; inactif : texte `--muted`, icône Feather 17px.
+- 5 items : **Tableau de bord**, **Bobines** (badge compteur à droite), **Humidité** (pastille rouge si alerte), **Matériaux**, puis un espace flexible qui repousse **Paramètres** en bas du groupe de nav (juste au-dessus de la bascule de thème). Item actif : fond `--active-bg`, texte `--text` ; inactif : texte `--muted`, icône Feather 17px.
 - Bas de sidebar : bascule de thème (segmenté Auto / Clair / Sombre) + ligne « Zig Factory · auto-hébergé ».
+- **Décision d'IA (juillet 2026)** : Fabricants et Emplacements ne sont **pas** des items de nav de premier niveau — ce sont des données de référence saisies une fois puis rarement modifiées. Elles vivent en sous-onglets de l'écran **Paramètres**. Matériaux, lui, reste en nav principale (consulté au quotidien : statuts, seuils d'humidité, alertes).
 - Détail et Formulaire ne sont pas des items de nav (on y accède depuis Bobines) mais gardent l'item **Bobines** actif.
 
 ### 1. Tableau de bord
@@ -123,18 +124,22 @@ Ne portez pas la logique JS du proto (state en mémoire, `setState`) ; elle simu
   - **Historique de consommation** : état « à venir » (le suivi par impression arrivera plus tard — ne pas inventer de données).
 - **Longueur (m)** calculée depuis la masse : `L_m = (masse_g / densité) / (π·(d/2/10)²) / 100` (d en mm ; ex. Ø1.75). La densité vient du référentiel matériaux.
 
-### 5. Formulaire ajout / édition — **wizard 2 écrans**
-> Révisé (juillet 2026). L'ancien geste « peser → tare → net déduit » est **supprimé** :
-> décision produit = **poids net uniquement** (comme à l'achat). Le formulaire est un
-> **wizard 2 écrans**, partagé add/edit. Source de vérité = `Filature.dc.html` + le
-> view-model JS ; ce README suit le proto.
-- **Purpose** : saisie rapide, geste répété. Ouvert par « Ajouter » (mode add, part de l'écran 1) ou « Éditer » du détail (mode edit, prérempli, ouvre directement l'écran 2).
-- **Écran 1 — État** : 3 cartes (icône + titre + description). **Neuve** (restant = net, statut Scellée) · **Entamée** (on saisit le restant, statut Ouverte) · **Recharge** (refill sans support, assumée neuve en v1, statut Scellée). Grille `--etat-cols` : 3 col ≥1040px → 1 col ≤760px.
-- **Écran 2 — Détails** : header (titre + **badge d'état** + lien « Changer » qui revient à l'écran 1 ; Annuler / Enregistrer). Colonne max 680px, 3 cartes-sections :
-  - **Identité** : select Matériau, **select Marque** (liste + « Autre… »), **Couleur** — pas de champ « nom de couleur » saisi : le nom est **dérivé automatiquement du hex** (nom de la pastille préréglée si ça matche, sinon le code hex, ex. « #C62828 » ; `transparent` → « Transparent »), et c'est cette valeur dérivée qui est stockée. UI : **grille de pastilles préréglées** (libellé sous chacune, dont « Transparent »), séparateur « ou personnalisée », puis pastille de prévisualisation = `<input type="color">` caché (badge crayon en overlay) + champ hex texte (`#RRGGBB`, normalisation au blur — accepte `#RGB` et ajoute `#`) + libellé dérivé + message d'erreur inline si hex invalide + bouton ✕ pour effacer. **État « aucune couleur »** = pastille blanc barré rouge (diagonale danger).
-  - **Mesures** : Diamètre en segmenté (**1.75 / 2.85 mm**) ; **Poids net = select de presets** (`250 / 500 / 750 / 900 / 1000` défaut `/ 2000 / 3000 / 5000 g`) + « Autre… » → champ libre. **Si état = Entamée** : encart `--warn-bg` **« Poids restant (g) »** (absent sinon).
+### 5. Formulaire ajout / édition
+- **Purpose** : saisie rapide, geste répété. Ouvert par les boutons « Ajouter » (mode add) ou « Éditer » du détail (mode edit, prérempli).
+- **Layout** : header (titre + Annuler / Enregistrer). Colonne max 680px, 3 cartes-sections :
+  - **Identité** : select Matériau, input Marque, **Couleur** — pas de champ « nom de couleur » saisi par l'utilisateur : le nom est **dérivé automatiquement du hex** (nom de la pastille préréglée si ça matche, sinon le code hex lui-même, ex. « #C62828 »), et c'est cette valeur dérivée qui est stockée. UI : une **grille de pastilles préréglées** (avec libellé visible sous chacune, dont « Transparent »), puis sous un séparateur « ou personnalisée » : une pastille de prévisualisation qui est aussi un vrai `<input type="color">` caché (clic → sélecteur système, badge crayon en overlay) + un champ hex texte (`#RRGGBB`, validation/normalisation au blur — accepte aussi le format court `#RGB` et le préfixe `#` auto-ajouté), avec libellé dérivé affiché sous le champ et message d'erreur inline si le hex est invalide.
+  - **Mesures** : Diamètre en segmenté (1.75 / 2.85 mm) ; input **Poids net filament (g)** ; encart **« Ou peser la bobine → poids net déduit »** : `Poids total pesé (g)` − `Tare bobine vide (g)` = **Net filament** (recalculé en direct, affiché en gros accent). C'est le cas d'usage clé « je pèse → tare auto → net déduit ».
   - **Rangement & achat** : select Rangement, Prix (€), dates Acheté le / Ouvert le, Notes (textarea).
-- À l'enregistrement : `remaining = Entamée ? min(net, saisi) : net` ; `status = Entamée ? Ouverte : Scellée`. add → crée puis ouvre le détail ; edit → met à jour puis revient au détail.
+- À l'enregistrement : add → crée la bobine (reste = net, statut Scellée) puis ouvre son détail ; edit → met à jour puis revient au détail.
+
+### 6bis. Paramètres
+- **Purpose** : configuration d'instance + gestion des référentiels peu volatils (Fabricants, Emplacements) + sauvegarde/restauration.
+- **Layout** : header titre + barre de 4 onglets (**Général**, **Fabricants**, **Emplacements**, **Sauvegarde**), soulignement 2px `--accent` sur l'onglet actif, le reste en `--muted`. Contenu scrollable en dessous.
+  - **Général** : carte « Stock » — input **Seuil de stock bas** (%) + bouton **Enregistrer**. Même sémantique que `lowStockPct` (défaut 15) qui pilote déjà le calcul « bientôt vide » partout ailleurs dans l'app.
+  - **Fabricants** : carte liste — header avec compteur + input texte « Nom du fabricant » et bouton **+ Ajouter** ; une ligne par fabricant (nom, nombre de bobines qui le référencent en mono, icône poubelle pour retirer).
+  - **Emplacements** : même patron que Fabricants (nom du rangement, nb de bobines qui l'utilisent, ajout/suppression).
+  - **Sauvegarde** : deux colonnes — **Exporter** (bouton qui télécharge un JSON complet : bobines, matériaux, fabricants, emplacements, réglages) ; **Importer** (file input JSON, limite 1 Mio, case à cocher de confirmation obligatoire, bouton rouge **Remplacer l'instance** désactivé tant que la case n'est pas cochée et qu'aucun fichier n'est choisi — remplace tout, ne fusionne rien).
+- **Note produit** : Fabricants/Emplacements n'ont aujourd'hui aucune contrainte d'intégrité référentielle forte avec les bobines dans le proto (suppression libre même si des bobines y font encore référence) — à trancher côté implémentation réelle (bloquer, avertir, ou détacher silencieusement).
 
 ### 6. Référentiel matériaux
 - **Purpose** : écran de config, moins fréquent. **Source unique** des valeurs par défaut : modifier une sensibilité met à jour partout les seuils d'humidité et les longueurs (via la densité).
