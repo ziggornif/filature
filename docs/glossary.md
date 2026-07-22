@@ -58,6 +58,18 @@ printer form, Settings › Imprimantes tab).
 | **Slot** | Emplacement de bobine | A single filament position on a Printer or its Module, holding at most one loaded Spool at a time; may be empty. Has a stable key within its Printer so assignments survive an edit that keeps the layout. (Not to be confused with the Settings › Emplacements tab, which manages storage Locations.) |
 | **Loaded Spool / Loading** | Bobine chargée / Charger | The assignment of a Spool to a Slot. A Spool is loaded into **at most one Slot across all Printers** — two Printers can never share a Spool, nor two Slots of one Printer (exclusivity). Loading is independent of the Spool's Location and Status. Only **Sealed** or **Open** Spools can be loaded; a Spool that becomes **Empty** or **Archived** is automatically unloaded. |
 
+## Machine connectivity (slices `22a`/`22b`)
+
+Introduced by the Machine Link feature (live printer status). Design decisions
+recorded during discovery on 2026-07-22.
+
+| Term (canonical) | FR label | Definition |
+|---|---|---|
+| **Machine Link** | Connexion machine | An optional network configuration attached to a Printer, linking the declared Printer to its physical machine so Filature can query its state. One kind per Printer Brand: **PrusaLink** (host + API key), **Moonraker** (API URL — for Other printers marked as Klipper machines), **Bambu LAN** (host + LAN access code + serial number). A Printer without a Machine Link behaves as before. |
+| **Machine Status** | Statut machine | The instantaneous state reported by a Printer's physical machine through its Machine Link: a Machine State, and — when relevant — job progress (percent, remaining time), the current job name, and nozzle/bed temperatures (active Print Head; first head if the machine does not report which is active). Never persisted; fetched on demand. |
+| **Machine State** | État machine | The top-level state within a Machine Status. One of: **Offline** (Hors-ligne — Machine Link configured but the machine is unreachable), **Idle** (Repos), **Printing** (Impression), **Paused** (Pause), **Error** (Erreur). |
+| **Farm Activity** | Activité du parc | The dashboard panel listing every Printer that has a Machine Link, each with its live Machine Status — no Slots or Spools shown. Printers without a Machine Link appear only on the Printers page. |
+
 ## Deferred terms (Humidity feature — post-v1, no sensors yet)
 
 Recorded so the language is stable when the feature is picked up; **not modelled
