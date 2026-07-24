@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use domain::printers::{
-    MachineError, MachineLink, MachineState, MachineStatus, MachineStatusProbe, MachineTelemetry,
-    Temperature,
+    AmsTray, MachineError, MachineLink, MachineState, MachineStatus, MachineStatusProbe,
+    MachineTelemetry, Temperature,
 };
 use rumqttc::tokio_rustls::rustls::{
     self, DigitallySignedStruct, Error as TlsError, SignatureScheme,
@@ -156,6 +156,65 @@ impl BambuMachineStatusProbe {
             }
         }
     }
+
+    async fn ams_session(
+        &self,
+        host: &str,
+        access_code: &str,
+        serial: &str,
+    ) -> Result<Vec<AmsTray>, MachineError> {
+        let client_id = format!(
+            "filature-ams-{}-{}",
+            std::process::id(),
+            CLIENT_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        );
+        let mut options = MqttOptions::new(client_id, host, MQTT_PORT);
+        options
+            .set_credentials("bblp", access_code)
+            .set_keep_alive(Duration::from_secs(5))
+            .set_transport(Transport::tls_with_config(TlsConfiguration::Rustls(
+                Arc::new(tls12_config()?),
+            )));
+        let report_topic = format!("device/{serial}/report");
+        let request_topic = format!("device/{serial}/request");
+        let (client, mut eventloop) = AsyncClient::new(options, 10);
+        let mut subscribed = false;
+        let mut requested = false;
+        loop {
+            match eventloop
+                .poll()
+                .await
+                .map_err(|e| MachineError::Connection(e.to_string()))?
+            {
+                Event::Incoming(Incoming::ConnAck(_)) if !subscribed => {
+                    client
+                        .subscribe(report_topic.clone(), QoS::AtMostOnce)
+                        .await
+                        .map_err(|e| MachineError::Connection(e.to_string()))?;
+                    subscribed = true;
+                }
+                Event::Incoming(Incoming::SubAck(_)) if !requested => {
+                    client
+                        .publish(
+                            request_topic.clone(),
+                            QoS::AtMostOnce,
+                            false,
+                            br#"{"pushing":{"sequence_id":"1","command":"pushall"}}"#,
+                        )
+                        .await
+                        .map_err(|e| MachineError::Connection(e.to_string()))?;
+                    requested = true;
+                }
+                Event::Incoming(Incoming::Publish(message)) if message.topic == report_topic => {
+                    if let Some(trays) = parse_ams_report(&message.payload)? {
+                        let _ = client.disconnect().await;
+                        return Ok(trays);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -175,6 +234,57 @@ impl MachineStatusProbe for BambuMachineStatusProbe {
             .await
             .map_err(|_| MachineError::Connection("Bambu MQTT probe timed out".into()))?
     }
+
+    async fn fetch_ams(&self, link: &MachineLink) -> Result<Vec<AmsTray>, MachineError> {
+        let MachineLink::BambuLan {
+            host,
+            access_code,
+            serial,
+        } = link
+        else {
+            return Err(MachineError::AmsUnavailable);
+        };
+        tokio::time::timeout(PROBE_TIMEOUT, self.ams_session(host, access_code, serial))
+            .await
+            .map_err(|_| MachineError::Connection("Bambu MQTT AMS probe timed out".into()))?
+    }
+}
+
+fn optional_string(value: &Value) -> Option<String> {
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+}
+
+fn parse_ams_report(payload: &[u8]) -> Result<Option<Vec<AmsTray>>, MachineError> {
+    let value: Value = serde_json::from_slice(payload)
+        .map_err(|e| MachineError::Connection(format!("invalid Bambu report: {e}")))?;
+    let Some(units) = value.pointer("/print/ams/ams").and_then(Value::as_array) else {
+        return Ok(None);
+    };
+    let mut trays = Vec::new();
+    for (unit_index, unit) in units.iter().enumerate() {
+        let Some(unit_trays) = unit.get("tray").and_then(Value::as_array) else {
+            continue;
+        };
+        for (tray_index, tray) in unit_trays.iter().enumerate() {
+            trays.push(AmsTray {
+                unit_index: unit_index as u8,
+                tray_index: tray_index as u8,
+                filament_type: optional_string(&tray["tray_type"]),
+                color_hex: optional_string(&tray["tray_color"]).map(|value| {
+                    let value = value.trim_start_matches('#');
+                    format!("#{}", value.get(..6).unwrap_or(value).to_ascii_uppercase())
+                }),
+                sub_brand: optional_string(&tray["tray_sub_brands"]),
+                remain_percent: tray["remain"].as_u64().map(|value| value.min(100) as u8),
+                tag_uid: AmsTray::normalize_tag_uid(tray["tag_uid"].as_str()),
+            });
+        }
+    }
+    Ok(Some(trays))
 }
 
 fn number(value: Option<&Value>) -> Option<f32> {
@@ -227,7 +337,7 @@ fn parse_complete_report(payload: &[u8]) -> Result<Option<MachineStatus>, Machin
 
 #[cfg(test)]
 mod tests {
-    use super::parse_complete_report;
+    use super::{parse_ams_report, parse_complete_report};
     use domain::printers::{MachineState, Temperature};
     #[test]
     fn partial_push_is_ignored_until_gcode_state_arrives() {
@@ -263,5 +373,26 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(status.state, MachineState::Error);
+    }
+
+    #[test]
+    fn parses_ams_trays_and_normalizes_zero_uid() {
+        let trays = parse_ams_report(br##"{"print":{"ams":{"ams":[{"tray":[{"tray_type":"PLA","tray_color":"FF0000FF","tray_sub_brands":"PLA Basic","remain":73,"tag_uid":"ABC123"},{"tray_type":"PETG","tray_color":"00FF00","remain":5,"tag_uid":"0000000000000000"}]}]}}}"##)
+            .unwrap()
+            .unwrap();
+        assert_eq!(trays.len(), 2);
+        assert_eq!(trays[0].unit_index, 0);
+        assert_eq!(trays[0].tray_index, 0);
+        assert_eq!(trays[0].color_hex.as_deref(), Some("#FF0000"));
+        assert_eq!(trays[0].tag_uid.as_deref(), Some("ABC123"));
+        assert_eq!(trays[1].tag_uid, None);
+    }
+
+    #[test]
+    fn report_without_ams_is_partial() {
+        assert_eq!(
+            parse_ams_report(br#"{"print":{"gcode_state":"IDLE"}}"#).unwrap(),
+            None
+        );
     }
 }

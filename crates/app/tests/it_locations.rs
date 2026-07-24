@@ -46,6 +46,7 @@ fn sample_spool(material_id: MaterialId) -> NewSpool {
         notes: None,
         purchased_at: None,
         opened_at: None,
+        ams_tag_uid: None,
         remaining_weight: None,
     }
 }

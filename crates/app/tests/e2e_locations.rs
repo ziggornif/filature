@@ -204,6 +204,7 @@ async fn delete_blocked_then_allowed_after_unassign() {
             notes: None,
             purchased_at: None,
             opened_at: None,
+            ams_tag_uid: None,
             remaining_weight: None,
         })
         .await

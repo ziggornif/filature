@@ -1,6 +1,6 @@
 use super::spi::RepositoryError;
 use crate::printers::LoadableSpool;
-use crate::printers::{MachineError, MachineLink, MachineStatus, NewPrinter, Printer};
+use crate::printers::{AmsTray, MachineError, MachineLink, MachineStatus, NewPrinter, Printer};
 use crate::shared::{PrinterId, SpoolId};
 use async_trait::async_trait;
 
@@ -30,6 +30,7 @@ pub trait PrintersUseCases: Send + Sync {
 
 #[async_trait]
 pub trait MachineConnectivityUseCases: Send + Sync {
+    async fn fetch_ams_trays(&self, printer_id: PrinterId) -> Result<Vec<AmsTray>, MachineError>;
     async fn get_printer_status(
         &self,
         printer_id: PrinterId,

@@ -681,6 +681,7 @@ impl SpoolForm {
             notes: f.notes,
             purchased_at: f.purchased_at,
             opened_at: f.opened_at,
+            ams_tag_uid: None,
             remaining_weight,
         })
     }
@@ -716,6 +717,7 @@ impl SpoolForm {
             notes: f.notes,
             purchased_at: f.purchased_at,
             opened_at: f.opened_at,
+            ams_tag_uid: None,
         })
     }
 }

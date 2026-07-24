@@ -10,8 +10,8 @@ use crate::persistence::Db;
 use async_trait::async_trait;
 use domain::shared::{Grams, LocationId, ManufacturerId, MaterialId, Money};
 use domain::spools::{
-    Colour, Diameter, NewSpool, RepositoryError, Spool, SpoolDetail, SpoolFilter, SpoolId,
-    SpoolListItem, SpoolRepository, SpoolSort, SpoolStatus, SpoolType,
+    Colour, Diameter, NewSpool, ReconcilableSpool, RepositoryError, Spool, SpoolDetail,
+    SpoolFilter, SpoolId, SpoolListItem, SpoolRepository, SpoolSort, SpoolStatus, SpoolType,
 };
 use rust_decimal::Decimal;
 use time::Date;
@@ -142,6 +142,18 @@ struct SpoolRow {
     notes: Option<String>,
     purchased_at: Option<Date>,
     opened_at: Option<Date>,
+    ams_tag_uid: Option<String>,
+}
+
+#[derive(sqlx::FromRow)]
+struct ReconcilableRow {
+    id: String,
+    material_name: String,
+    colour_hex: Option<String>,
+    ams_tag_uid: Option<String>,
+    status: String,
+    remaining_percent: f64,
+    loaded: bool,
 }
 
 /// Escape the LIKE/ILIKE metacharacters (`\`, `%`, `_`) in a user-supplied
@@ -200,8 +212,8 @@ impl SpoolRepository for SqlxSpoolRepository {
             r#"INSERT INTO spools
                (id, material_id, spool_type, colour_hex, colour_name, diameter, net_weight,
                 remaining_weight, price_paid, status, location_id, manufacturer_id, notes,
-                purchased_at, opened_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)"#,
+                purchased_at, opened_at, ams_tag_uid)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)"#,
         )
         .bind(&id)
         .bind(s.material_id.as_str())
@@ -218,6 +230,7 @@ impl SpoolRepository for SqlxSpoolRepository {
         .bind(s.notes.as_deref())
         .bind(s.purchased_at)
         .bind(s.opened_at)
+        .bind(s.ams_tag_uid.as_deref())
         .execute(&self.pool)
         .await
         .map_err(|e| write_error(e, s.material_id.as_str(), location_id, manufacturer_id))?;
@@ -237,6 +250,7 @@ impl SpoolRepository for SqlxSpoolRepository {
             notes: s.notes,
             purchased_at: s.purchased_at,
             opened_at: s.opened_at,
+            ams_tag_uid: s.ams_tag_uid,
         })
     }
 
@@ -249,7 +263,8 @@ impl SpoolRepository for SqlxSpoolRepository {
             r#"UPDATE spools SET
                  material_id=$2, spool_type=$3, colour_hex=$4, colour_name=$5, diameter=$6,
                  net_weight=$7, remaining_weight=$8, price_paid=$9, status=$10, location_id=$11,
-                 manufacturer_id=$12, notes=$13, purchased_at=$14, opened_at=$15
+                 manufacturer_id=$12, notes=$13, purchased_at=$14, opened_at=$15,
+                 ams_tag_uid=$16
                WHERE id=$1"#,
         )
         .bind(s.id.as_str())
@@ -267,6 +282,7 @@ impl SpoolRepository for SqlxSpoolRepository {
         .bind(s.notes.as_deref())
         .bind(s.purchased_at)
         .bind(s.opened_at)
+        .bind(s.ams_tag_uid.as_deref())
         .execute(&self.pool)
         .await
         .map_err(|e| write_error(e, s.material_id.as_str(), location_id, manufacturer_id))?;
@@ -407,7 +423,7 @@ impl SpoolRepository for SqlxSpoolRepository {
         let row = sqlx::query_as::<_, SpoolRow>(
             r#"SELECT id, material_id, spool_type, colour_hex, diameter,
                       net_weight, remaining_weight, price_paid, status, location_id,
-                      manufacturer_id, notes, purchased_at, opened_at
+                      manufacturer_id, notes, purchased_at, opened_at, ams_tag_uid
                FROM spools WHERE id = $1"#,
         )
         .bind(id.as_str())
@@ -435,6 +451,7 @@ impl SpoolRepository for SqlxSpoolRepository {
             notes: r.notes,
             purchased_at: r.purchased_at,
             opened_at: r.opened_at,
+            ams_tag_uid: r.ams_tag_uid,
         }))
     }
 
@@ -527,6 +544,34 @@ impl SpoolRepository for SqlxSpoolRepository {
             .map_err(|e| backend(e, ""))?;
         u64::try_from(count)
             .map_err(|_| RepositoryError::Backend("count query returned a negative value".into()))
+    }
+
+    async fn reconcilable(&self) -> Result<Vec<ReconcilableSpool>, RepositoryError> {
+        let rows = sqlx::query_as::<_, ReconcilableRow>(
+            r#"SELECT s.id, m.name AS material_name, s.colour_hex, s.ams_tag_uid, s.status,
+                      (s.remaining_weight / s.net_weight * 100.0) AS remaining_percent,
+                      EXISTS (SELECT 1 FROM printer_slots ps WHERE ps.spool_id = s.id) AS loaded
+               FROM spools s
+               JOIN materials m ON m.id = s.material_id
+               WHERE s.status IN ('Sealed', 'Open')
+               ORDER BY s.created_at DESC"#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|error| backend(error, ""))?;
+        rows.into_iter()
+            .map(|row| {
+                Ok(ReconcilableSpool {
+                    id: SpoolId::new(row.id),
+                    material_name: row.material_name,
+                    colour_hex: row.colour_hex,
+                    ams_tag_uid: row.ams_tag_uid,
+                    status: build_status(&row.status)?,
+                    remaining_percent: row.remaining_percent.round().clamp(0.0, 100.0) as u8,
+                    loaded: row.loaded,
+                })
+            })
+            .collect()
     }
 }
 

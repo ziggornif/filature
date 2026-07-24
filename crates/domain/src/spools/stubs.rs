@@ -1,6 +1,8 @@
 use crate::shared::Money;
 use crate::spools::model::{NewSpool, Spool, SpoolId, SpoolStatus};
-use crate::spools::ports::spi::{RepositoryError, SpoolFilter, SpoolRepository, SpoolSort};
+use crate::spools::ports::spi::{
+    ReconcilableSpool, RepositoryError, SpoolFilter, SpoolRepository, SpoolSort,
+};
 use crate::spools::read_models::{SpoolDetail, SpoolListItem};
 use async_trait::async_trait;
 use rust_decimal::Decimal;
@@ -125,6 +127,7 @@ impl SpoolRepository for StubSpoolRepository {
             notes: s.notes,
             purchased_at: s.purchased_at,
             opened_at: s.opened_at,
+            ams_tag_uid: s.ams_tag_uid,
         };
         rows.push(spool.clone());
         Ok(spool)
@@ -217,5 +220,24 @@ impl SpoolRepository for StubSpoolRepository {
             .filter(|r| matches_filter(r, &filter))
             .filter(|r| r.status != SpoolStatus::Archived)
             .count() as u64)
+    }
+
+    async fn reconcilable(&self) -> Result<Vec<ReconcilableSpool>, RepositoryError> {
+        Ok(self
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|spool| matches!(spool.status, SpoolStatus::Sealed | SpoolStatus::Open))
+            .map(|spool| ReconcilableSpool {
+                id: spool.id.clone(),
+                material_name: STUB_MATERIAL_NAME.to_owned(),
+                colour_hex: spool.colour.as_ref().map(|colour| colour.hex().to_owned()),
+                ams_tag_uid: spool.ams_tag_uid.clone(),
+                status: spool.status,
+                remaining_percent: (spool.remaining_ratio() * 100.0).round() as u8,
+                loaded: false,
+            })
+            .collect())
     }
 }

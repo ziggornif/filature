@@ -18,6 +18,8 @@ pub enum RepositoryError {
     UnknownLocation(LocationId),
     #[error("no manufacturer with id '{}'", .0.as_str())]
     UnknownManufacturer(ManufacturerId),
+    #[error("AMS tag UID must be non-empty and non-zero")]
+    InvalidAmsTagUid,
     #[error("{0}")]
     Domain(#[from] DomainError),
 }
@@ -45,6 +47,19 @@ pub enum SpoolSort {
     RemainingRatioDesc,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReconcilableSpool {
+    pub id: SpoolId,
+    pub material_name: String,
+    pub colour_hex: Option<String>,
+    pub ams_tag_uid: Option<String>,
+    pub status: SpoolStatus,
+    pub remaining_percent: u8,
+    /// Loaded spools remain visible for an RFID-certain re-sync, but are never
+    /// eligible for attribute fallback.
+    pub loaded: bool,
+}
+
 #[async_trait]
 pub trait SpoolRepository: Send + Sync {
     async fn insert(&self, s: NewSpool) -> Result<Spool, RepositoryError>;
@@ -62,4 +77,5 @@ pub trait SpoolRepository: Send + Sync {
     /// matching `filter`.
     async fn stock_value(&self, filter: SpoolFilter) -> Result<Money, RepositoryError>;
     async fn count(&self, filter: SpoolFilter) -> Result<u64, RepositoryError>;
+    async fn reconcilable(&self) -> Result<Vec<ReconcilableSpool>, RepositoryError>;
 }

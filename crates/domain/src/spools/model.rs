@@ -230,6 +230,7 @@ pub struct NewSpool {
     pub notes: Option<String>,
     pub purchased_at: Option<Date>,
     pub opened_at: Option<Date>,
+    pub ams_tag_uid: Option<String>,
     /// Only used for an opened spool; ignored for the other conditions.
     pub remaining_weight: Option<Grams>,
 }
@@ -251,6 +252,7 @@ pub struct EditSpool {
     pub notes: Option<String>,
     pub purchased_at: Option<Date>,
     pub opened_at: Option<Date>,
+    pub ams_tag_uid: Option<String>,
     /// Only used for an opened spool; ignored for a new spool.
     pub remaining_weight: Option<Grams>,
 }
@@ -318,6 +320,13 @@ pub struct Spool {
     pub notes: Option<String>,
     pub purchased_at: Option<Date>,
     pub opened_at: Option<Date>,
+    pub ams_tag_uid: Option<String>,
+}
+
+pub fn normalize_ams_tag_uid(value: &str) -> Option<String> {
+    let value = value.trim();
+    (!value.is_empty() && !value.chars().all(|character| character == '0'))
+        .then(|| value.to_owned())
 }
 
 impl Spool {
@@ -437,6 +446,7 @@ mod tests {
             notes: None,
             purchased_at: None,
             opened_at: None,
+            ams_tag_uid: None,
         }
     }
 
@@ -521,6 +531,7 @@ mod tests {
             notes: None,
             purchased_at: None,
             opened_at: None,
+            ams_tag_uid: None,
             remaining_weight,
         };
         let opened = make(SpoolCondition::Opened, Some(Grams::new(1200.0).unwrap()));

@@ -105,6 +105,7 @@ pub struct SnapshotSpool {
     pub notes: Option<String>,
     pub purchased_at: Option<Date>,
     pub opened_at: Option<Date>,
+    pub ams_tag_uid: Option<String>,
     pub created_at: String,
 }
 
@@ -385,6 +386,7 @@ mod tests {
                     notes: Some("Test spool".into()),
                     purchased_at: Some(Date::from_ordinal_date(2026, 1).unwrap()),
                     opened_at: None,
+                    ams_tag_uid: None,
                     created_at: "1970-01-01T00:00:00Z".into(),
                 }],
                 printers: vec![],
