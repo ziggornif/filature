@@ -676,13 +676,21 @@ async fn ams_reconciliation(
                 ];
             }
             crate::ams_reconciliation::ReconciliationKind::Conflict => {
-                options.retain(|option| option.selected);
-                let no_detected_spool = options.is_empty();
-                options.push(AmsOptionView {
-                    id: "keep".into(),
-                    label: st.renderer.t(&locale, "ams.option.keep_local"),
-                    selected: no_detected_spool,
-                });
+                // Keep the full loadable list so the operator can pick the right
+                // spool from inventory — the RFID-detected spool is preselected
+                // when its tag is already memorised, otherwise nothing is (the
+                // tag was never learned, e.g. a third-party or first-seen roll),
+                // and "keep local" becomes the default. Picking any spool carries
+                // the tray tag_uid, so confirming memorises it for next time.
+                let no_detected_spool = !options.iter().any(|option| option.selected);
+                options.insert(
+                    0,
+                    AmsOptionView {
+                        id: "keep".into(),
+                        label: st.renderer.t(&locale, "ams.option.keep_local"),
+                        selected: no_detected_spool,
+                    },
+                );
             }
             crate::ams_reconciliation::ReconciliationKind::Attributed
             | crate::ams_reconciliation::ReconciliationKind::None => {
