@@ -102,39 +102,56 @@ this explicit seam.
 
 # AMS reconciliation panel (slice 23)
 
-Décision de design (review lavish, 2026-07-24) pour le **panneau de
-Réconciliation AMS** (voir glossaire § « AMS spool sync », ADR-0007,
-`docs/specs/23-ams-spool-sync.md`). Trois directions comparées ; **direction A
-retenue**.
+Voir glossaire § « AMS spool sync », ADR-0007, `docs/specs/23-ams-spool-sync.md`.
+Handoff designer de référence : `init_assets/design_handoff_ams_reconciliation/`
+(README + `Filature.dc.html` + captures).
 
-**A — Panneau in-place (retenu).** Le clic « Synchroniser l'AMS » sur la carte
-Printer Bambu déclenche un simple fragment htmx (`hx-get`) qui **remplace la zone
-Slots** de la carte par le panneau de réconciliation. Une **ligne par bac AMS**,
-empilée sur deux niveaux pour ne jamais déborder en largeur :
-- **niveau haut** : clé de Slot (`ams{u}-{n}`, mono) · pastille couleur + type/%
-  du bac détecté · **écart de poids en lecture seule** (badge à droite, `±0%` /
-  `−15%`, ambre si écart marqué) ;
-- **niveau bas** : `↳` + le **select bobine suggérée** pleine largeur (réutilise
-  le select chargeable de `15b`, pastille + libellé) avec un **badge de match**
-  `RFID` (vert, match certain) / `attr.` (ambre, suggestion par attributs) /
-  `aucun` (à charger à la main).
-- **footer** : Annuler · Confirmer (n) — confirmation groupée.
+**Décision : drawer ancré à droite, `position:fixed` hors du conteneur multicol.**
+Remplace la première direction retenue (« panneau in-place ») : celle-ci s'est
+révélée incompatible avec le masonry `.printer-grid{columns:340px}` — un panneau
+in-place volumineux fragmente la carte (footer chevauchant la carte suivante), et
+le contournement `column-span:all` fait **sauter toute la grille** (« ça fait
+bouger tout l'écran », rejeté). Le drawer, `position:fixed` sibling de la grille
+(pas un descendant), ne touche jamais au multicol → **zéro reflow**, de 1 à 16
+bacs (4 unités AMS). Écartés aussi : vue dédiée pleine page (rompt le « in-place »
++ navigation pour un geste fréquent) ; popover ancré à la carte (déborde dès 2+
+unités, JS de positionnement).
 
-**Multi-AMS (AMS Hub).** Les lignes sont **groupées par AMS Unit** (sous-en-tête
-`AMS 1` / `AMS 2` …, accent) et disposées en **grille 2 colonnes**
-(`minmax(230px,1fr)`), pour qu'un hub jusqu'à 4 unités / 16 bacs reste compact
-(un hub plein scrolle dans la page — cas rare, accepté).
+**Déclencheur & drawer.** Bouton « Synchroniser l'AMS » dans le header de carte,
+visible seulement pour les imprimantes Bambu (groupe AMS) ; désactivé + tooltip si
+injoignable (MQTT down). Clic → `hx-get` qui rend le drawer dans un conteneur
+`#ams-drawer` **placé une seule fois hors de `.printer-grid`** (jamais dedans).
+Drawer = scrim cliquable (`rgba(40,35,25,.28)`, = annuler) + panneau
+`position:fixed` pleine hauteur à droite, largeur `min(400px,100vw)`,
+`border-left:1px solid var(--border-strong)`, `box-shadow:-8px 0 24px rgba(40,35,25,.18)`.
+Header (titre + `{{printer.name}} · {{n}} bacs` mono `--faint`), corps scrollable
+groupé par **AMS Unit**, footer sticky.
 
-Pourquoi pas les autres : **B (modale focalisée)** dépenserait l'unique budget
-« 1 modale simple » du produit (§ Out of scope design) et introduirait de la
-gestion d'overlay/focus étrangère au reste de l'app (100 % fragments in-place) ;
-**C (réconciliation par slot)** perd la vue d'ensemble et la confirmation groupée
-et loge mal l'écart de poids dans une tuile 150px.
+**Badge d'état de synchro** sous le header de carte, à côté du badge d'occupation :
+`à jour` (vert `--ok`/`--ok-bg`) · `désynchro` (ambre `--warn`, dès qu'un bac
+diverge) · `hors ligne` (neutre `--faint`/`--active-bg`). Déclenchement 100%
+manuel cette itération (pas de veille auto) : le badge reflète le **dernier état
+connu** (état de synchro persisté par imprimante, mis à jour à chaque synchro).
 
-Respecte les principes htmx (fragment autonome re-rendu en place, pas de JS
-custom) et réutilise chip + gauge + select de `15b`. i18n en+fr pour tous les
-libellés. Maquette de travail (non committée) : `.lavish/ams-reconciliation-design.html`.
+**Cinq états de ligne** (une ligne par bac, omise si vide côté local ET machine) :
 
-**Hors scope 23 (→ follow-up 23b) :** l'UI d'**alignement** du poids quand
-l'écart AMS↔Filature est important (« op tranche ») — dans le panneau 23 l'écart
-reste en lecture seule.
+| État | Condition | Fond ligne | Badge | Select |
+|---|---|---|---|---|
+| **Match** | RFID lu = bobine du slot local | neutre | `RFID` vert | aucun (écart poids en info) |
+| **Retiré** | bac vide machine, slot local chargé | ambre | `retiré` ambre | *Vider le slot* (défaut) / *Garder (ignorer)* |
+| **Conflit** | RFID lu ≠ bobine du slot local | ambre | `conflit` ambre | bobine détectée RFID (défaut) / *Ignorer, garder local* |
+| **Attribué** | pas de RFID, type+couleur matchent une chargeable | neutre | `attr.` ambre | select chargeable (15b), présélectionné |
+| **Aucun** | pas de RFID, aucune correspondance | neutre | `aucun` neutre | select chargeable, vide |
+
+Chip couleur = anneau `--border-strong` (hachure si transparent). Écart de poids
+**toujours en lecture seule**, mono `--faint`, jamais de couleur/fond (poids
+Filature autoritaire, ADR-0004). Footer : compteur à gauche (`« n à confirmer »`
+ou `« Tout est synchronisé »` → bouton devient « Fermer »), Annuler (ghost) /
+Confirmer (n) (accent). **Piège :** Confirmer applique le défaut présélectionné
+même si l'utilisateur n'a pas touché le select (pas seulement les choix modifiés).
+
+Server-rendered + htmx, pas de SPA/JS de positionnement. Aucun nouveau token.
+i18n en+fr. Réutilise chip + gauge + select chargeable de `15b`.
+
+**Hors scope 23 (→ follow-up) :** tolérance colorimétrique du match `attr.`
+(actuellement hex exact) ; UI d'alignement du poids (l'écart reste lecture seule).

@@ -152,16 +152,25 @@ la confirmation charge le Slot. **Bambu uniquement.**
 - Toute modification du parsing **statut** 22a/22b ou des règles de chargement
   `15b` (on les réutilise, on ne les change pas).
 
-**Design (phase 3b) — DÉCIDÉ (review lavish 2026-07-24) :**
-- **Direction A — Panneau in-place.** Fragment htmx (`hx-get`) déclenché par
-  « Synchroniser l'AMS » qui **remplace la zone Slots** de la carte. Une ligne
-  par bac AMS, empilée 2 niveaux (haut : clé Slot `ams{u}-{n}` + bac détecté +
-  écart poids lecture seule ; bas : `↳` + select bobine suggérée pleine largeur +
-  badge match `RFID`/`attr.`/`aucun`). Footer confirmation groupée « Confirmer (n) ».
-- **Multi-AMS** : lignes **groupées par AMS Unit** (sous-en-têtes `AMS 1/2…`) en
-  grille 2 colonnes. Détail + justification (vs modale / par-slot) dans
-  `docs/design.md` § « AMS reconciliation panel (slice 23) ». Maquette de travail :
-  `.lavish/ams-reconciliation-design.html`.
+**Design (phase 3b) — DÉCIDÉ (handoff designer 2026-07-24) : drawer à droite.**
+La 1ère direction (« panneau in-place ») a été abandonnée : incompatible avec le
+masonry multicol (fragmentation / saut de grille). Décision finale = **drawer
+`position:fixed` ancré à droite, hors du conteneur `.printer-grid`** → zéro reflow
+du masonry. Contrat visuel complet (drawer, badge d'état de synchro, **cinq états
+de ligne** Match/Retiré/Conflit/Attribué/Aucun, footer sticky) dans
+`docs/design.md` § « AMS reconciliation panel (slice 23) » et le handoff de
+référence `init_assets/design_handoff_ams_reconciliation/` (README + `Filature.dc.html`
++ captures). Ce contrat **élargit** le comportement ci-dessus :
+- **États comparant machine vs local** : *Retiré* (bac vide machine, slot local
+  chargé → proposer vider le slot) et *Conflit* (RFID lu ≠ bobine du slot local →
+  proposer la bobine détectée) s'ajoutent à *Match* / *Attribué* / *Aucun*. Une
+  ligne dont le bac ET le slot local sont vides est **omise**.
+- **Confirm par état** : Match = rien ; Retiré = vider le slot (unload) ou garder ;
+  Conflit = charger la détectée ou garder ; Attribué/Aucun = charger la sélection.
+  Le défaut présélectionné s'applique même si l'op ne touche pas le select.
+- **Badge d'état de synchro** persisté par imprimante (`à jour`/`désynchro`/`hors
+  ligne`), reflétant le dernier résultat de synchro (déclenchement manuel, pas de
+  veille auto).
 
 **References:**
 - Product brief : `docs/product/brief.md`

@@ -71,3 +71,22 @@ Forces:
 - The weight-discrepancy resolution UI is deferred to the design phase (open
   question from discovery); until designed, a sync shows the discrepancy read-only
   and changes no weight.
+
+## Addendum (2026-07-24) — panel placement & richer reconciliation states
+
+The reconciliation UI is a **right-anchored `position:fixed` drawer**, a sibling
+of the printer `.printer-grid` (never a descendant), so it never perturbs the
+multicol masonry — chosen after an in-place panel proved incompatible with the
+grid (fragmentation; the `column-span:all` workaround made the whole grid jump).
+Rejected: full-page dedicated view (breaks "in-place", adds navigation for a
+frequent gesture) and a card-anchored popover (overflows past one AMS unit, needs
+positioning JS). Handoff: `init_assets/design_handoff_ams_reconciliation/`.
+
+The drawer also widens reconciliation from pure suggestion to **five per-tray
+states** by comparing the live tray against the slot's currently-loaded spool:
+**Match** (RFID = loaded), **Removed** (tray empty, slot still loaded → offer to
+unload), **Conflict** (RFID ≠ loaded → offer the detected spool), **Attributed**
+(no RFID, type+colour match), **None**. Confirm applies the (possibly defaulted)
+choice per row, including unload for Removed. A per-printer **sync state**
+(`up-to-date`/`drift`/`offline`) is persisted from the last manual sync and shown
+as an at-rest badge; there is no background polling in this iteration.
