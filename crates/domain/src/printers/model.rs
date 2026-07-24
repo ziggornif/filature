@@ -197,6 +197,7 @@ pub struct LoadedSpool {
     pub remaining_weight: f64,
     pub net_weight: f64,
     pub status: String,
+    pub ams_tag_uid: Option<String>,
 }
 
 impl LoadedSpool {
@@ -226,7 +227,36 @@ pub struct Printer {
     pub ams_units: u8,
     pub feed_modes: Vec<FeedMode>,
     pub machine_link: Option<MachineLink>,
+    pub ams_sync_state: AmsSyncState,
     pub slots: Vec<Slot>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AmsSyncState {
+    UpToDate,
+    Drift,
+    Offline,
+}
+
+impl AmsSyncState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::UpToDate => "up_to_date",
+            Self::Drift => "drift",
+            Self::Offline => "offline",
+        }
+    }
+
+    pub fn parse(value: &str) -> Result<Self, DomainError> {
+        match value {
+            "up_to_date" => Ok(Self::UpToDate),
+            "drift" => Ok(Self::Drift),
+            "offline" => Ok(Self::Offline),
+            _ => Err(DomainError::InvalidPrinterConfiguration(
+                "invalid AMS sync state".into(),
+            )),
+        }
+    }
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewPrinter {

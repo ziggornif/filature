@@ -1,4 +1,4 @@
-use crate::printers::LoadableSpool;
+use crate::printers::{AmsSyncState, LoadableSpool};
 use crate::printers::{NewPrinter, Printer, PrinterRepository, PrintersUseCases, RepositoryError};
 use crate::shared::{DomainError, PrinterId, SpoolId};
 use async_trait::async_trait;
@@ -59,5 +59,12 @@ impl PrintersUseCases for PrintersService {
         current: Option<SpoolId>,
     ) -> Result<Vec<LoadableSpool>, RepositoryError> {
         self.repo.loadable_spools(current.as_ref()).await
+    }
+    async fn set_ams_sync_state(
+        &self,
+        printer_id: PrinterId,
+        state: AmsSyncState,
+    ) -> Result<(), RepositoryError> {
+        self.repo.set_ams_sync_state(&printer_id, state).await
     }
 }

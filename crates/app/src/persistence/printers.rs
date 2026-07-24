@@ -1,8 +1,8 @@
 use crate::{credentials::CredentialCipher, persistence::Db};
 use async_trait::async_trait;
 use domain::printers::{
-    FeedMode, LoadableSpool, LoadedSpool, MachineLink, Module, NewPrinter, Printer, PrinterBrand,
-    PrinterName, PrinterRepository, RepositoryError, Slot, derive_slots,
+    AmsSyncState, FeedMode, LoadableSpool, LoadedSpool, MachineLink, Module, NewPrinter, Printer,
+    PrinterBrand, PrinterName, PrinterRepository, RepositoryError, Slot, derive_slots,
 };
 use domain::shared::{PrinterId, SpoolId};
 use sqlx::Row;
@@ -217,7 +217,7 @@ fn slot_write_error(
 impl PrinterRepository for SqlxPrinterRepository {
     async fn list(&self) -> Result<Vec<Printer>, RepositoryError> {
         let rows = sqlx::query(
-            "SELECT id,name,brand,model,heads,module_kind,module_count FROM printers ORDER BY name,id",
+            "SELECT id,name,brand,model,heads,module_kind,module_count,ams_sync_state FROM printers ORDER BY name,id",
         )
         .fetch_all(&self.pool)
         .await
@@ -237,7 +237,7 @@ impl PrinterRepository for SqlxPrinterRepository {
             let (ams_units, feed_modes) = topology(&self.pool, &id, heads).await?;
             let slot_rows = sqlx::query(
                 r#"SELECT ps.group_label,ps.slot_key,ps.position,ps.spool_id,
-                          s.colour_hex,s.colour_name,s.remaining_weight,s.net_weight,s.status,
+                          s.colour_hex,s.colour_name,s.remaining_weight,s.net_weight,s.status,s.ams_tag_uid,
                           m.name AS material_name,mf.name AS manufacturer_name
                    FROM printer_slots ps
                    LEFT JOIN spools s ON s.id=ps.spool_id
@@ -266,6 +266,7 @@ impl PrinterRepository for SqlxPrinterRepository {
                                 remaining_weight: r.get("remaining_weight"),
                                 net_weight: r.get("net_weight"),
                                 status: r.get("status"),
+                                ams_tag_uid: r.get("ams_tag_uid"),
                             }
                         }),
                     };
@@ -287,6 +288,7 @@ impl PrinterRepository for SqlxPrinterRepository {
                 ams_units,
                 feed_modes,
                 machine_link,
+                ams_sync_state: AmsSyncState::parse(row.get("ams_sync_state"))?,
                 slots,
             });
         }
@@ -336,6 +338,7 @@ impl PrinterRepository for SqlxPrinterRepository {
             ams_units: p.ams_units,
             feed_modes: p.feed_modes,
             machine_link: p.machine_link,
+            ams_sync_state: AmsSyncState::Offline,
             slots,
         })
     }
@@ -511,5 +514,22 @@ impl PrinterRepository for SqlxPrinterRepository {
                 material_name: r.get("material_name"),
             })
             .collect())
+    }
+
+    async fn set_ams_sync_state(
+        &self,
+        printer_id: &PrinterId,
+        state: AmsSyncState,
+    ) -> Result<(), RepositoryError> {
+        let result = sqlx::query("UPDATE printers SET ams_sync_state=$2 WHERE id=$1")
+            .bind(printer_id.as_str())
+            .bind(state.as_str())
+            .execute(&self.pool)
+            .await
+            .map_err(backend)?;
+        if result.rows_affected() == 0 {
+            return Err(RepositoryError::NotFound(printer_id.clone()));
+        }
+        Ok(())
     }
 }

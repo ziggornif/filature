@@ -1,9 +1,10 @@
-<div id="printer-loading-content">
+<div id="printer-loading-content"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
 <p class="printers-loaded-count">{{ loaded_spools_count }} {{ t(key="printers.loaded_count") }}</p>
 <div class="printer-grid">
 {% for p in printers %}
   <article class="printer-card" style="--printer-liner:{{ p.liner }}">
-    <header><div><h2>{{ p.name }}</h2><p>{{ p.model }}</p></div><div class="printer-card-actions">{% if p.can_sync_ams %}<button type="button" class="button button-small" hx-get="/printers/{{ p.id }}/ams-reconciliation" hx-target="#printer-slots-{{ p.id }}" hx-swap="innerHTML">{{ t(key="ams.sync") }}</button>{% endif %}<span class="printer-occupancy printer-occupancy--{{ p.occupancy_state }}">{{ p.filled }} / {{ p.total }} {{ t(key="printers.occupancy.loaded") }}</span><a class="printer-edit" href="/printers/{{ p.id }}/edit" aria-label="{{ t(key='printers.edit') }}" title="{{ t(key='printers.edit') }}">✎</a></div></header>
+    <header><div><h2>{{ p.name }}</h2><p>{{ p.model }}</p></div><div class="printer-card-actions">{% if p.can_sync_ams %}<button type="button" class="button button-small" hx-get="/printers/{{ p.id }}/ams-reconciliation" hx-target="#ams-drawer" hx-swap="innerHTML"{% if p.sync_disabled %} disabled title="{{ t(key='ams.unreachable') }}"{% else %} title="{{ t(key='ams.read') }}"{% endif %}>{{ t(key="ams.sync") }}</button>{% endif %}<span class="printer-occupancy printer-occupancy--{{ p.occupancy_state }}">{{ p.filled }} / {{ p.total }} {{ t(key="printers.occupancy.loaded") }}</span><a class="printer-edit" href="/printers/{{ p.id }}/edit" aria-label="{{ t(key='printers.edit') }}" title="{{ t(key='printers.edit') }}">✎</a></div></header>
+    {% if p.can_sync_ams %}<span id="ams-sync-state-{{ p.id }}" class="ams-sync-state ams-sync-state--{{ p.sync_state }}">{{ t(key=p.sync_state_key) }}</span>{% endif %}
     {% if p.has_machine_link %}<div class="machine-status-slot" hx-get="/printers/{{ p.id }}/machine-status" hx-trigger="load, every 10s" hx-swap="innerHTML" aria-live="polite"></div>{% endif %}
     <div id="printer-slots-{{ p.id }}">
     {% for g in p.groups %}
@@ -58,4 +59,5 @@
   </article>
 {% endfor %}
 </div>
+<div id="ams-drawer"></div>
 </div>

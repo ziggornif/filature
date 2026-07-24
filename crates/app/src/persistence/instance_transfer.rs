@@ -88,6 +88,7 @@ struct PrinterRow {
     module_count: Option<i32>,
     ams_units: i64,
     feed_modes: Vec<String>,
+    ams_sync_state: String,
 }
 
 #[derive(sqlx::FromRow)]
@@ -228,7 +229,7 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
         .collect::<Result<Vec<_>, TransferError>>()?;
 
         let mut printers = sqlx::query_as::<_, PrinterRow>(
-            r#"SELECT p.id, p.name, p.brand, p.model, p.heads, p.module_kind, p.module_count,
+            r#"SELECT p.id, p.name, p.brand, p.model, p.heads, p.module_kind, p.module_count, p.ams_sync_state,
                       (SELECT COUNT(*) FROM printer_ams_units a WHERE a.printer_id=p.id) AS ams_units,
                       ARRAY(SELECT feed_mode FROM printer_head_feed_modes f WHERE f.printer_id=p.id ORDER BY head_index) AS feed_modes
                FROM printers p ORDER BY p.id"#,
@@ -251,6 +252,7 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
                     .transpose()?,
                 ams_units: u8::try_from(row.ams_units).map_err(|_| invalid_value("ams_units", row.ams_units))?,
                 feed_modes: row.feed_modes,
+                ams_sync_state: row.ams_sync_state,
                 slots: vec![],
             })
         })
@@ -414,8 +416,8 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
 
         for printer in snapshot.printers {
             sqlx::query(
-                r#"INSERT INTO printers (id, name, brand, model, heads, module_kind, module_count)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7)"#,
+                r#"INSERT INTO printers (id, name, brand, model, heads, module_kind, module_count, ams_sync_state)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
             )
             .bind(&printer.id)
             .bind(printer.name)
@@ -424,6 +426,7 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
             .bind(i32::from(printer.heads))
             .bind(printer.module_kind)
             .bind(printer.module_count.map(i32::from))
+            .bind(printer.ams_sync_state)
             .execute(&mut *transaction)
             .await
             .map_err(backend)?;

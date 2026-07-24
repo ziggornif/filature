@@ -2347,6 +2347,13 @@ mod tests {
             {
                 Ok(vec![])
             }
+            async fn set_ams_sync_state(
+                &self,
+                _: domain::shared::PrinterId,
+                _: domain::printers::AmsSyncState,
+            ) -> Result<(), domain::printers::RepositoryError> {
+                Ok(())
+            }
         }
 
         fn sample_new_material() -> NewMaterial {

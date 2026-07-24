@@ -158,6 +158,7 @@ async fn unknown_update_and_delete_are_not_found() {
         ams_units: 0,
         feed_modes: vec![FeedMode::Direct],
         machine_link: None,
+        ams_sync_state: domain::printers::AmsSyncState::Offline,
         slots: vec![],
     };
     assert!(matches!(
@@ -168,6 +169,30 @@ async fn unknown_update_and_delete_are_not_found() {
         repo.delete(&missing).await,
         Err(RepositoryError::NotFound(_))
     ));
+}
+
+#[tokio::test]
+async fn ams_sync_state_roundtrips_for_the_target_printer() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let repo = SqlxPrinterRepository::new(pool);
+    let created = repo
+        .insert(sample("AMS sync state target", Module::None))
+        .await
+        .unwrap();
+
+    repo.set_ams_sync_state(&created.id, domain::printers::AmsSyncState::Drift)
+        .await
+        .unwrap();
+
+    let found = repo
+        .list()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|printer| printer.id == created.id)
+        .unwrap();
+    assert_eq!(found.ams_sync_state, domain::printers::AmsSyncState::Drift);
 }
 
 #[tokio::test]
@@ -224,6 +249,7 @@ async fn bambu_edit_sentinel_preserves_stored_credential() {
             access_code: "__configured__".into(),
             serial: "NEW-SERIAL".into(),
         }),
+        ams_sync_state: domain::printers::AmsSyncState::Offline,
         slots: vec![],
     })
     .await

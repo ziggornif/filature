@@ -34,6 +34,7 @@ pub struct SnapshotPrinter {
     pub module_count: Option<u16>,
     pub ams_units: u8,
     pub feed_modes: Vec<String>,
+    pub ams_sync_state: String,
     pub slots: Vec<SnapshotPrinterSlot>,
 }
 

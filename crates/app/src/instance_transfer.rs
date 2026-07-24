@@ -69,10 +69,15 @@ struct WirePrinter {
     ams_units: Option<u8>,
     #[serde(default)]
     feed_modes: Option<Vec<String>>,
+    #[serde(default = "default_ams_sync_state")]
+    ams_sync_state: String,
     slots: Vec<WirePrinterSlot>,
 }
 fn default_printer_heads() -> u8 {
     1
+}
+fn default_ams_sync_state() -> String {
+    "offline".into()
 }
 
 #[derive(Serialize, Deserialize)]
@@ -237,6 +242,7 @@ impl From<&SnapshotPrinter> for WirePrinter {
             module_count: printer.module_count,
             ams_units: Some(printer.ams_units),
             feed_modes: Some(printer.feed_modes.clone()),
+            ams_sync_state: printer.ams_sync_state.clone(),
             slots: printer.slots.iter().map(WirePrinterSlot::from).collect(),
         }
     }
@@ -427,6 +433,7 @@ impl From<WirePrinter> for SnapshotPrinter {
             module_count,
             ams_units,
             feed_modes,
+            ams_sync_state: printer.ams_sync_state,
             slots,
         }
     }
