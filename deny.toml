@@ -8,8 +8,16 @@ yanked = "deny"
 # docs/security/accepted-risks.md. Both entries below are transitive via
 # rumqttc 0.25 (latest; Bambu MQTT, slice 22b) — see AR-009.
 ignore = [
-  "RUSTSEC-2026-0049",  # rustls-webpki 0.102 CRL matching — Bambu adapter bypasses cert verification entirely (AR-008); no CRL path reached.
-  "RUSTSEC-2025-0134",  # rustls-pemfile unmaintained — transitive, no PEM loaded by us. Not a vulnerability.
+  # rustls-webpki 0.102.8, pulled ONLY by rumqttc (Bambu MQTT). The Bambu
+  # adapter bypasses all certificate verification (AR-008), so none of these
+  # cert/CRL code paths are ever exercised. The app's verifying TLS (reqwest,
+  # 22a) uses rustls-webpki 0.103.13, which satisfies each advisory's fix
+  # (>=0.103.12) and is unaffected. See AR-009.
+  "RUSTSEC-2026-0049",  # CRLs not authoritative by distribution point
+  "RUSTSEC-2026-0098",  # name constraints for URI names incorrectly accepted
+  "RUSTSEC-2026-0099",  # name constraints accepted for wildcard-name certs
+  "RUSTSEC-2026-0104",  # reachable panic in CRL parsing
+  "RUSTSEC-2025-0134",  # rustls-pemfile unmaintained — transitive, no PEM loaded by us
 ]
 
 [licenses]
