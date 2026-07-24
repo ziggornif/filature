@@ -35,6 +35,27 @@ pub struct MachineStatus {
     pub telemetry: MachineTelemetry,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AmsTray {
+    pub unit_index: u8,
+    pub tray_index: u8,
+    pub filament_type: Option<String>,
+    pub color_hex: Option<String>,
+    pub sub_brand: Option<String>,
+    pub remain_percent: Option<u8>,
+    pub tag_uid: Option<String>,
+}
+
+impl AmsTray {
+    pub fn normalize_tag_uid(value: Option<&str>) -> Option<String> {
+        value
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .filter(|value| !value.chars().all(|character| character == '0'))
+            .map(str::to_owned)
+    }
+}
+
 impl MachineStatus {
     pub fn offline() -> Self {
         Self {
@@ -57,6 +78,8 @@ pub enum MachineError {
     PrinterNotFound,
     #[error("printer has no machine link")]
     NoMachineLink,
+    #[error("AMS tray discovery is unavailable for this machine")]
+    AmsUnavailable,
     #[error("machine connection failed: {0}")]
     Connection(String),
     #[error("machine link repository failed: {0}")]
@@ -79,6 +102,17 @@ impl MachineConnectivityService {
 
 #[async_trait]
 impl MachineConnectivityUseCases for MachineConnectivityService {
+    async fn fetch_ams_trays(&self, printer_id: PrinterId) -> Result<Vec<AmsTray>, MachineError> {
+        let link = self
+            .repository
+            .find_link(&printer_id)
+            .await?
+            .ok_or(MachineError::NoMachineLink)?;
+        if !matches!(link, MachineLink::BambuLan { .. }) {
+            return Err(MachineError::AmsUnavailable);
+        }
+        self.probe.fetch_ams(&link).await
+    }
     async fn get_printer_status(
         &self,
         printer_id: PrinterId,
@@ -176,6 +210,9 @@ mod tests {
         async fn fetch_status(&self, link: &MachineLink) -> Result<MachineStatus, MachineError> {
             *self.0.lock().unwrap() = Some(link.clone());
             Ok(MachineStatus::offline())
+        }
+        async fn fetch_ams(&self, _: &MachineLink) -> Result<Vec<AmsTray>, MachineError> {
+            Ok(Vec::new())
         }
     }
 

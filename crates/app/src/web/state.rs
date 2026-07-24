@@ -1,3 +1,4 @@
+use crate::ams_reconciliation::AmsReconciliationService;
 use crate::config::Config;
 use crate::persistence::Db;
 use crate::web::i18n::Catalog;
@@ -29,6 +30,7 @@ pub struct AppState {
     pub locations: Arc<dyn LocationsUseCases>,
     pub printers: Arc<dyn PrintersUseCases>,
     pub machine_connectivity: Arc<dyn MachineConnectivityUseCases>,
+    pub ams_reconciliation: Arc<AmsReconciliationService>,
     pub machine_links_enabled: bool,
     pub manufacturers: Arc<dyn ManufacturersUseCases>,
     pub dashboard: Arc<dyn DashboardUseCases>,
@@ -64,6 +66,14 @@ impl AppState {
             crate::machine_http::MachineStatusProbeAdapter::new()
                 .expect("machine client configuration is valid"),
         );
+        let printers: Arc<dyn PrintersUseCases> = Arc::new(PrintersService::new(printer_repo));
+        let machine_connectivity: Arc<dyn MachineConnectivityUseCases> =
+            Arc::new(MachineConnectivityService::new(link_repo, probe));
+        let ams_reconciliation = Arc::new(AmsReconciliationService::new(
+            machine_connectivity.clone(),
+            spools.clone(),
+            printers.clone(),
+        ));
         Self {
             db,
             renderer: Renderer::new(catalog),
@@ -71,8 +81,9 @@ impl AppState {
             materials,
             spools,
             locations,
-            printers: Arc::new(PrintersService::new(printer_repo)),
-            machine_connectivity: Arc::new(MachineConnectivityService::new(link_repo, probe)),
+            printers,
+            machine_connectivity,
+            ams_reconciliation,
             machine_links_enabled: std::env::var("FILATURE_DEMO")
                 .map_or(true, |v| v != "true" && v != "1"),
             manufacturers,

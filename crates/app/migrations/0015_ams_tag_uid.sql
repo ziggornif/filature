@@ -1,0 +1,1 @@
+ALTER TABLE spools ADD COLUMN ams_tag_uid TEXT NULL;

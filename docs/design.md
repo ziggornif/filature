@@ -99,3 +99,59 @@ driving adapter coordinates the two use cases. A database trigger was rejected
 because it would hide this behaviour and make it harder to test. If more
 cross-slice reactions accumulate, a domain-event/outbox design should replace
 this explicit seam.
+
+# AMS reconciliation panel (slice 23)
+
+Voir glossaire § « AMS spool sync », ADR-0007, `docs/specs/23-ams-spool-sync.md`.
+Handoff designer de référence : `init_assets/design_handoff_ams_reconciliation/`
+(README + `Filature.dc.html` + captures).
+
+**Décision : drawer ancré à droite, `position:fixed` hors du conteneur multicol.**
+Remplace la première direction retenue (« panneau in-place ») : celle-ci s'est
+révélée incompatible avec le masonry `.printer-grid{columns:340px}` — un panneau
+in-place volumineux fragmente la carte (footer chevauchant la carte suivante), et
+le contournement `column-span:all` fait **sauter toute la grille** (« ça fait
+bouger tout l'écran », rejeté). Le drawer, `position:fixed` sibling de la grille
+(pas un descendant), ne touche jamais au multicol → **zéro reflow**, de 1 à 16
+bacs (4 unités AMS). Écartés aussi : vue dédiée pleine page (rompt le « in-place »
++ navigation pour un geste fréquent) ; popover ancré à la carte (déborde dès 2+
+unités, JS de positionnement).
+
+**Déclencheur & drawer.** Bouton « Synchroniser l'AMS » dans le header de carte,
+visible seulement pour les imprimantes Bambu (groupe AMS) ; désactivé + tooltip si
+injoignable (MQTT down). Clic → `hx-get` qui rend le drawer dans un conteneur
+`#ams-drawer` **placé une seule fois hors de `.printer-grid`** (jamais dedans).
+Drawer = scrim cliquable (`rgba(40,35,25,.28)`, = annuler) + panneau
+`position:fixed` pleine hauteur à droite, largeur `min(400px,100vw)`,
+`border-left:1px solid var(--border-strong)`, `box-shadow:-8px 0 24px rgba(40,35,25,.18)`.
+Header (titre + `{{printer.name}} · {{n}} bacs` mono `--faint`), corps scrollable
+groupé par **AMS Unit**, footer sticky.
+
+**Badge d'état de synchro** sous le header de carte, à côté du badge d'occupation :
+`à jour` (vert `--ok`/`--ok-bg`) · `désynchro` (ambre `--warn`, dès qu'un bac
+diverge) · `hors ligne` (neutre `--faint`/`--active-bg`). Déclenchement 100%
+manuel cette itération (pas de veille auto) : le badge reflète le **dernier état
+connu** (état de synchro persisté par imprimante, mis à jour à chaque synchro).
+
+**Cinq états de ligne** (une ligne par bac, omise si vide côté local ET machine) :
+
+| État | Condition | Fond ligne | Badge | Select |
+|---|---|---|---|---|
+| **Match** | RFID lu = bobine du slot local | neutre | `RFID` vert | aucun (écart poids en info) |
+| **Retiré** | bac vide machine, slot local chargé | ambre | `retiré` ambre | *Vider le slot* (défaut) / *Garder (ignorer)* |
+| **Conflit** | RFID lu ≠ bobine du slot local | ambre | `conflit` ambre | bobine détectée RFID (défaut) / *Ignorer, garder local* |
+| **Attribué** | pas de RFID, type+couleur matchent une chargeable | neutre | `attr.` ambre | select chargeable (15b), présélectionné |
+| **Aucun** | pas de RFID, aucune correspondance | neutre | `aucun` neutre | select chargeable, vide |
+
+Chip couleur = anneau `--border-strong` (hachure si transparent). Écart de poids
+**toujours en lecture seule**, mono `--faint`, jamais de couleur/fond (poids
+Filature autoritaire, ADR-0004). Footer : compteur à gauche (`« n à confirmer »`
+ou `« Tout est synchronisé »` → bouton devient « Fermer »), Annuler (ghost) /
+Confirmer (n) (accent). **Piège :** Confirmer applique le défaut présélectionné
+même si l'utilisateur n'a pas touché le select (pas seulement les choix modifiés).
+
+Server-rendered + htmx, pas de SPA/JS de positionnement. Aucun nouveau token.
+i18n en+fr. Réutilise chip + gauge + select chargeable de `15b`.
+
+**Hors scope 23 (→ follow-up) :** tolérance colorimétrique du match `attr.`
+(actuellement hex exact) ; UI d'alignement du poids (l'écart reste lecture seule).

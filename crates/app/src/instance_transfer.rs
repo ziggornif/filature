@@ -69,10 +69,15 @@ struct WirePrinter {
     ams_units: Option<u8>,
     #[serde(default)]
     feed_modes: Option<Vec<String>>,
+    #[serde(default = "default_ams_sync_state")]
+    ams_sync_state: String,
     slots: Vec<WirePrinterSlot>,
 }
 fn default_printer_heads() -> u8 {
     1
+}
+fn default_ams_sync_state() -> String {
+    "offline".into()
 }
 
 #[derive(Serialize, Deserialize)]
@@ -142,6 +147,8 @@ struct WireSpool {
     purchased_at: Option<String>,
     #[serde(default)]
     opened_at: Option<String>,
+    #[serde(default)]
+    ams_tag_uid: Option<String>,
     created_at: String,
 }
 
@@ -235,6 +242,7 @@ impl From<&SnapshotPrinter> for WirePrinter {
             module_count: printer.module_count,
             ams_units: Some(printer.ams_units),
             feed_modes: Some(printer.feed_modes.clone()),
+            ams_sync_state: printer.ams_sync_state.clone(),
             slots: printer.slots.iter().map(WirePrinterSlot::from).collect(),
         }
     }
@@ -321,6 +329,7 @@ impl TryFrom<&SnapshotSpool> for WireSpool {
             notes: spool.notes.clone(),
             purchased_at: spool.purchased_at.map(format_date).transpose()?,
             opened_at: spool.opened_at.map(format_date).transpose()?,
+            ams_tag_uid: spool.ams_tag_uid.clone(),
             created_at: {
                 OffsetDateTime::parse(&spool.created_at, &Rfc3339)
                     .map_err(|error| CodecError::Timestamp(error.to_string()))?;
@@ -424,6 +433,7 @@ impl From<WirePrinter> for SnapshotPrinter {
             module_count,
             ams_units,
             feed_modes,
+            ams_sync_state: printer.ams_sync_state,
             slots,
         }
     }
@@ -510,6 +520,7 @@ impl TryFrom<WireSpool> for SnapshotSpool {
             notes: spool.notes,
             purchased_at: spool.purchased_at.map(parse_date).transpose()?,
             opened_at: spool.opened_at.map(parse_date).transpose()?,
+            ams_tag_uid: spool.ams_tag_uid,
             created_at: {
                 OffsetDateTime::parse(&spool.created_at, &Rfc3339)
                     .map_err(|error| CodecError::Timestamp(error.to_string()))?;
@@ -540,8 +551,23 @@ mod tests {
         assert_eq!(document.content.spools[0].notes, None);
         assert_eq!(document.content.spools[0].purchased_at, None);
         assert_eq!(document.content.spools[0].opened_at, None);
+        assert_eq!(document.content.spools[0].ams_tag_uid, None);
         let decoded_again = decode(&encode(&document).unwrap()).unwrap();
         assert_eq!(decoded_again, document);
+    }
+
+    #[test]
+    fn round_trip_preserves_ams_tag_uid() {
+        let json = VALID.replace(
+            "\"created_at\":\"2026-07-13T12:00:00Z\"",
+            "\"ams_tag_uid\":\"A1B2C3D4\",\"created_at\":\"2026-07-13T12:00:00Z\"",
+        );
+        let document = decode(json.as_bytes()).unwrap();
+        assert_eq!(
+            document.content.spools[0].ams_tag_uid.as_deref(),
+            Some("A1B2C3D4")
+        );
+        assert_eq!(decode(&encode(&document).unwrap()).unwrap(), document);
     }
 
     #[test]

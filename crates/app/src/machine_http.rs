@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use domain::printers::{
-    MachineError, MachineLink, MachineState, MachineStatus, MachineStatusProbe, MachineTelemetry,
-    Temperature,
+    AmsTray, MachineError, MachineLink, MachineState, MachineStatus, MachineStatusProbe,
+    MachineTelemetry, Temperature,
 };
 use reqwest::{Client, redirect::Policy};
 use serde_json::Value;
@@ -31,6 +31,12 @@ impl MachineStatusProbe for MachineStatusProbeAdapter {
         match link {
             MachineLink::BambuLan { .. } => self.bambu.fetch_status(link).await,
             _ => self.rest.fetch_status(link).await,
+        }
+    }
+    async fn fetch_ams(&self, link: &MachineLink) -> Result<Vec<AmsTray>, MachineError> {
+        match link {
+            MachineLink::BambuLan { .. } => self.bambu.fetch_ams(link).await,
+            _ => Err(MachineError::AmsUnavailable),
         }
     }
 }
@@ -221,6 +227,9 @@ impl MachineStatusProbe for RestMachineStatusProbe {
                 "Bambu link sent to REST probe".into(),
             )),
         }
+    }
+    async fn fetch_ams(&self, _: &MachineLink) -> Result<Vec<AmsTray>, MachineError> {
+        Err(MachineError::AmsUnavailable)
     }
 }
 

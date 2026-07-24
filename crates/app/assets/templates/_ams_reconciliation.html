@@ -1,0 +1,43 @@
+<div class="ams-drawer-scrim" aria-hidden="true" hx-get="/printers/ams-drawer/close" hx-target="#ams-drawer" hx-swap="innerHTML"></div>
+<span id="ams-sync-state-{{ printer_id }}" class="ams-sync-state ams-sync-state--{% if selected_count %}drift{% else %}up-to-date{% endif %}" hx-swap-oob="outerHTML">{% if selected_count %}{{ t(key="ams.state.drift") }}{% else %}{{ t(key="ams.state.up_to_date") }}{% endif %}</span>
+<section class="ams-drawer-panel" role="dialog" aria-modal="true" aria-label="{{ t(key='ams.panel.title') }}">
+  <form hx-post="/printers/{{ printer_id }}/ams-reconciliation"
+        hx-target="#ams-drawer" hx-swap="innerHTML"
+        onsubmit="this.rows_csv.value=Array.from(this.querySelectorAll('select[data-unit]')).map(s=>[s.dataset.unit,s.dataset.tray,s.value].join(':')).join(',')">
+    <input type="hidden" name="rows_csv" value="">
+    <header class="ams-drawer-header">
+      <strong>{{ t(key="ams.sync") }}</strong>
+      <span>{{ printer_name }} · {{ tray_count }} {{ t(key="ams.trays") }}</span>
+    </header>
+    <div class="ams-drawer-body">
+      {% for unit in units %}
+      <section class="ams-drawer-unit">
+        <h3>{{ t(key="ams.unit") }} Unit {{ unit.number }}</h3>
+        {% for row in unit.rows %}
+        <div class="ams-drawer-row ams-drawer-row--{{ row.kind }}">
+          <span class="ams-drawer-chip{% if row.colour_hex == 'transparent' %} ams-drawer-chip--empty{% endif %}" style="background:{{ row.colour_hex }}"></span>
+          <div class="ams-drawer-row-main">
+            <strong>{{ row.slot_key }} · {{ t(key=row.title_key) }}{% if row.detected %} {{ row.detected }}{% endif %}</strong>
+            {% if row.local_description %}<small>{{ t(key="ams.local") }}: {{ row.local_description }}</small>{% endif %}
+            {% if row.weight_delta is not none %}<small class="ams-drawer-delta">{{ t(key="ams.weight_delta") }} {{ row.weight_delta }} % ({{ t(key="ams.info") }})</small>{% endif %}
+            {% if row.options %}
+            <select data-unit="{{ row.unit_index }}" data-tray="{{ row.tray_index }}" aria-label="{{ t(key='ams.spool') }}"{% if not row.slot_known %} disabled{% endif %}>
+              {% for option in row.options %}<option value="{{ option.id }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}
+            </select>
+            {% endif %}
+          </div>
+          <span class="ams-drawer-badge">{{ t(key=row.badge_key) }}</span>
+        </div>
+        {% endfor %}
+      </section>
+      {% endfor %}
+    </div>
+    <footer class="ams-drawer-footer">
+      <span>{% if selected_count %}{{ selected_count }} {{ t(key="ams.to_confirm") }}{% else %}{{ t(key="ams.all_synced") }}{% endif %}</span>
+      <div>
+        <button type="button" class="button button-secondary" hx-get="/printers/ams-drawer/close" hx-target="#ams-drawer" hx-swap="innerHTML">{{ t(key="common.cancel") }}</button>
+        <button type="submit" class="button">{% if selected_count %}{{ t(key="ams.confirm") }} ({{ selected_count }}){% else %}{{ t(key="common.close") }}{% endif %}</button>
+      </div>
+    </footer>
+  </form>
+</section>

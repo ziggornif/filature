@@ -1,7 +1,9 @@
 use crate::shared::{Grams, LocationId, Money};
-use crate::spools::model::{EditSpool, NewSpool, Spool, SpoolId};
+use crate::spools::model::{EditSpool, NewSpool, Spool, SpoolId, normalize_ams_tag_uid};
 use crate::spools::ports::api::SpoolsUseCases;
-use crate::spools::ports::spi::{RepositoryError, SpoolFilter, SpoolRepository, SpoolSort};
+use crate::spools::ports::spi::{
+    ReconcilableSpool, RepositoryError, SpoolFilter, SpoolRepository, SpoolSort,
+};
 use crate::spools::read_models::{SpoolDetail, SpoolListItem};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -18,7 +20,29 @@ impl SpoolsService {
 
 #[async_trait]
 impl SpoolsUseCases for SpoolsService {
-    async fn add(&self, s: NewSpool) -> Result<Spool, RepositoryError> {
+    async fn reconcilable(&self) -> Result<Vec<ReconcilableSpool>, RepositoryError> {
+        self.repo.reconcilable().await
+    }
+
+    async fn memorize_ams_tag(
+        &self,
+        id: SpoolId,
+        tag_uid: String,
+    ) -> Result<Spool, RepositoryError> {
+        let tag_uid = normalize_ams_tag_uid(&tag_uid).ok_or(RepositoryError::InvalidAmsTagUid)?;
+        let mut spool = self
+            .repo
+            .find(&id)
+            .await?
+            .ok_or_else(|| RepositoryError::NotFound(id.clone()))?;
+        if spool.ams_tag_uid.as_deref() == Some(tag_uid.as_str()) {
+            return Ok(spool);
+        }
+        spool.ams_tag_uid = Some(tag_uid);
+        self.repo.update(spool).await
+    }
+    async fn add(&self, mut s: NewSpool) -> Result<Spool, RepositoryError> {
+        s.ams_tag_uid = s.ams_tag_uid.as_deref().and_then(normalize_ams_tag_uid);
         self.repo.insert(s).await
     }
 
@@ -42,6 +66,9 @@ impl SpoolsUseCases for SpoolsService {
         spool.notes = edit.notes;
         spool.purchased_at = edit.purchased_at;
         spool.opened_at = edit.opened_at;
+        if let Some(tag_uid) = edit.ams_tag_uid.as_deref() {
+            spool.ams_tag_uid = normalize_ams_tag_uid(tag_uid);
+        }
         self.repo.update(spool).await
     }
 
@@ -150,6 +177,7 @@ mod tests {
             notes: None,
             purchased_at: None,
             opened_at: None,
+            ams_tag_uid: None,
             remaining_weight: None,
         }
     }
@@ -168,6 +196,7 @@ mod tests {
             notes: spool.notes.clone(),
             purchased_at: spool.purchased_at,
             opened_at: spool.opened_at,
+            ams_tag_uid: spool.ams_tag_uid.clone(),
             remaining_weight: Some(spool.remaining_weight),
         }
     }
@@ -180,6 +209,34 @@ mod tests {
         assert_eq!(created.spool_type, SpoolType::Complete);
         assert_eq!(created.remaining_weight.value(), created.net_weight.value());
         assert_eq!(created.net_weight.value(), 1000.0);
+    }
+
+    #[tokio::test]
+    async fn memorize_ams_tag_is_idempotent_and_rejects_empty_or_zero_uids() {
+        let s = svc();
+        let created = s.add(sample_new_spool("material-ams")).await.unwrap();
+        let memorized = s
+            .memorize_ams_tag(created.id.clone(), " A1B2C3 ".into())
+            .await
+            .unwrap();
+        assert_eq!(memorized.ams_tag_uid.as_deref(), Some("A1B2C3"));
+        let again = s
+            .memorize_ams_tag(created.id, "A1B2C3".into())
+            .await
+            .unwrap();
+        assert_eq!(again.ams_tag_uid, memorized.ams_tag_uid);
+        assert_eq!(
+            s.memorize_ams_tag(SpoolId::new("missing"), "00000000".into())
+                .await
+                .unwrap_err(),
+            RepositoryError::InvalidAmsTagUid
+        );
+        assert_eq!(
+            s.memorize_ams_tag(SpoolId::new("missing"), " ".into())
+                .await
+                .unwrap_err(),
+            RepositoryError::InvalidAmsTagUid
+        );
     }
 
     #[tokio::test]

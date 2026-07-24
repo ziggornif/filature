@@ -681,6 +681,7 @@ impl SpoolForm {
             notes: f.notes,
             purchased_at: f.purchased_at,
             opened_at: f.opened_at,
+            ams_tag_uid: None,
             remaining_weight,
         })
     }
@@ -716,6 +717,7 @@ impl SpoolForm {
             notes: f.notes,
             purchased_at: f.purchased_at,
             opened_at: f.opened_at,
+            ams_tag_uid: None,
         })
     }
 }
@@ -2344,6 +2346,13 @@ mod tests {
             ) -> Result<Vec<domain::printers::LoadableSpool>, domain::printers::RepositoryError>
             {
                 Ok(vec![])
+            }
+            async fn set_ams_sync_state(
+                &self,
+                _: domain::shared::PrinterId,
+                _: domain::printers::AmsSyncState,
+            ) -> Result<(), domain::printers::RepositoryError> {
+                Ok(())
             }
         }
 

@@ -8,8 +8,9 @@ use axum::{
     routing::get,
 };
 use domain::printers::{
-    BAMBU_MODELS, FeedMode, LoadableSpool, MachineLink, MachineState, MachineStatus, Module,
-    NewPrinter, PRUSA_MODELS, Printer, PrinterBrand, PrinterName, RepositoryError, Temperature,
+    AmsSyncState, BAMBU_MODELS, FeedMode, LoadableSpool, MachineLink, MachineState, MachineStatus,
+    Module, NewPrinter, PRUSA_MODELS, Printer, PrinterBrand, PrinterName, RepositoryError,
+    Temperature,
 };
 use domain::shared::{PrinterId, SpoolId};
 use domain::spools::Colour;
@@ -61,10 +62,33 @@ pub struct PrinterView {
     pub total: usize,
     pub occupancy_state: &'static str,
     pub has_machine_link: bool,
+    pub can_sync_ams: bool,
+    pub sync_disabled: bool,
+    pub sync_state: &'static str,
+    pub sync_state_key: &'static str,
 }
 impl PrinterView {
     async fn build(p: Printer, st: &AppState, locale: &str) -> Result<Self, RepositoryError> {
         let has_machine_link = p.machine_link.is_some();
+        let can_sync_ams = st.machine_links_enabled
+            && p.brand == PrinterBrand::BambuLab
+            && has_machine_link
+            && p.ams_units > 0;
+        let sync_disabled = if can_sync_ams {
+            !matches!(
+                st.machine_connectivity
+                    .get_printer_status(p.id.clone())
+                    .await,
+                Ok(status) if status.state != MachineState::Offline
+            )
+        } else {
+            false
+        };
+        let (sync_state, sync_state_key) = match p.ams_sync_state {
+            AmsSyncState::UpToDate => ("up-to-date", "ams.state.up_to_date"),
+            AmsSyncState::Drift => ("drift", "ams.state.drift"),
+            AmsSyncState::Offline => ("offline", "ams.state.offline"),
+        };
         let mut grouped: BTreeMap<String, Vec<SlotView>> = BTreeMap::new();
         let mut order = Vec::new();
         for slot in p.slots {
@@ -139,6 +163,10 @@ impl PrinterView {
             total,
             occupancy_state,
             has_machine_link,
+            can_sync_ams,
+            sync_disabled,
+            sync_state,
+            sync_state_key,
         })
     }
 }
@@ -146,6 +174,13 @@ impl PrinterView {
 impl From<Printer> for PrinterView {
     fn from(p: Printer) -> Self {
         let has_machine_link = p.machine_link.is_some();
+        let can_sync_ams = p.brand == PrinterBrand::BambuLab && has_machine_link && p.ams_units > 0;
+        let sync_disabled = p.ams_sync_state == AmsSyncState::Offline;
+        let (sync_state, sync_state_key) = match p.ams_sync_state {
+            AmsSyncState::UpToDate => ("up-to-date", "ams.state.up_to_date"),
+            AmsSyncState::Drift => ("drift", "ams.state.drift"),
+            AmsSyncState::Offline => ("offline", "ams.state.offline"),
+        };
         let mut grouped: BTreeMap<String, usize> = BTreeMap::new();
         let mut order = Vec::new();
         for slot in &p.slots {
@@ -178,6 +213,10 @@ impl From<Printer> for PrinterView {
             total: p.slots.len(),
             occupancy_state: "empty",
             has_machine_link,
+            can_sync_ams,
+            sync_disabled,
+            sync_state,
+            sync_state_key,
         }
     }
 }
@@ -404,18 +443,22 @@ async fn page(State(st): State<AppState>, headers: HeaderMap) -> Response {
     }
 }
 
-async fn loading_fragment(st: &AppState, headers: &HeaderMap) -> Response {
+async fn loading_fragment_html(
+    st: &AppState,
+    headers: &HeaderMap,
+    oob: bool,
+) -> Result<String, String> {
     let locale = resolve_locale(headers, st);
     let theme = resolve_theme(headers);
     let items = match st.printers.list().await {
         Ok(items) => items,
-        Err(e) => return internal_error(e),
+        Err(e) => return Err(e.to_string()),
     };
     let mut views = Vec::with_capacity(items.len());
     for item in items {
         match PrinterView::build(item, st, &locale).await {
             Ok(view) => views.push(view),
-            Err(e) => return internal_error(e),
+            Err(e) => return Err(e.to_string()),
         }
     }
     let loaded_spools_count = views
@@ -427,12 +470,16 @@ async fn loading_fragment(st: &AppState, headers: &HeaderMap) -> Response {
     let mut ctx = Context::new();
     ctx.insert("printers", &views);
     ctx.insert("loaded_spools_count", &loaded_spools_count);
-    match st
-        .renderer
+    ctx.insert("oob", &oob);
+    st.renderer
         .render("_printer_loading.html", &locale, theme.data_attr(), ctx)
-    {
-        Ok(h) => Html(h).into_response(),
-        Err(e) => internal_error(e),
+        .map_err(|error| error.to_string())
+}
+
+async fn loading_fragment(st: &AppState, headers: &HeaderMap) -> Response {
+    match loading_fragment_html(st, headers, false).await {
+        Ok(html) => Html(html).into_response(),
+        Err(error) => internal_error(error),
     }
 }
 
@@ -440,6 +487,302 @@ async fn loading_fragment(st: &AppState, headers: &HeaderMap) -> Response {
 struct SlotForm {
     #[serde(default)]
     spool_id: String,
+}
+
+#[derive(Serialize)]
+struct AmsOptionView {
+    id: String,
+    label: String,
+    selected: bool,
+}
+#[derive(Serialize)]
+struct AmsRowView {
+    unit_index: u8,
+    tray_index: u8,
+    slot_key: String,
+    detected: String,
+    colour_hex: String,
+    weight_delta: Option<i16>,
+    kind: &'static str,
+    badge_key: &'static str,
+    title_key: &'static str,
+    local_description: String,
+    slot_known: bool,
+    options: Vec<AmsOptionView>,
+}
+#[derive(Serialize)]
+struct AmsUnitView {
+    number: u8,
+    rows: Vec<AmsRowView>,
+}
+#[derive(Deserialize)]
+struct AmsConfirmForm {
+    #[serde(default)]
+    rows_csv: String,
+}
+
+fn parse_confirmation_rows(
+    value: &str,
+) -> Result<Vec<crate::ams_reconciliation::AmsConfirmation>, ()> {
+    value
+        .split(',')
+        .filter(|row| !row.is_empty())
+        .map(|row| {
+            let mut fields = row.splitn(3, ':');
+            let unit_index = fields.next().ok_or(())?.parse().map_err(|_| ())?;
+            let tray_index = fields.next().ok_or(())?.parse().map_err(|_| ())?;
+            let mut encoded = fields.next().ok_or(())?.splitn(3, ';');
+            let action = match encoded.next().ok_or(())? {
+                "keep" => crate::ams_reconciliation::AmsConfirmationAction::Keep,
+                "unload" => crate::ams_reconciliation::AmsConfirmationAction::Unload,
+                "load" => crate::ams_reconciliation::AmsConfirmationAction::Load {
+                    spool_id: SpoolId::new(encoded.next().filter(|id| !id.is_empty()).ok_or(())?),
+                    tag_uid: encoded
+                        .next()
+                        .filter(|uid| !uid.is_empty())
+                        .map(str::to_owned),
+                },
+                _ => return Err(()),
+            };
+            Ok(crate::ams_reconciliation::AmsConfirmation {
+                unit_index,
+                tray_index,
+                action,
+            })
+        })
+        .collect()
+}
+
+async fn ams_reconciliation(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Response {
+    if !st.machine_links_enabled {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let printer_id = PrinterId::new(id.clone());
+    let slot_keys = match st.printers.list().await {
+        Ok(printers) => printers.into_iter().find_map(|printer| {
+            (printer.id == printer_id
+                && printer.brand == PrinterBrand::BambuLab
+                && printer.machine_link.is_some()
+                && printer.ams_units > 0)
+                .then(|| {
+                    printer
+                        .slots
+                        .into_iter()
+                        .map(|slot| slot.key)
+                        .collect::<std::collections::HashSet<_>>()
+                })
+        }),
+        Err(error) => return internal_error(error),
+    };
+    let Some(slot_keys) = slot_keys else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let reconciliation = match st.ams_reconciliation.reconcile(printer_id).await {
+        Ok(value) => value,
+        Err(error) => return internal_error(error),
+    };
+    let printer_name = reconciliation.printer.name.as_str().to_owned();
+    let locale = resolve_locale(&headers, &st);
+    let mut grouped: BTreeMap<u8, Vec<AmsRowView>> = BTreeMap::new();
+    for matched in reconciliation.rows {
+        let suggested = matched.suggested_spool_id.as_ref();
+        let detected = [
+            matched.tray.filament_type.as_deref(),
+            matched.tray.sub_brand.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(" · ");
+        let weight_delta = matched
+            .tray
+            .remain_percent
+            .zip(suggested.and_then(|id| {
+                reconciliation
+                    .spools
+                    .iter()
+                    .find(|spool| &spool.id == id)
+                    .map(|spool| spool.remaining_percent)
+            }))
+            .map(|(ams, filature)| i16::from(ams) - i16::from(filature));
+        let mut options: Vec<_> = reconciliation
+            .spools
+            .iter()
+            .filter(|spool| !spool.loaded || suggested == Some(&spool.id))
+            .map(|spool| AmsOptionView {
+                id: format!(
+                    "load;{};{}",
+                    spool.id.as_str(),
+                    matched.tray.tag_uid.as_deref().unwrap_or_default()
+                ),
+                label: format!(
+                    "{} · {}",
+                    spool.material_name,
+                    localized_colour_name(&st, &locale, spool.colour_hex.as_deref())
+                ),
+                selected: suggested == Some(&spool.id),
+            })
+            .collect();
+        let (kind, badge_key, title_key) = match matched.kind {
+            crate::ams_reconciliation::ReconciliationKind::Match => {
+                ("match", "ams.match.rfid", "ams.row.match")
+            }
+            crate::ams_reconciliation::ReconciliationKind::Removed => {
+                ("removed", "ams.match.removed", "ams.row.removed")
+            }
+            crate::ams_reconciliation::ReconciliationKind::Conflict => {
+                ("conflict", "ams.match.conflict", "ams.row.conflict")
+            }
+            crate::ams_reconciliation::ReconciliationKind::Attributed => {
+                ("attributed", "ams.match.attributes", "ams.row.detected")
+            }
+            crate::ams_reconciliation::ReconciliationKind::None => {
+                ("none", "ams.match.none", "ams.row.detected")
+            }
+        };
+        let unit_index = matched.tray.unit_index;
+        let tray_index = matched.tray.tray_index;
+        let slot_key = format!("ams{unit_index}-{tray_index}");
+        let slot_known = slot_keys.contains(&slot_key);
+        let local_description = matched
+            .local_spool
+            .as_ref()
+            .map(|spool| {
+                format!(
+                    "{} · {}",
+                    spool.material_name,
+                    localized_colour_name(&st, &locale, spool.colour_hex.as_deref())
+                )
+            })
+            .unwrap_or_default();
+        match matched.kind {
+            crate::ams_reconciliation::ReconciliationKind::Match => options.clear(),
+            crate::ams_reconciliation::ReconciliationKind::Removed => {
+                options = vec![
+                    AmsOptionView {
+                        id: "unload".into(),
+                        label: st.renderer.t(&locale, "ams.option.unload"),
+                        selected: true,
+                    },
+                    AmsOptionView {
+                        id: "keep".into(),
+                        label: st.renderer.t(&locale, "ams.option.keep"),
+                        selected: false,
+                    },
+                ];
+            }
+            crate::ams_reconciliation::ReconciliationKind::Conflict => {
+                // Keep the full loadable list so the operator can pick the right
+                // spool from inventory — the RFID-detected spool is preselected
+                // when its tag is already memorised, otherwise nothing is (the
+                // tag was never learned, e.g. a third-party or first-seen roll),
+                // and "keep local" becomes the default. Picking any spool carries
+                // the tray tag_uid, so confirming memorises it for next time.
+                let no_detected_spool = !options.iter().any(|option| option.selected);
+                options.insert(
+                    0,
+                    AmsOptionView {
+                        id: "keep".into(),
+                        label: st.renderer.t(&locale, "ams.option.keep_local"),
+                        selected: no_detected_spool,
+                    },
+                );
+            }
+            crate::ams_reconciliation::ReconciliationKind::Attributed
+            | crate::ams_reconciliation::ReconciliationKind::None => {
+                options.insert(
+                    0,
+                    AmsOptionView {
+                        id: "keep".into(),
+                        label: st.renderer.t(&locale, "ams.option.none"),
+                        selected: suggested.is_none(),
+                    },
+                );
+            }
+        }
+        grouped.entry(unit_index).or_default().push(AmsRowView {
+            unit_index,
+            tray_index,
+            slot_key,
+            detected,
+            colour_hex: matched
+                .tray
+                .color_hex
+                .unwrap_or_else(|| "transparent".into()),
+            weight_delta,
+            kind,
+            badge_key,
+            title_key,
+            local_description,
+            slot_known,
+            options: if slot_known { options } else { Vec::new() },
+        });
+    }
+    let units: Vec<_> = grouped
+        .into_iter()
+        .map(|(index, rows)| AmsUnitView {
+            number: index + 1,
+            rows,
+        })
+        .collect();
+    let selected_count = units
+        .iter()
+        .flat_map(|unit| &unit.rows)
+        .filter(|row| row.kind != "match")
+        .count();
+    let tray_count = units.iter().map(|unit| unit.rows.len()).sum::<usize>();
+    let mut context = Context::new();
+    context.insert("printer_id", &id);
+    context.insert("printer_name", &printer_name);
+    context.insert("units", &units);
+    context.insert("selected_count", &selected_count);
+    context.insert("tray_count", &tray_count);
+    match st
+        .renderer
+        .render("_ams_reconciliation.html", &locale, "", context)
+    {
+        Ok(html) => Html(html).into_response(),
+        Err(error) => internal_error(error),
+    }
+}
+
+async fn confirm_ams_reconciliation(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Form(form): Form<AmsConfirmForm>,
+) -> Response {
+    if !st.machine_links_enabled {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let rows = match parse_confirmation_rows(&form.rows_csv) {
+        Ok(rows) => rows,
+        Err(()) => return StatusCode::BAD_REQUEST.into_response(),
+    };
+    match st
+        .ams_reconciliation
+        .confirm(PrinterId::new(id), rows)
+        .await
+    {
+        Ok(()) => match loading_fragment_html(&st, &headers, true).await {
+            Ok(cards) => Html(cards).into_response(),
+            Err(error) => internal_error(error),
+        },
+        Err(crate::ams_reconciliation::AmsReconciliationError::Printers(
+            RepositoryError::NotFound(_)
+            | RepositoryError::SlotNotFound { .. }
+            | RepositoryError::UnknownSpool(_),
+        )) => StatusCode::NOT_FOUND.into_response(),
+        Err(error) => internal_error(error),
+    }
+}
+
+async fn close_ams_drawer() -> Html<&'static str> {
+    Html("")
 }
 
 async fn set_slot(
@@ -649,6 +992,7 @@ async fn update(
         ams_units,
         feed_modes,
         machine_link,
+        ams_sync_state: AmsSyncState::Offline,
         slots: vec![],
     };
     match st.printers.edit(printer).await {
@@ -816,12 +1160,17 @@ pub fn routes() -> Router<AppState> {
             axum::routing::post(set_slot),
         )
         .route("/printers/{id}/machine-status", get(status_fragment))
+        .route(
+            "/printers/{id}/ams-reconciliation",
+            get(ams_reconciliation).post(confirm_ams_reconciliation),
+        )
+        .route("/printers/ams-drawer/close", get(close_ams_drawer))
         .route("/machine-links/test", axum::routing::post(test_link))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{PrinterForm, TestLinkForm};
+    use super::{AmsConfirmForm, PrinterForm, TestLinkForm, parse_confirmation_rows};
     use crate::web::{i18n::Catalog, templates::Renderer};
     use domain::printers::FeedMode;
     use serde_json::json;
@@ -831,6 +1180,41 @@ mod tests {
     // repeated keys into a sequence, so feed_modes travels as one CSV field.
     fn form(body: &str) -> PrinterForm {
         serde_urlencoded::from_str(body).expect("urlencoded body deserializes")
+    }
+
+    #[test]
+    fn confirmation_accepts_a_real_multi_row_urlencoded_body() {
+        let form: AmsConfirmForm = serde_urlencoded::from_str(
+            "rows_csv=0%3A0%3Aload%3Bspool-a%3BUIDA%2C0%3A1%3Aload%3Bspool-b%3B",
+        )
+        .unwrap();
+        let rows = parse_confirmation_rows(&form.rows_csv).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert!(matches!(
+            &rows[0].action,
+            crate::ams_reconciliation::AmsConfirmationAction::Load { spool_id, tag_uid }
+                if spool_id.as_str() == "spool-a" && tag_uid.as_deref() == Some("UIDA")
+        ));
+        assert!(matches!(
+            &rows[1].action,
+            crate::ams_reconciliation::AmsConfirmationAction::Load { spool_id, tag_uid }
+                if spool_id.as_str() == "spool-b" && tag_uid.is_none()
+        ));
+    }
+
+    #[test]
+    fn confirmation_csv_preserves_default_unload_and_keep_actions() {
+        let form: AmsConfirmForm =
+            serde_urlencoded::from_str("rows_csv=0%3A0%3Aunload%2C0%3A1%3Akeep").unwrap();
+        let rows = parse_confirmation_rows(&form.rows_csv).unwrap();
+        assert!(matches!(
+            rows[0].action,
+            crate::ams_reconciliation::AmsConfirmationAction::Unload
+        ));
+        assert!(matches!(
+            rows[1].action,
+            crate::ams_reconciliation::AmsConfirmationAction::Keep
+        ));
     }
 
     #[test]

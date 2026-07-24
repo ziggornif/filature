@@ -1,5 +1,6 @@
 use crate::printers::{
-    LoadableSpool, MachineError, MachineLink, MachineStatus, NewPrinter, Printer,
+    AmsSyncState, AmsTray, LoadableSpool, MachineError, MachineLink, MachineStatus, NewPrinter,
+    Printer,
 };
 use crate::shared::{DomainError, PrinterId, SpoolId};
 use async_trait::async_trait;
@@ -42,6 +43,11 @@ pub trait PrinterRepository: Send + Sync {
         &self,
         current: Option<&SpoolId>,
     ) -> Result<Vec<LoadableSpool>, RepositoryError>;
+    async fn set_ams_sync_state(
+        &self,
+        printer_id: &PrinterId,
+        state: AmsSyncState,
+    ) -> Result<(), RepositoryError>;
 }
 
 #[async_trait]
@@ -52,4 +58,5 @@ pub trait MachineLinkRepository: Send + Sync {
 #[async_trait]
 pub trait MachineStatusProbe: Send + Sync {
     async fn fetch_status(&self, link: &MachineLink) -> Result<MachineStatus, MachineError>;
+    async fn fetch_ams(&self, link: &MachineLink) -> Result<Vec<AmsTray>, MachineError>;
 }
