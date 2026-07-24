@@ -11,6 +11,30 @@ pub struct RestMachineStatusProbe {
     client: Client,
 }
 
+pub struct MachineStatusProbeAdapter {
+    rest: RestMachineStatusProbe,
+    bambu: crate::machine_bambu::BambuMachineStatusProbe,
+}
+
+impl MachineStatusProbeAdapter {
+    pub fn new() -> Result<Self, reqwest::Error> {
+        Ok(Self {
+            rest: RestMachineStatusProbe::new()?,
+            bambu: crate::machine_bambu::BambuMachineStatusProbe::new(),
+        })
+    }
+}
+
+#[async_trait]
+impl MachineStatusProbe for MachineStatusProbeAdapter {
+    async fn fetch_status(&self, link: &MachineLink) -> Result<MachineStatus, MachineError> {
+        match link {
+            MachineLink::BambuLan { .. } => self.bambu.fetch_status(link).await,
+            _ => self.rest.fetch_status(link).await,
+        }
+    }
+}
+
 impl RestMachineStatusProbe {
     pub fn new() -> Result<Self, reqwest::Error> {
         Client::builder()
@@ -193,6 +217,9 @@ impl MachineStatusProbe for RestMachineStatusProbe {
         match link {
             MachineLink::PrusaLink { host, api_key } => self.prusa(host, api_key).await,
             MachineLink::Moonraker { url } => self.moonraker(url).await,
+            MachineLink::BambuLan { .. } => Err(MachineError::Connection(
+                "Bambu link sent to REST probe".into(),
+            )),
         }
     }
 }

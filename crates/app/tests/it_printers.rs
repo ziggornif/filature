@@ -1,8 +1,8 @@
 mod support;
 
 use domain::printers::{
-    FeedMode, Module, NewPrinter, PrinterBrand, PrinterName, PrinterRepository, PrintersService,
-    PrintersUseCases, RepositoryError,
+    FeedMode, MachineLink, Module, NewPrinter, Printer, PrinterBrand, PrinterName,
+    PrinterRepository, PrintersService, PrintersUseCases, RepositoryError,
 };
 use domain::shared::{PrinterId, SpoolId};
 use filature::persistence::{connect_and_migrate, printers::SqlxPrinterRepository};
@@ -168,6 +168,80 @@ async fn unknown_update_and_delete_are_not_found() {
         repo.delete(&missing).await,
         Err(RepositoryError::NotFound(_))
     ));
+}
+
+#[tokio::test]
+async fn forged_bambu_configured_sentinel_cannot_create_a_credential() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let repo = SqlxPrinterRepository::new(pool);
+    let mut printer = sample("Forged sentinel", Module::None);
+    printer.machine_link = Some(MachineLink::BambuLan {
+        host: "192.168.1.50".into(),
+        access_code: "__configured__".into(),
+        serial: "01P00FORGEDSERIAL".into(),
+    });
+    assert!(matches!(
+        repo.insert(printer).await,
+        Err(RepositoryError::Backend(message))
+            if message.contains("configured Bambu credential is missing")
+    ));
+}
+
+#[tokio::test]
+async fn bambu_edit_sentinel_preserves_stored_credential() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let id = "bambu-sentinel-edit";
+    sqlx::query("DELETE FROM printers WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO printers(id,name,brand,model,heads,module_kind,module_count) VALUES($1,'Bambu sentinel','bambu','P1S',1,'none',NULL)")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO machine_links(printer_id,kind,endpoint,credential) VALUES($1,'bambu',$2,'opaque-encrypted-access-code')")
+        .bind(id)
+        .bind(r#"{"host":"192.168.1.50","serial":"OLD"}"#)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let repo = SqlxPrinterRepository::new(pool.clone());
+    repo.update(Printer {
+        id: PrinterId::new(id),
+        name: PrinterName::new("Bambu sentinel").unwrap(),
+        brand: PrinterBrand::BambuLab,
+        model: "P1S".into(),
+        heads: 1,
+        module: Module::None,
+        ams_units: 0,
+        feed_modes: vec![FeedMode::Direct],
+        machine_link: Some(MachineLink::BambuLan {
+            host: "192.168.1.51".into(),
+            access_code: "__configured__".into(),
+            serial: "NEW-SERIAL".into(),
+        }),
+        slots: vec![],
+    })
+    .await
+    .unwrap();
+    let (endpoint, credential): (String, String) =
+        sqlx::query_as("SELECT endpoint,credential FROM machine_links WHERE printer_id=$1")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(credential, "opaque-encrypted-access-code");
+    assert!(endpoint.contains("192.168.1.51"));
+    assert!(endpoint.contains("NEW-SERIAL"));
+    sqlx::query("DELETE FROM printers WHERE id=$1")
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
 }
 
 #[tokio::test]

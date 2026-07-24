@@ -36,6 +36,7 @@ argon2 = { version = "0.5", features = ["std"] }
 base64 = "0.22"
 ring = "0.17"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
+rumqttc = { version = "0.25.1", features = ["use-rustls"] }
 
 [dev-dependencies]
 domain = { path = "../domain", features = ["stubs"] }

@@ -235,6 +235,8 @@ pub struct PrinterForm {
     #[serde(default)]
     machine_api_key_configured: bool,
     #[serde(default)]
+    machine_serial: String,
+    #[serde(default)]
     from: String,
 }
 fn default_heads() -> u8 {
@@ -328,9 +330,21 @@ impl PrinterForm {
                     .validate_for_brand(brand)
                     .map_err(|e| e.to_string())?,
                 ),
-                PrinterBrand::BambuLab => {
-                    return Err("machine link unsupported for Bambu Lab".into());
-                }
+                PrinterBrand::BambuLab => Some(
+                    MachineLink::BambuLan {
+                        host: self.machine_endpoint.trim().to_string(),
+                        access_code: if self.machine_api_key.trim().is_empty()
+                            && self.machine_api_key_configured
+                        {
+                            "__configured__".into()
+                        } else {
+                            self.machine_api_key.trim().to_string()
+                        },
+                        serial: self.machine_serial.trim().to_string(),
+                    }
+                    .validate_for_brand(brand)
+                    .map_err(|e| e.to_string())?,
+                ),
             }
         };
         Ok((
@@ -544,13 +558,17 @@ struct PrinterFormView {
     machine_link_enabled: bool,
     machine_endpoint: String,
     machine_api_key_configured: bool,
+    machine_serial: String,
 }
 impl From<Printer> for PrinterFormView {
     fn from(p: Printer) -> Self {
-        let (machine_endpoint, machine_api_key_configured) = match &p.machine_link {
-            Some(MachineLink::PrusaLink { host, .. }) => (host.clone(), true),
-            Some(MachineLink::Moonraker { url }) => (url.clone(), false),
-            None => (String::new(), false),
+        let (machine_endpoint, machine_api_key_configured, machine_serial) = match &p.machine_link {
+            Some(MachineLink::PrusaLink { host, .. }) => (host.clone(), true, String::new()),
+            Some(MachineLink::Moonraker { url }) => (url.clone(), false, String::new()),
+            Some(MachineLink::BambuLan { host, serial, .. }) => {
+                (host.clone(), true, serial.clone())
+            }
+            None => (String::new(), false, String::new()),
         };
         Self {
             id: p.id.as_str().into(),
@@ -569,6 +587,7 @@ impl From<Printer> for PrinterFormView {
             machine_link_enabled: p.machine_link.is_some(),
             machine_endpoint,
             machine_api_key_configured,
+            machine_serial,
         }
     }
 }
@@ -735,6 +754,8 @@ struct TestLinkForm {
     brand: String,
     #[serde(default)]
     printer_id: Option<String>,
+    #[serde(default)]
+    machine_serial: String,
 }
 async fn test_link(
     State(st): State<AppState>,
@@ -744,7 +765,7 @@ async fn test_link(
     if !st.machine_links_enabled {
         return StatusCode::NOT_FOUND.into_response();
     }
-    let result = if f.brand == "prusa"
+    let result = if matches!(f.brand.as_str(), "prusa" | "bambu")
         && f.machine_api_key.is_empty()
         && f.machine_api_key_configured
         && let Some(printer_id) = f.printer_id
@@ -753,15 +774,19 @@ async fn test_link(
             .test_printer_machine_link(PrinterId::new(printer_id), f.machine_endpoint)
             .await
     } else {
-        let link = if f.brand == "prusa" {
-            MachineLink::PrusaLink {
+        let link = match f.brand.as_str() {
+            "prusa" => MachineLink::PrusaLink {
                 host: f.machine_endpoint,
                 api_key: f.machine_api_key,
-            }
-        } else {
-            MachineLink::Moonraker {
+            },
+            "bambu" => MachineLink::BambuLan {
+                host: f.machine_endpoint,
+                access_code: f.machine_api_key,
+                serial: f.machine_serial,
+            },
+            _ => MachineLink::Moonraker {
                 url: f.machine_endpoint,
-            }
+            },
         };
         st.machine_connectivity.test_machine_link(link).await
     };
@@ -856,6 +881,27 @@ mod tests {
         let (_, _, _, _, _, _, _, link) = form("name=MK4&brand=prusa&model=MK4S&heads=1&module=none&machine_link_enabled=1&machine_endpoint=http%3A%2F%2Fprusa.local&machine_api_key=top-secret").domain().unwrap();
         assert!(
             matches!(link, Some(domain::printers::MachineLink::PrusaLink { ref api_key, .. }) if api_key == "top-secret")
+        );
+    }
+
+    #[test]
+    fn bambu_link_deserializes_from_a_real_urlencoded_body() {
+        let (_, _, _, _, _, _, _, link) = form("name=P1S&brand=bambu&model=P1S&heads=1&module=none&ams_units=0&feed_modes=direct&machine_link_enabled=1&machine_endpoint=192.168.1.50&machine_api_key=87654321&machine_serial=01P00A123456789").domain().unwrap();
+        assert_eq!(
+            link,
+            Some(domain::printers::MachineLink::BambuLan {
+                host: "192.168.1.50".into(),
+                access_code: "87654321".into(),
+                serial: "01P00A123456789".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn configured_bambu_save_uses_preserve_sentinel_when_code_is_blank() {
+        let (_, _, _, _, _, _, _, link) = form("name=P1S&brand=bambu&model=P1S&heads=1&module=none&ams_units=0&feed_modes=direct&machine_link_enabled=1&machine_endpoint=192.168.1.51&machine_api_key_configured=true&machine_api_key=&machine_serial=01P00A123456789").domain().unwrap();
+        assert!(
+            matches!(link, Some(domain::printers::MachineLink::BambuLan { ref access_code, .. }) if access_code == "__configured__")
         );
     }
 

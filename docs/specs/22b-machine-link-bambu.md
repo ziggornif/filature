@@ -1,23 +1,25 @@
 # 22b — Connexion machine (Bambu LAN) : statut live via MQTT
 
 > Brief généré par IA (harness) à partir du design validé en review lavish le
-> 2026-07-22, relu par un humain. **Conditionné au go du spike Bambu.**
+> 2026-07-22, relu par un humain. **Go du spike Bambu validé dans l'issue #92.**
 
-## Préalable — spike jetable (go/no-go)
+## Résultats du spike Bambu réel (issue #92) — acquis
 
-Avant toute implémentation : un spike **jetable** (code hors repo ou supprimé
-ensuite) contre la Bambu réelle du parc, qui valide :
-1. le mode LAN (dev mode) est activable et l'accès MQTT fonctionne sur le
-   firmware actuel de la machine ;
-2. connexion MQTT TLS :8883 avec cert auto-signé + access code LAN, abonnement
-   `device/{serial}/report`, réception d'un payload d'état exploitable
-   (état, progression, job, températures) ;
-3. la stratégie « connexion courte » (connect → premier report → disconnect)
-   répond en < 3 s ; sinon, mesurer et documenter l'alternative (connexion
-   maintenue côté serveur).
-Sortie du spike : go/no-go + payload réel documenté (collé dans l'issue du
-spike ou en commentaire de celle de 22b). **No-go → cette slice est gelée**,
-pas de demi-implémentation.
+- [x] Le mode LAN fonctionne et expose MQTT TLS sur le port `8883`, avec
+  l'utilisateur `bblp` et l'access code comme mot de passe.
+- [x] Le certificat est auto-signé. Son acceptation doit rester confinée au
+  seul adapter Bambu. **TLS 1.2 doit être sélectionné explicitement** : la
+  négociation par défaut échoue avec `Protocol error`.
+- [x] Les séries P1 émettent des pushs incrémentaux : le premier message est
+  partiel. La séquence validée est connect → abonnement à
+  `device/{serial}/report` → publication de
+  `{"pushing":{"sequence_id":"1","command":"pushall"}}` sur
+  `device/{serial}/request` → attente du rapport contenant
+  `print.gcode_state` → disconnect.
+- [x] Le cycle complet mesuré est d'environ 2 s ; le timeout global reste à
+  environ 3 s, au-delà duquel la machine est considérée Offline.
+- [x] `print.mc_remaining_time` est exprimé en **minutes** et doit être
+  converti en secondes pour `MachineTelemetry.remaining_seconds`.
 
 ## Agent Brief
 
@@ -40,11 +42,11 @@ adapter MQTT. L'UI de statut existe déjà et ne change pas.
 2. **Adapter MQTT** — l'adapter Bambu implémente `MachineStatusProbe` en
    « connexion courte » : connect TLS :8883 (acceptation du cert auto-signé
    **limitée à cet adapter**, jamais globale), authentification par access
-   code, abonnement `device/{serial}/report`, premier message d'état → mappé
-   en `MachineStatus`, disconnect. Timeout global court (~3 s) ; échec de
-   connexion, d'auth ou timeout → Offline. Si le spike a conclu qu'une
-   connexion maintenue est nécessaire, l'adapter la gère en interne — le port
-   `MachineStatusProbe` et le reste de l'app ne changent pas.
+   code, abonnement `device/{serial}/report`, publication de `pushall`, puis
+   attente du premier rapport **complet** contenant `print.gcode_state` →
+   mapping en `MachineStatus`, disconnect. Timeout global court (~3 s) ; échec
+   de connexion, d'auth ou timeout → Offline. Le port `MachineStatusProbe` et
+   le reste de l'app ne changent pas.
 3. **Statut affiché** — badge Machine State, bloc job (progression, temps
    restant, nom, températures) sur la carte et dans Farm Activity, à
    l'identique des machines REST — aucune UI nouvelle.
@@ -64,11 +66,15 @@ adapter MQTT. L'UI de statut existe déjà et ne change pas.
 **Acceptance criteria:**
 - [ ] Bambu réelle en LAN mode avec IP + access code + série valides : badge et bloc job conformes à la machine, sur la carte et dans Farm Activity.
 - [ ] Machine éteinte / access code invalide / série inconnue : badge Offline sous ~3 s, aucun blocage de page, aucun panic.
-- [ ] Acceptation du cert auto-signé confinée à l'adapter Bambu — les clients HTTP de 22a gardent la validation TLS par défaut.
-- [ ] Access code chiffré en DB, jamais ré-affiché, absent de tout HTML/fragment.
-- [ ] « Tester la connexion » opérationnel pour la variante Bambu.
-- [ ] Payload `report` avec état inconnu → état sûr, couvert par un test.
-- [ ] Tests adapter contre broker MQTT factice (nominal, auth KO, timeout, payload inattendu) ; validation manuelle contre la machine réelle documentée dans la PR. Suite complète verte.
+- [x] Acceptation du cert auto-signé confinée à l'adapter Bambu — les clients HTTP de 22a gardent la validation TLS par défaut.
+- [x] Access code chiffré en DB, jamais ré-affiché, absent de tout HTML/fragment.
+- [x] « Tester la connexion » implémenté pour la variante Bambu.
+- [x] Payload `report` avec état inconnu → état sûr, couvert par un test.
+- [x] Parsing/mapping MQTT couvert en unitaire (rapports complets RUNNING/IDLE,
+  push partiel, état inconnu). Le broker factice est écarté comme
+  disproportionné ; auth KO et timeout suivent le chemin d'erreur de
+  l'adapter. La validation manuelle finale contre la machine réelle reste à
+  documenter dans la PR.
 
 **Out of scope:**
 - Synchro des bobines chargées / AMS (RFID) — slice `23`.

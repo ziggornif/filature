@@ -242,8 +242,18 @@ pub struct NewPrinter {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MachineLink {
-    PrusaLink { host: String, api_key: String },
-    Moonraker { url: String },
+    PrusaLink {
+        host: String,
+        api_key: String,
+    },
+    Moonraker {
+        url: String,
+    },
+    BambuLan {
+        host: String,
+        access_code: String,
+        serial: String,
+    },
 }
 
 impl MachineLink {
@@ -253,6 +263,18 @@ impl MachineLink {
                 !host.trim().is_empty() && !api_key.trim().is_empty()
             }
             (Self::Moonraker { url }, PrinterBrand::Other) => !url.trim().is_empty(),
+            (
+                Self::BambuLan {
+                    host,
+                    access_code,
+                    serial,
+                },
+                PrinterBrand::BambuLab,
+            ) => {
+                !host.trim().is_empty()
+                    && !access_code.trim().is_empty()
+                    && !serial.trim().is_empty()
+            }
             _ => false,
         };
         valid.then_some(self).ok_or_else(|| {
@@ -609,6 +631,20 @@ mod tests {
     fn invalid_cross_brand_modules() {
         assert!(Module::validate(PrinterBrand::BambuLab, "P1S", 1, Module::Mmu).is_err());
         assert!(Module::validate(PrinterBrand::Prusa, "XL", 2, Module::Mmu).is_err());
+    }
+    #[test]
+    fn bambu_machine_link_only_validates_for_bambu() {
+        let link = MachineLink::BambuLan {
+            host: "192.168.1.50".into(),
+            access_code: "12345678".into(),
+            serial: "01P00A123456789".into(),
+        };
+        assert!(
+            link.clone()
+                .validate_for_brand(PrinterBrand::BambuLab)
+                .is_ok()
+        );
+        assert!(link.validate_for_brand(PrinterBrand::Prusa).is_err());
     }
     #[test]
     fn multi_slot_storage_round_trip() {

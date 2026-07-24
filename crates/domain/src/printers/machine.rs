@@ -115,6 +115,15 @@ impl MachineConnectivityUseCases for MachineConnectivityService {
                 api_key,
             },
             MachineLink::Moonraker { .. } => MachineLink::Moonraker { url: endpoint },
+            MachineLink::BambuLan {
+                access_code,
+                serial,
+                ..
+            } => MachineLink::BambuLan {
+                host: endpoint,
+                access_code,
+                serial,
+            },
         };
         self.probe.fetch_status(&link).await
     }
