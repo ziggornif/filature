@@ -52,6 +52,7 @@ fn sample_spool(material_id: MaterialId, net: f64, price: &str) -> NewSpool {
         notes: None,
         purchased_at: None,
         opened_at: None,
+        ams_tag_uid: None,
         remaining_weight: None,
     }
 }
@@ -332,6 +333,7 @@ async fn list_filters_by_manufacturer_location_and_search() {
         notes: None,
         purchased_at: None,
         opened_at: None,
+        ams_tag_uid: None,
         remaining_weight: None,
     };
 
@@ -502,6 +504,7 @@ async fn update_unknown_id_returns_not_found() {
         notes: None,
         purchased_at: None,
         opened_at: None,
+        ams_tag_uid: None,
     };
 
     let err = spools.update(fake.clone()).await.unwrap_err();
@@ -773,4 +776,35 @@ async fn insert_with_unknown_location_maps_to_unknown_location_not_unknown_mater
         RepositoryError::UnknownLocation(id) => assert_eq!(id, bogus_location),
         other => panic!("expected UnknownLocation, got {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn ams_tag_uid_roundtrips_and_reconcilable_row_is_scoped_by_id() {
+    let url = support::postgres_url().await;
+    let pool = connect_and_migrate(&url).await.unwrap();
+    let materials = SqlxMaterialRepository::new(pool.clone());
+    let spools = SqlxSpoolRepository::new(pool);
+    let material = materials
+        .insert(sample_material("PLA-AMS-Tag"))
+        .await
+        .unwrap();
+    let mut created = spools
+        .insert(sample_spool(material.id, 1000.0, "25.00"))
+        .await
+        .unwrap();
+    created.ams_tag_uid = Some("A1B2C3D4".into());
+    spools.update(created.clone()).await.unwrap();
+
+    let found = spools.find(&created.id).await.unwrap().unwrap();
+    assert_eq!(found.ams_tag_uid.as_deref(), Some("A1B2C3D4"));
+    let row = spools
+        .reconcilable()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|row| row.id == created.id)
+        .expect("the test spool is reconcilable");
+    assert_eq!(row.material_name, "PLA-AMS-Tag");
+    assert_eq!(row.ams_tag_uid.as_deref(), Some("A1B2C3D4"));
+    assert!(!row.loaded);
 }

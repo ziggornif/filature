@@ -1,0 +1,37 @@
+<section class="ams-reconciliation" aria-label="{{ t(key='ams.panel.title') }}">
+  <form hx-post="/printers/{{ printer_id }}/ams-reconciliation"
+        hx-target="#printer-loading-content" hx-swap="outerHTML"
+        onsubmit="this.rows_csv.value=Array.from(this.querySelectorAll('select[data-unit]')).filter(s=>s.value).map(s=>[s.dataset.unit,s.dataset.tray,s.value,s.dataset.tag].join(':')).join(',')">
+    <input type="hidden" name="rows_csv" value="">
+    {% for unit in units %}
+    <div class="ams-unit">
+      <h3>{{ t(key="ams.unit") }} {{ unit.number }}</h3>
+      <div class="ams-grid">
+      {% for row in unit.rows %}
+        <div class="ams-row">
+          <div class="ams-row-top">
+            <code>{{ row.slot_key }}</code>
+            <span class="colour-swatch" style="background:{{ row.colour_hex }}"></span>
+            <span>{{ row.detected | default(value="—") }}</span>
+            {% if not row.slot_known %}<span class="ams-match">{{ t(key="ams.slot_unknown") }}</span>{% endif %}
+            {% if row.weight_delta is not none %}<span class="ams-delta">{{ row.weight_delta }} %</span>{% endif %}
+          </div>
+          <div class="ams-row-bottom">
+            <span aria-hidden="true">↳</span>
+            <select data-unit="{{ row.unit_index }}" data-tray="{{ row.tray_index }}" data-tag="{{ row.tag_uid }}" aria-label="{{ t(key='ams.spool') }}">
+              <option value="">{{ t(key="ams.ignore") }}</option>
+              {% for option in row.options %}<option value="{{ option.id }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}
+            </select>
+            <span class="ams-match">{{ t(key=row.match_key) }}</span>
+          </div>
+        </div>
+      {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    <footer>
+      <button type="button" class="button button-secondary" hx-get="/printers" hx-target="#printer-loading-content" hx-select="#printer-loading-content" hx-swap="outerHTML">{{ t(key="common.cancel") }}</button>
+      <button type="submit" class="button">{{ t(key="ams.confirm") }} ({{ selected_count }})</button>
+    </footer>
+  </form>
+</section>

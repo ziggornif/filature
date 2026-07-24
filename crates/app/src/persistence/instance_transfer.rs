@@ -73,6 +73,7 @@ struct SpoolRow {
     notes: Option<String>,
     purchased_at: Option<Date>,
     opened_at: Option<Date>,
+    ams_tag_uid: Option<String>,
     created_at: OffsetDateTime,
 }
 
@@ -196,7 +197,7 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
         let spools = sqlx::query_as::<_, SpoolRow>(
             r#"SELECT id, material_id, spool_type, colour_hex, colour_name, diameter,
                       net_weight, remaining_weight, price_paid, status, location_id,
-                      manufacturer_id, notes, purchased_at, opened_at, created_at
+                      manufacturer_id, notes, purchased_at, opened_at, ams_tag_uid, created_at
                FROM spools ORDER BY id"#,
         )
         .fetch_all(&mut *transaction)
@@ -220,6 +221,7 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
                 notes: row.notes,
                 purchased_at: row.purchased_at,
                 opened_at: row.opened_at,
+                ams_tag_uid: row.ams_tag_uid,
                 created_at: row.created_at.format(&Rfc3339).map_err(backend)?,
             })
         })
@@ -385,8 +387,8 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
                 r#"INSERT INTO spools
                    (id, material_id, spool_type, colour_hex, colour_name, diameter, net_weight,
                     remaining_weight, price_paid, status, location_id, manufacturer_id, notes,
-                    purchased_at, opened_at, created_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)"#,
+                    purchased_at, opened_at, ams_tag_uid, created_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)"#,
             )
             .bind(spool.id)
             .bind(spool.material_id)
@@ -403,6 +405,7 @@ impl InstanceTransferRepository for SqlxInstanceTransferRepository {
             .bind(spool.notes)
             .bind(spool.purchased_at)
             .bind(spool.opened_at)
+            .bind(spool.ams_tag_uid)
             .bind(created_at)
             .execute(&mut *transaction)
             .await

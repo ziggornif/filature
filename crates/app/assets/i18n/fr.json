@@ -322,5 +322,15 @@
   "machine_status.nozzle": "Buse",
   "machine_status.bed": "Plateau",
   "farm_activity.title": "Activité du parc",
-  "farm_activity.empty": "Aucune machine connectée."
+  "farm_activity.empty": "Aucune machine connectée.",
+  "ams.sync": "Synchroniser l’AMS",
+  "ams.panel.title": "Réconciliation AMS",
+  "ams.unit": "AMS",
+  "ams.spool": "Bobine Filature",
+  "ams.ignore": "— ignorer —",
+  "ams.match.rfid": "RFID",
+  "ams.match.attributes": "attr.",
+  "ams.match.none": "aucun",
+  "ams.slot_unknown": "slot inconnu",
+  "ams.confirm": "Confirmer"
 }

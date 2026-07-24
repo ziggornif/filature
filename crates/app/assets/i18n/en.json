@@ -322,5 +322,15 @@
   "machine_status.nozzle": "Nozzle",
   "machine_status.bed": "Bed",
   "farm_activity.title": "Farm Activity",
-  "farm_activity.empty": "No connected machines."
+  "farm_activity.empty": "No connected machines.",
+  "ams.sync": "Sync AMS",
+  "ams.panel.title": "AMS reconciliation",
+  "ams.unit": "AMS",
+  "ams.spool": "Filature spool",
+  "ams.ignore": "— ignore —",
+  "ams.match.rfid": "RFID",
+  "ams.match.attributes": "attr.",
+  "ams.match.none": "none",
+  "ams.slot_unknown": "unknown slot",
+  "ams.confirm": "Confirm"
 }

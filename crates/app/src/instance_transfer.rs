@@ -142,6 +142,8 @@ struct WireSpool {
     purchased_at: Option<String>,
     #[serde(default)]
     opened_at: Option<String>,
+    #[serde(default)]
+    ams_tag_uid: Option<String>,
     created_at: String,
 }
 
@@ -321,6 +323,7 @@ impl TryFrom<&SnapshotSpool> for WireSpool {
             notes: spool.notes.clone(),
             purchased_at: spool.purchased_at.map(format_date).transpose()?,
             opened_at: spool.opened_at.map(format_date).transpose()?,
+            ams_tag_uid: spool.ams_tag_uid.clone(),
             created_at: {
                 OffsetDateTime::parse(&spool.created_at, &Rfc3339)
                     .map_err(|error| CodecError::Timestamp(error.to_string()))?;
@@ -510,6 +513,7 @@ impl TryFrom<WireSpool> for SnapshotSpool {
             notes: spool.notes,
             purchased_at: spool.purchased_at.map(parse_date).transpose()?,
             opened_at: spool.opened_at.map(parse_date).transpose()?,
+            ams_tag_uid: spool.ams_tag_uid,
             created_at: {
                 OffsetDateTime::parse(&spool.created_at, &Rfc3339)
                     .map_err(|error| CodecError::Timestamp(error.to_string()))?;
@@ -540,8 +544,23 @@ mod tests {
         assert_eq!(document.content.spools[0].notes, None);
         assert_eq!(document.content.spools[0].purchased_at, None);
         assert_eq!(document.content.spools[0].opened_at, None);
+        assert_eq!(document.content.spools[0].ams_tag_uid, None);
         let decoded_again = decode(&encode(&document).unwrap()).unwrap();
         assert_eq!(decoded_again, document);
+    }
+
+    #[test]
+    fn round_trip_preserves_ams_tag_uid() {
+        let json = VALID.replace(
+            "\"created_at\":\"2026-07-13T12:00:00Z\"",
+            "\"ams_tag_uid\":\"A1B2C3D4\",\"created_at\":\"2026-07-13T12:00:00Z\"",
+        );
+        let document = decode(json.as_bytes()).unwrap();
+        assert_eq!(
+            document.content.spools[0].ams_tag_uid.as_deref(),
+            Some("A1B2C3D4")
+        );
+        assert_eq!(decode(&encode(&document).unwrap()).unwrap(), document);
     }
 
     #[test]

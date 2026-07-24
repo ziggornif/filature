@@ -99,3 +99,42 @@ driving adapter coordinates the two use cases. A database trigger was rejected
 because it would hide this behaviour and make it harder to test. If more
 cross-slice reactions accumulate, a domain-event/outbox design should replace
 this explicit seam.
+
+# AMS reconciliation panel (slice 23)
+
+Décision de design (review lavish, 2026-07-24) pour le **panneau de
+Réconciliation AMS** (voir glossaire § « AMS spool sync », ADR-0007,
+`docs/specs/23-ams-spool-sync.md`). Trois directions comparées ; **direction A
+retenue**.
+
+**A — Panneau in-place (retenu).** Le clic « Synchroniser l'AMS » sur la carte
+Printer Bambu déclenche un simple fragment htmx (`hx-get`) qui **remplace la zone
+Slots** de la carte par le panneau de réconciliation. Une **ligne par bac AMS**,
+empilée sur deux niveaux pour ne jamais déborder en largeur :
+- **niveau haut** : clé de Slot (`ams{u}-{n}`, mono) · pastille couleur + type/%
+  du bac détecté · **écart de poids en lecture seule** (badge à droite, `±0%` /
+  `−15%`, ambre si écart marqué) ;
+- **niveau bas** : `↳` + le **select bobine suggérée** pleine largeur (réutilise
+  le select chargeable de `15b`, pastille + libellé) avec un **badge de match**
+  `RFID` (vert, match certain) / `attr.` (ambre, suggestion par attributs) /
+  `aucun` (à charger à la main).
+- **footer** : Annuler · Confirmer (n) — confirmation groupée.
+
+**Multi-AMS (AMS Hub).** Les lignes sont **groupées par AMS Unit** (sous-en-tête
+`AMS 1` / `AMS 2` …, accent) et disposées en **grille 2 colonnes**
+(`minmax(230px,1fr)`), pour qu'un hub jusqu'à 4 unités / 16 bacs reste compact
+(un hub plein scrolle dans la page — cas rare, accepté).
+
+Pourquoi pas les autres : **B (modale focalisée)** dépenserait l'unique budget
+« 1 modale simple » du produit (§ Out of scope design) et introduirait de la
+gestion d'overlay/focus étrangère au reste de l'app (100 % fragments in-place) ;
+**C (réconciliation par slot)** perd la vue d'ensemble et la confirmation groupée
+et loge mal l'écart de poids dans une tuile 150px.
+
+Respecte les principes htmx (fragment autonome re-rendu en place, pas de JS
+custom) et réutilise chip + gauge + select de `15b`. i18n en+fr pour tous les
+libellés. Maquette de travail (non committée) : `.lavish/ams-reconciliation-design.html`.
+
+**Hors scope 23 (→ follow-up 23b) :** l'UI d'**alignement** du poids quand
+l'écart AMS↔Filature est important (« op tranche ») — dans le panneau 23 l'écart
+reste en lecture seule.

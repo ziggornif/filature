@@ -70,6 +70,19 @@ recorded during discovery on 2026-07-22.
 | **Machine State** | État machine | The top-level state within a Machine Status. One of: **Offline** (Hors-ligne — Machine Link configured but the machine is unreachable), **Idle** (Repos), **Printing** (Impression), **Paused** (Pause), **Error** (Erreur). |
 | **Farm Activity** | Activité du parc | The dashboard panel listing every Printer that has a Machine Link, each with its live Machine Status — no Slots or Spools shown. Printers without a Machine Link appear only on the Printers page. |
 
+## AMS spool sync (slice `23`)
+
+Introduced by the AMS spool sync feature. Lets Filature read what a Bambu AMS
+physically holds and reconcile it against the operator's Spools, removing the
+double entry between the physical AMS and manual Slot loading (`15b`). Bambu
+only — no other Machine Link kind reports per-tray filament data.
+
+| Term (canonical) | FR label | Definition |
+|---|---|---|
+| **AMS Tray** | Bac AMS | The live filament reading a Bambu AMS reports for one of its four positions via MQTT: filament type, colour, sub-brand (e.g. `PLA Basic`), a coarse remaining percentage, and an **AMS Tag UID**. A Tray is the machine's live view of an AMS-Unit **Slot**; it is never persisted. |
+| **AMS Tag UID** | Identifiant RFID AMS | The RFID tag UID a Bambu AMS reports for a Tray (`tag_uid`). Genuine Bambu spools carry a unique UID; third-party spools report `0000…` (absent). Once an operator confirms a match, the UID is **memorized on the Spool**, making later syncs a certain match. |
+| **AMS Reconciliation** | Réconciliation AMS | The operator-confirmed process of matching live AMS Trays to Filature Spools and loading each into its AMS-Unit Slot. The system **suggests** a Spool per Tray — by AMS Tag UID first, else by type + colour (+ sub-brand) among loadable Spools — and the operator confirms or corrects. Never auto-creates a Spool; never silently overwrites remaining weight (Filature's weighed weight stays authoritative, ADR-0004 — an AMS/Filature discrepancy is surfaced for the operator to resolve). Reuses the `15b` loading rules (exclusivity, Sealed/Open only). |
+
 ## Deferred terms (Humidity feature — post-v1, no sensors yet)
 
 Recorded so the language is stable when the feature is picked up; **not modelled
