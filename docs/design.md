@@ -153,5 +153,13 @@ même si l'utilisateur n'a pas touché le select (pas seulement les choix modifi
 Server-rendered + htmx, pas de SPA/JS de positionnement. Aucun nouveau token.
 i18n en+fr. Réutilise chip + gauge + select chargeable de `15b`.
 
-**Hors scope 23 (→ follow-up) :** tolérance colorimétrique du match `attr.`
-(actuellement hex exact) ; UI d'alignement du poids (l'écart reste lecture seule).
+**Slice 23b (raffinements).** Deux ajouts au drawer, sans nouvelle surface ni
+modale (voir `docs/specs/23b-ams-reconciliation-refinements.md`) :
+- **Match couleur tolérant** — le match `attr.` passe de l'hex exact à une distance
+  perceptuelle CIELAB ΔE sous un seuil (matière toujours requise) ; le badge reste
+  `attr.`. Réduit les faux « aucun ».
+- **Action inline « aligner »** — sur une ligne de bac présentant un écart de poids,
+  un bouton discret (styles de contrôle existants) aligne le restant Filature sur
+  l'estimation AMS (`remain% × poids net`), en htmx inline re-rendant la ligne.
+  Opt-in strictement par bac ; l'écart reste sinon en lecture seule. Exception
+  opérateur-initiée à ADR-0004 (voir ADR-0007).
