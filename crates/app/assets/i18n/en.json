@@ -345,6 +345,8 @@
   "ams.row.detected": "detected",
   "ams.local": "Local",
   "ams.weight_delta": "difference",
+  "ams.align_weight": "align",
+  "ams.align_weight_tooltip": "Use the AMS estimate as the remaining weight",
   "ams.info": "info",
   "ams.option.unload": "Empty this local slot",
   "ams.option.keep": "Keep as-is (ignore)",

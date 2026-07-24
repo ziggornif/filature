@@ -1,5 +1,6 @@
 <div class="ams-drawer-scrim" aria-hidden="true" hx-get="/printers/ams-drawer/close" hx-target="#ams-drawer" hx-swap="innerHTML"></div>
 <span id="ams-sync-state-{{ printer_id }}" class="ams-sync-state ams-sync-state--{% if selected_count %}drift{% else %}up-to-date{% endif %}" hx-swap-oob="outerHTML">{% if selected_count %}{{ t(key="ams.state.drift") }}{% else %}{{ t(key="ams.state.up_to_date") }}{% endif %}</span>
+<form id="ams-align-request-{{ printer_id }}"></form>
 <section class="ams-drawer-panel" role="dialog" aria-modal="true" aria-label="{{ t(key='ams.panel.title') }}">
   <form hx-post="/printers/{{ printer_id }}/ams-reconciliation"
         hx-target="#ams-drawer" hx-swap="innerHTML"
@@ -14,16 +15,29 @@
       <section class="ams-drawer-unit">
         <h3>{{ t(key="ams.unit") }} Unit {{ unit.number }}</h3>
         {% for row in unit.rows %}
-        <div class="ams-drawer-row ams-drawer-row--{{ row.kind }}">
+        <div id="ams-row-{{ row.unit_index }}-{{ row.tray_index }}" class="ams-drawer-row ams-drawer-row--{{ row.kind }}">
           <span class="ams-drawer-chip{% if row.colour_hex == 'transparent' %} ams-drawer-chip--empty{% endif %}" style="background:{{ row.colour_hex }}"></span>
           <div class="ams-drawer-row-main">
             <strong>{{ row.slot_key }} · {{ t(key=row.title_key) }}{% if row.detected %} {{ row.detected }}{% endif %}</strong>
             {% if row.local_description %}<small>{{ t(key="ams.local") }}: {{ row.local_description }}</small>{% endif %}
-            {% if row.weight_delta is not none %}<small class="ams-drawer-delta">{{ t(key="ams.weight_delta") }} {{ row.weight_delta }} % ({{ t(key="ams.info") }})</small>{% endif %}
+            {% if row.weight_delta is not none %}
+            <small class="ams-drawer-delta">
+              {{ t(key="ams.weight_delta") }} {{ row.weight_delta }} % ({{ t(key="ams.info") }})
+              {% if row.can_align_weight %}
+              <button type="button" form="ams-align-request-{{ printer_id }}" class="ams-align-weight"
+                      title="{{ t(key='ams.align_weight_tooltip') }}"
+                      hx-post="/printers/{{ printer_id }}/ams-reconciliation/{{ row.unit_index }}/{{ row.tray_index }}/align-weight"
+                      hx-target="#ams-drawer" hx-swap="innerHTML"
+                      hx-include="closest .ams-drawer-row">{{ t(key="ams.align_weight") }}</button>
+              {% endif %}
+            </small>
+            {% endif %}
             {% if row.options %}
-            <select data-unit="{{ row.unit_index }}" data-tray="{{ row.tray_index }}" aria-label="{{ t(key='ams.spool') }}"{% if not row.slot_known %} disabled{% endif %}>
+            <select name="target" data-unit="{{ row.unit_index }}" data-tray="{{ row.tray_index }}" aria-label="{{ t(key='ams.spool') }}"{% if not row.slot_known %} disabled{% endif %}>
               {% for option in row.options %}<option value="{{ option.id }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}
             </select>
+            {% elif row.can_align_weight %}
+            <input type="hidden" name="target" value="{{ row.align_target }}">
             {% endif %}
           </div>
           <span class="ams-drawer-badge">{{ t(key=row.badge_key) }}</span>
