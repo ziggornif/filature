@@ -4,8 +4,7 @@
 {% for p in printers %}
   <article class="printer-card" style="--printer-liner:{{ p.liner }}">
     <header><div><h2>{{ p.name }}</h2><p>{{ p.model }}</p></div><div class="printer-card-actions">{% if p.can_sync_ams %}<button type="button" class="button button-small" hx-get="/printers/{{ p.id }}/ams-reconciliation" hx-target="#ams-drawer" hx-swap="innerHTML"{% if p.sync_disabled %} disabled title="{{ t(key='ams.unreachable') }}"{% else %} title="{{ t(key='ams.read') }}"{% endif %}>{{ t(key="ams.sync") }}</button>{% endif %}<span class="printer-occupancy printer-occupancy--{{ p.occupancy_state }}">{{ p.filled }} / {{ p.total }} {{ t(key="printers.occupancy.loaded") }}</span><a class="printer-edit" href="/printers/{{ p.id }}/edit" aria-label="{{ t(key='printers.edit') }}" title="{{ t(key='printers.edit') }}">✎</a></div></header>
-    {% if p.can_sync_ams %}<span id="ams-sync-state-{{ p.id }}" class="ams-sync-state ams-sync-state--{{ p.sync_state }}">{{ t(key=p.sync_state_key) }}</span>{% endif %}
-    {% if p.has_machine_link %}<div class="machine-status-slot" hx-get="/printers/{{ p.id }}/machine-status" hx-trigger="load, every 10s" hx-swap="innerHTML" aria-live="polite"></div>{% endif %}
+    {% if p.can_sync_ams or p.has_machine_link %}<div class="printer-badge-row">{% if p.can_sync_ams %}<span id="ams-sync-state-{{ p.id }}" class="ams-sync-state ams-sync-state--{{ p.sync_state }}">{{ t(key=p.sync_state_key) }}</span>{% endif %}{% if p.has_machine_link %}<div class="machine-status-slot" hx-get="/printers/{{ p.id }}/machine-status" hx-trigger="load, every 10s" hx-swap="innerHTML" aria-live="polite"></div>{% endif %}</div>{% endif %}
     <div id="printer-slots-{{ p.id }}">
     {% for g in p.groups %}
       <section class="slot-group{% if g.multi %} multi{% else %} single{% endif %}">

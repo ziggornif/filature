@@ -90,3 +90,20 @@ unload), **Conflict** (RFID ≠ loaded → offer the detected spool), **Attribut
 choice per row, including unload for Removed. A per-printer **sync state**
 (`up-to-date`/`drift`/`offline`) is persisted from the last manual sync and shown
 as an at-rest badge; there is no background polling in this iteration.
+
+## Addendum (2026-07-24) — slice 23b refinements
+
+Two follow-ups deferred from slice 23 (`docs/specs/23b-ams-reconciliation-refinements.md`):
+
+- **Tolerant colour match.** The attribute match relaxes from exact hex to a
+  perceptual **CIELAB ΔE** distance under a documented threshold (material still
+  matched exactly), suggesting the closest spool below the threshold — this cuts
+  the frequent "None" results when the AMS-reported colour differs slightly from a
+  stock spool's hex. RFID/Match/Removed/Conflict are untouched.
+- **Weight alignment is an opt-in, operator-initiated exception to ADR-0004.**
+  ADR-0004 makes the weighed net weight authoritative and slice 23 keeps the
+  AMS/Filature discrepancy read-only. 23b adds a per-tray inline "align" action that
+  sets the Filature remaining weight to the AMS estimate (`remain% × net`). This is
+  the one place the machine estimate writes the weight — and only when the operator
+  explicitly clicks it, per tray, never automatically and never bundled with
+  "Confirm". The weighed value stays authoritative everywhere else.

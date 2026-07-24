@@ -12,8 +12,8 @@ use domain::printers::{
     Module, NewPrinter, PRUSA_MODELS, Printer, PrinterBrand, PrinterName, RepositoryError,
     Temperature,
 };
-use domain::shared::{PrinterId, SpoolId};
-use domain::spools::Colour;
+use domain::shared::{Grams, PrinterId, SpoolId};
+use domain::spools::{Colour, SpoolStatus};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use tera::Context;
@@ -503,6 +503,8 @@ struct AmsRowView {
     detected: String,
     colour_hex: String,
     weight_delta: Option<i16>,
+    can_align_weight: bool,
+    align_target: String,
     kind: &'static str,
     badge_key: &'static str,
     title_key: &'static str,
@@ -519,6 +521,12 @@ struct AmsUnitView {
 struct AmsConfirmForm {
     #[serde(default)]
     rows_csv: String,
+}
+
+#[derive(Default, Deserialize)]
+struct AmsAlignForm {
+    #[serde(default)]
+    target: String,
 }
 
 fn parse_confirmation_rows(
@@ -578,15 +586,30 @@ async fn ams_reconciliation(
         }),
         Err(error) => return internal_error(error),
     };
-    let Some(slot_keys) = slot_keys else {
+    let Some(_slot_keys) = slot_keys else {
         return StatusCode::NOT_FOUND.into_response();
     };
     let reconciliation = match st.ams_reconciliation.reconcile(printer_id).await {
         Ok(value) => value,
         Err(error) => return internal_error(error),
     };
+    render_ams_reconciliation(&st, &headers, &id, reconciliation).await
+}
+
+async fn render_ams_reconciliation(
+    st: &AppState,
+    headers: &HeaderMap,
+    id: &str,
+    reconciliation: crate::ams_reconciliation::AmsReconciliation,
+) -> Response {
     let printer_name = reconciliation.printer.name.as_str().to_owned();
-    let locale = resolve_locale(&headers, &st);
+    let slot_keys = reconciliation
+        .printer
+        .slots
+        .iter()
+        .map(|slot| slot.key.as_str())
+        .collect::<std::collections::HashSet<_>>();
+    let locale = resolve_locale(headers, st);
     let mut grouped: BTreeMap<u8, Vec<AmsRowView>> = BTreeMap::new();
     for matched in reconciliation.rows {
         let suggested = matched.suggested_spool_id.as_ref();
@@ -598,17 +621,39 @@ async fn ams_reconciliation(
         .flatten()
         .collect::<Vec<_>>()
         .join(" · ");
+        let weight_target = match matched.kind {
+            crate::ams_reconciliation::ReconciliationKind::Match
+            | crate::ams_reconciliation::ReconciliationKind::Removed
+            | crate::ams_reconciliation::ReconciliationKind::Conflict => {
+                matched.local_spool.as_ref().map(|spool| spool.id.clone())
+            }
+            crate::ams_reconciliation::ReconciliationKind::Attributed
+            | crate::ams_reconciliation::ReconciliationKind::None => {
+                matched.suggested_spool_id.clone()
+            }
+        };
+        let weight_detail = if let Some(id) = weight_target.as_ref() {
+            match st.spools.view(id.clone()).await {
+                Ok(detail) => Some(detail),
+                Err(domain::spools::RepositoryError::NotFound(_)) => None,
+                Err(error) => return internal_error(error),
+            }
+        } else {
+            None
+        };
         let weight_delta = matched
             .tray
             .remain_percent
-            .zip(suggested.and_then(|id| {
-                reconciliation
-                    .spools
-                    .iter()
-                    .find(|spool| &spool.id == id)
-                    .map(|spool| spool.remaining_percent)
-            }))
-            .map(|(ams, filature)| i16::from(ams) - i16::from(filature));
+            .zip(weight_detail.as_ref())
+            .map(|(ams, spool)| i16::from(ams) - (spool.remaining_ratio() * 100.0).round() as i16);
+        let can_align_weight = matched
+            .tray
+            .remain_percent
+            .zip(weight_detail.as_ref())
+            .is_some_and(|(remain, spool)| {
+                let estimated = (f64::from(remain) * spool.net_weight.value() / 100.0).round();
+                (estimated - spool.remaining_weight.value()).abs() > f64::EPSILON
+            });
         let mut options: Vec<_> = reconciliation
             .spools
             .iter()
@@ -622,7 +667,7 @@ async fn ams_reconciliation(
                 label: format!(
                     "{} · {}",
                     spool.material_name,
-                    localized_colour_name(&st, &locale, spool.colour_hex.as_deref())
+                    localized_colour_name(st, &locale, spool.colour_hex.as_deref())
                 ),
                 selected: suggested == Some(&spool.id),
             })
@@ -647,7 +692,7 @@ async fn ams_reconciliation(
         let unit_index = matched.tray.unit_index;
         let tray_index = matched.tray.tray_index;
         let slot_key = format!("ams{unit_index}-{tray_index}");
-        let slot_known = slot_keys.contains(&slot_key);
+        let slot_known = slot_keys.contains(slot_key.as_str());
         let local_description = matched
             .local_spool
             .as_ref()
@@ -655,7 +700,7 @@ async fn ams_reconciliation(
                 format!(
                     "{} · {}",
                     spool.material_name,
-                    localized_colour_name(&st, &locale, spool.colour_hex.as_deref())
+                    localized_colour_name(st, &locale, spool.colour_hex.as_deref())
                 )
             })
             .unwrap_or_default();
@@ -714,6 +759,11 @@ async fn ams_reconciliation(
                 .color_hex
                 .unwrap_or_else(|| "transparent".into()),
             weight_delta,
+            can_align_weight,
+            align_target: weight_target
+                .as_ref()
+                .map(|id| id.as_str().to_owned())
+                .unwrap_or_default(),
             kind,
             badge_key,
             title_key,
@@ -736,7 +786,7 @@ async fn ams_reconciliation(
         .count();
     let tray_count = units.iter().map(|unit| unit.rows.len()).sum::<usize>();
     let mut context = Context::new();
-    context.insert("printer_id", &id);
+    context.insert("printer_id", id);
     context.insert("printer_name", &printer_name);
     context.insert("units", &units);
     context.insert("selected_count", &selected_count);
@@ -748,6 +798,91 @@ async fn ams_reconciliation(
         Ok(html) => Html(html).into_response(),
         Err(error) => internal_error(error),
     }
+}
+
+fn alignment_spool_id(
+    row: &crate::ams_reconciliation::AmsReconciliationRow,
+    spools: &[domain::spools::ReconcilableSpool],
+    target: &str,
+) -> Option<SpoolId> {
+    match row.kind {
+        crate::ams_reconciliation::ReconciliationKind::Match
+        | crate::ams_reconciliation::ReconciliationKind::Removed
+        | crate::ams_reconciliation::ReconciliationKind::Conflict => {
+            row.local_spool.as_ref().map(|spool| spool.id.clone())
+        }
+        crate::ams_reconciliation::ReconciliationKind::Attributed
+        | crate::ams_reconciliation::ReconciliationKind::None => {
+            let raw_id = target
+                .strip_prefix("load;")
+                .and_then(|encoded| encoded.split(';').next())
+                .unwrap_or(target);
+            spools
+                .iter()
+                .find(|spool| spool.id.as_str() == raw_id && !spool.loaded)
+                .map(|spool| spool.id.clone())
+        }
+    }
+}
+
+fn ams_aligned_remaining(net_weight: Grams, remain_percent: u8) -> Grams {
+    Grams::new((f64::from(remain_percent) * net_weight.value() / 100.0).round())
+        .expect("an AMS percentage of a valid net weight is valid")
+}
+
+async fn align_ams_weight(
+    State(st): State<AppState>,
+    headers: HeaderMap,
+    Path((id, unit_index, tray_index)): Path<(String, u8, u8)>,
+    Form(form): Form<AmsAlignForm>,
+) -> Response {
+    if !st.machine_links_enabled {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let printer_id = PrinterId::new(id.clone());
+    let reconciliation = match st.ams_reconciliation.reconcile(printer_id).await {
+        Ok(value) => value,
+        Err(crate::ams_reconciliation::AmsReconciliationError::Printers(
+            RepositoryError::NotFound(_),
+        )) => return StatusCode::NOT_FOUND.into_response(),
+        Err(error) => return internal_error(error),
+    };
+    let Some(row) = reconciliation
+        .rows
+        .iter()
+        .find(|row| row.tray.unit_index == unit_index && row.tray.tray_index == tray_index)
+    else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let Some(remain_percent) = row.tray.remain_percent else {
+        return render_ams_reconciliation(&st, &headers, &id, reconciliation).await;
+    };
+    let Some(spool_id) = alignment_spool_id(row, &reconciliation.spools, &form.target) else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    let detail = match st.spools.view(spool_id.clone()).await {
+        Ok(detail) => detail,
+        Err(domain::spools::RepositoryError::NotFound(_)) => {
+            return StatusCode::NOT_FOUND.into_response();
+        }
+        Err(error) => return internal_error(error),
+    };
+    let estimated = ams_aligned_remaining(detail.net_weight, remain_percent);
+    if (estimated.value() - detail.remaining_weight.value()).abs() > f64::EPSILON {
+        let updated = match st.spools.set_remaining(spool_id.clone(), estimated).await {
+            Ok(spool) => spool,
+            Err(domain::spools::RepositoryError::NotFound(_)) => {
+                return StatusCode::NOT_FOUND.into_response();
+            }
+            Err(error) => return internal_error(error),
+        };
+        if updated.status == SpoolStatus::Empty
+            && let Err(error) = st.printers.unload_spool(spool_id).await
+        {
+            return internal_error(error);
+        }
+    }
+    render_ams_reconciliation(&st, &headers, &id, reconciliation).await
 }
 
 async fn confirm_ams_reconciliation(
@@ -1164,13 +1299,20 @@ pub fn routes() -> Router<AppState> {
             "/printers/{id}/ams-reconciliation",
             get(ams_reconciliation).post(confirm_ams_reconciliation),
         )
+        .route(
+            "/printers/{id}/ams-reconciliation/{unit_index}/{tray_index}/align-weight",
+            axum::routing::post(align_ams_weight),
+        )
         .route("/printers/ams-drawer/close", get(close_ams_drawer))
         .route("/machine-links/test", axum::routing::post(test_link))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{AmsConfirmForm, PrinterForm, TestLinkForm, parse_confirmation_rows};
+    use super::{
+        AmsAlignForm, AmsConfirmForm, PrinterForm, TestLinkForm, ams_aligned_remaining,
+        parse_confirmation_rows,
+    };
     use crate::web::{i18n::Catalog, templates::Renderer};
     use domain::printers::FeedMode;
     use serde_json::json;
@@ -1200,6 +1342,20 @@ mod tests {
             crate::ams_reconciliation::AmsConfirmationAction::Load { spool_id, tag_uid }
                 if spool_id.as_str() == "spool-b" && tag_uid.is_none()
         ));
+    }
+
+    #[test]
+    fn alignment_accepts_one_real_urlencoded_target_field() {
+        let form: AmsAlignForm =
+            serde_urlencoded::from_str("target=load%3Bspool-a%3BUIDA").unwrap();
+        assert_eq!(form.target, "load;spool-a;UIDA");
+    }
+
+    #[test]
+    fn alignment_rounds_ams_percentage_of_net_weight_including_zero() {
+        let net = domain::shared::Grams::new(1001.0).unwrap();
+        assert_eq!(ams_aligned_remaining(net, 33).value(), 330.0);
+        assert_eq!(ams_aligned_remaining(net, 0).value(), 0.0);
     }
 
     #[test]
