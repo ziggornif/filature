@@ -4,7 +4,13 @@
 [advisories]
 version = 2
 yanked = "deny"
-# ignore = []   # add "RUSTSEC-YYYY-NNNN" with a justification only when accepted in docs/security/accepted-risks.md
+# Add "RUSTSEC-YYYY-NNNN" here only with a justification recorded in
+# docs/security/accepted-risks.md. Both entries below are transitive via
+# rumqttc 0.25 (latest; Bambu MQTT, slice 22b) — see AR-009.
+ignore = [
+  "RUSTSEC-2026-0049",  # rustls-webpki 0.102 CRL matching — Bambu adapter bypasses cert verification entirely (AR-008); no CRL path reached.
+  "RUSTSEC-2025-0134",  # rustls-pemfile unmaintained — transitive, no PEM loaded by us. Not a vulnerability.
+]
 
 [licenses]
 version = 2
