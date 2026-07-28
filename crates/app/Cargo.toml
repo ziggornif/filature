@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 publish = false
 
+[features]
+default = []
+demo-stub = []
+
 [lib]
 name = "filature"
 path = "src/lib.rs"
