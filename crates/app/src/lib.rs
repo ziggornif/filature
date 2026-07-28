@@ -4,5 +4,7 @@ pub mod credentials;
 pub mod instance_transfer;
 pub mod machine_bambu;
 pub mod machine_http;
+#[cfg(feature = "demo-stub")]
+pub mod machine_stub;
 pub mod persistence;
 pub mod web;

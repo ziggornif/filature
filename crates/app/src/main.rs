@@ -35,6 +35,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}", web::auth::hash_password(password));
         return Ok(());
     }
+    #[cfg(feature = "demo-stub")]
+    if args.get(1).map(String::as_str) == Some("encrypt-credential") {
+        let Some(clear) = args.get(2) else {
+            eprintln!("usage: filature encrypt-credential <valeur>");
+            std::process::exit(2);
+        };
+        let cipher = match filature::credentials::CredentialCipher::from_env() {
+            Ok(Some(cipher)) => cipher,
+            Ok(None) => {
+                eprintln!("FILATURE_CREDENTIALS_KEY est requise pour chiffrer un credential");
+                std::process::exit(2);
+            }
+            Err(error) => {
+                eprintln!("FILATURE_CREDENTIALS_KEY invalide: {error}");
+                std::process::exit(2);
+            }
+        };
+        match cipher.encrypt(clear) {
+            Ok(encrypted) => println!("{encrypted}"),
+            Err(error) => {
+                eprintln!("échec du chiffrement du credential: {error}");
+                std::process::exit(2);
+            }
+        }
+        return Ok(());
+    }
 
     // Log level is config-driven via the `RUST_LOG` env var (the standard
     // 12-factor / docker-compose knob); absent that, a sensible default keeps

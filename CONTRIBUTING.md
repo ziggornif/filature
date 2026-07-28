@@ -19,6 +19,35 @@ docker compose up
 
 Alternatively, run your own PostgreSQL instance, set `FILATURE_DATABASE__URL`, and start the Rust application with Cargo. Templates, static assets, translations, and migrations are embedded in the binary, so editing an embedded static asset requires a rebuild.
 
+## Instance de démo
+
+L'instance destinée aux captures utilise PostgreSQL mais ne contacte aucune
+imprimante. Démarrez PostgreSQL, définissez une clé AES de 32 octets encodée en
+base64, puis lancez l'application avec le stub explicite :
+
+```sh
+export FILATURE_CREDENTIALS_KEY="$(openssl rand -base64 32)"
+export FILATURE_MACHINE_STUB=tools/demo-machines.json
+cargo run -p filature --features demo-stub
+```
+
+Dans un autre terminal, avec la même `FILATURE_CREDENTIALS_KEY`, importez le jeu
+de données et créez les huit Machine Links :
+
+```sh
+cargo build -p filature --features demo-stub
+tools/seed-demo.sh --yes
+```
+
+⚠️ `seed-demo.sh` **remplace tout le contenu** de l'instance visée (bobines,
+imprimantes, rangements, Machine Links). Il refuse de tourner sans `--yes`, et
+refuse toute `FILATURE_URL` qui ne pointe pas sur la machine locale — ne
+contournez pas ces garde-fous pour le lancer contre une instance réelle.
+
+Le script accepte `FILATURE_URL`, `FILATURE_USER`, `FILATURE_PASSWORD`,
+`DATABASE_URL` et `FILATURE_BIN`. `FILATURE_DEMO` doit rester non définie :
+ce mode public masque précisément Machine Link et Farm Activity.
+
 ## Tests
 
 Run the complete Rust test suite with:

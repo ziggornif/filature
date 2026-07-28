@@ -10,7 +10,8 @@ use domain::locations::LocationsUseCases;
 use domain::manufacturers::ManufacturersUseCases;
 use domain::materials::MaterialsUseCases;
 use domain::printers::{
-    MachineConnectivityService, MachineConnectivityUseCases, PrintersService, PrintersUseCases,
+    MachineConnectivityService, MachineConnectivityUseCases, MachineStatusProbe, PrintersService,
+    PrintersUseCases,
 };
 use domain::spools::{SpoolFilter, SpoolsUseCases};
 use std::sync::Arc;
@@ -62,10 +63,31 @@ impl AppState {
         let link_repo = Arc::new(
             crate::persistence::machine_links::SqlxMachineLinkRepository::new(db.clone(), cipher),
         );
-        let probe = Arc::new(
-            crate::machine_http::MachineStatusProbeAdapter::new()
-                .expect("machine client configuration is valid"),
-        );
+        let probe: Arc<dyn MachineStatusProbe> = {
+            #[cfg(feature = "demo-stub")]
+            if let Ok(path) = std::env::var("FILATURE_MACHINE_STUB") {
+                tracing::warn!(
+                    path = %path,
+                    "statuts machine SIMULÉS depuis {path} — instance de démo"
+                );
+                Arc::new(
+                    crate::machine_stub::DemoMachineStatusProbe::from_file(&path)
+                        .expect("le scénario FILATURE_MACHINE_STUB doit être lisible et valide"),
+                )
+            } else {
+                Arc::new(
+                    crate::machine_http::MachineStatusProbeAdapter::new()
+                        .expect("machine client configuration is valid"),
+                )
+            }
+            #[cfg(not(feature = "demo-stub"))]
+            {
+                Arc::new(
+                    crate::machine_http::MachineStatusProbeAdapter::new()
+                        .expect("machine client configuration is valid"),
+                )
+            }
+        };
         let printers: Arc<dyn PrintersUseCases> = Arc::new(PrintersService::new(printer_repo));
         let machine_connectivity: Arc<dyn MachineConnectivityUseCases> =
             Arc::new(MachineConnectivityService::new(link_repo, probe));

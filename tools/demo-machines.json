@@ -1,0 +1,63 @@
+{
+  "machines": {
+    "01P00A3B0500123": {
+      "state": "printing", "progress_percent": 68, "remaining_seconds": 4380,
+      "job_name": "support-cam-v3.3mf", "active_head": 0,
+      "nozzles": [{ "actual": 218.0, "target": 220.0 }],
+      "bed": { "actual": 60.0, "target": 60.0 },
+      "ams": [
+        { "unit_index": 0, "tray_index": 0, "filament_type": "PLA", "color_hex": "1A1A1AFF", "sub_brand": "PLA Matte", "remain_percent": 78, "tag_uid": "A1B2C3D4E5F60001" },
+        { "unit_index": 0, "tray_index": 1, "filament_type": "PLA", "color_hex": "F5F5F5FF", "sub_brand": "PLA Basic", "remain_percent": 12, "tag_uid": "A1B2C3D4E5F60002" },
+        { "unit_index": 0, "tray_index": 2, "filament_type": "PLA", "color_hex": "D7263DFF", "sub_brand": "PLA Basic", "remain_percent": 84, "tag_uid": "A1B2C3D4E5F60003" },
+        { "unit_index": 0, "tray_index": 3, "filament_type": "PLA", "color_hex": "4EA8DEFF", "sub_brand": "PLA Basic", "remain_percent": 56, "tag_uid": "A1B2C3D4E5F60004" },
+        { "unit_index": 1, "tray_index": 0, "filament_type": "PETG", "color_hex": "808080FF", "sub_brand": "PETG HF", "remain_percent": 64, "tag_uid": "A1B2C3D4E5F60005" },
+        { "unit_index": 1, "tray_index": 1, "filament_type": "PETG", "color_hex": "E8622CFF", "sub_brand": "PETG HF", "remain_percent": 32, "tag_uid": "A1B2C3D4E5F60006" }
+      ]
+    },
+    "01H00C7D0900456": {
+      "state": "printing", "progress_percent": 24, "remaining_seconds": 9120,
+      "job_name": "boitier-capteur-v2.3mf", "active_head": 0,
+      "nozzles": [{ "actual": 255.0, "target": 255.0 }, { "actual": 28.0, "target": 0.0 }],
+      "bed": { "actual": 90.0, "target": 90.0 },
+      "ams": [
+        { "unit_index": 0, "tray_index": 0, "filament_type": "PLA", "color_hex": "2E2E2EFF", "sub_brand": "PLA Matte", "remain_percent": 43, "tag_uid": "B1B2C3D4E5F60001" },
+        { "unit_index": 0, "tray_index": 1, "filament_type": "PLA", "color_hex": "E8622CFF", "sub_brand": "PLA Basic", "remain_percent": 47, "tag_uid": "B1B2C3D4E5F60002" },
+        { "unit_index": 0, "tray_index": 2, "filament_type": "PLA", "color_hex": "E58AA8FF", "sub_brand": "PLA Basic", "remain_percent": 10 },
+        { "unit_index": 0, "tray_index": 3, "filament_type": "PLA", "color_hex": "1F6F45FF", "sub_brand": "PLA Basic", "remain_percent": 69, "tag_uid": "B1B2C3D4E5F60004" }
+      ]
+    },
+    "01X00E1F0300789": {
+      "state": "idle",
+      "nozzles": [{ "actual": 26.0, "target": 0.0 }],
+      "bed": { "actual": 24.0, "target": 0.0 }
+    },
+    "01H00C2A0700321": {
+      "state": "paused", "progress_percent": 41, "remaining_seconds": 5400,
+      "job_name": "capot-ventilo.3mf",
+      "nozzles": [{ "actual": 245.0, "target": 245.0 }],
+      "bed": { "actual": 100.0, "target": 100.0 }
+    },
+    "192.168.1.42": {
+      "state": "printing", "progress_percent": 91, "remaining_seconds": 720,
+      "job_name": "plaque-montage.bgcode", "active_head": 0,
+      "nozzles": [{ "actual": 250.0, "target": 250.0 }],
+      "bed": { "actual": 90.0, "target": 90.0 }
+    },
+    "192.168.1.43": {
+      "state": "error",
+      "nozzles": [{ "actual": 31.0, "target": 0.0 }],
+      "bed": { "actual": 25.0, "target": 0.0 }
+    },
+    "192.168.1.44": {
+      "state": "idle",
+      "nozzles": [{ "actual": 27.0, "target": 0.0 }],
+      "bed": { "actual": 24.0, "target": 0.0 }
+    },
+    "http://192.168.1.51:7125": {
+      "state": "printing", "progress_percent": 12, "remaining_seconds": 11700,
+      "job_name": "pa612-support-bras.gcode",
+      "nozzles": [{ "actual": 270.0, "target": 270.0 }],
+      "bed": { "actual": 90.0, "target": 90.0 }
+    }
+  }
+}
